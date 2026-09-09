@@ -38,6 +38,7 @@ import {
   fetchModelsWithHeaders,
   detectServerType,
 } from '../../api/openai';
+import {isLocalHost} from '../../utils/network';
 import {deriveListCaps} from '../../utils/listCaps';
 import {t} from '../../locales';
 
@@ -128,7 +129,10 @@ export const RemoteModelSheet: React.FC<RemoteModelSheetProps> = observer(
         try {
           // Validate URL format — throws on invalid
           const parsed = new URL(trimmedUrl);
-          if (!parsed.hostname) {
+          if (
+            !parsed.hostname ||
+            (parsed.protocol !== 'https:' && !isLocalHost(trimmedUrl))
+          ) {
             throw new Error('No hostname');
           }
         } catch {

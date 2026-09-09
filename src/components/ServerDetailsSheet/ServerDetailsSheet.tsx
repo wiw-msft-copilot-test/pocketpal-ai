@@ -25,6 +25,7 @@ import {L10nContext} from '../../utils';
 import {parseTimeoutMs} from '../../utils/timeout';
 import {SERVER_TYPE_DROPDOWN_OPTIONS} from '../../utils/serverTypes';
 import {testConnection} from '../../api/openai';
+import {isLocalHost} from '../../utils/network';
 import {t} from '../../locales';
 
 import {createStyles} from './styles';
@@ -105,7 +106,10 @@ export const ServerDetailsSheet: React.FC<ServerDetailsSheetProps> = observer(
         try {
           // Validate URL format — throws on invalid
           const parsed = new URL(trimmedUrl);
-          if (!parsed.hostname) {
+          if (
+            !parsed.hostname ||
+            (parsed.protocol !== 'https:' && !isLocalHost(trimmedUrl))
+          ) {
             throw new Error('No hostname');
           }
         } catch {

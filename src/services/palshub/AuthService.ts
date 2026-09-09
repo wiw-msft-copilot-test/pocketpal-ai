@@ -48,6 +48,9 @@ class AuthService {
   constructor() {
     try {
       makeAutoObservable(this);
+      if (!__ENABLE_PALSHUB__) {
+        return;
+      }
       makePersistable(this, {
         name: 'AuthService',
         properties: ['profile'], // Only persist profile, let Supabase handle session

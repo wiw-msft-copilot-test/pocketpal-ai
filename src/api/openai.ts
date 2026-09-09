@@ -211,6 +211,17 @@ function buildHeaders(apiKey?: string): Record<string, string> {
  * Normalize server URL: remove trailing slash.
  */
 function normalizeUrl(serverUrl: string): string {
+  const parsed = new URL(serverUrl);
+  const isLocal =
+    parsed.hostname === 'localhost' ||
+    parsed.hostname === '::1' ||
+    parsed.hostname.startsWith('127.') ||
+    parsed.hostname.startsWith('10.') ||
+    parsed.hostname.startsWith('192.168.') ||
+    /^172\.(1[6-9]|2\d|3[01])\./.test(parsed.hostname);
+  if ((!isLocal && parsed.protocol !== 'https:') || !parsed.hostname) {
+    throw new Error('Remote AI servers must use HTTPS.');
+  }
   return serverUrl.replace(/\/+$/, '');
 }
 
