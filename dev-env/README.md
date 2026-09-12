@@ -41,6 +41,10 @@ python3 dev-env/android_emulator.py install path/to/app.apk \
   --launch com.pocketpalai.e2e/com.pocketpal.MainActivity \
   --launch-check-seconds 10
 
+# Relaunch an installed app without reinstalling its APK.
+python3 dev-env/android_emulator.py launch com.pocketpalai.e2e \
+  --launch-check-seconds 15
+
 # Follow emulator logs.
 python3 dev-env/android_emulator.py logs --follow
 
@@ -53,7 +57,9 @@ present. Subsequent starts reuse the named container and its emulator state.
 When `--launch` is a package name, the script resolves its installed launcher
 activity. A full component must include the complete activity class name. The
 script fails if Android reports a launch error, the app process exits during
-the launch-check interval, or the resolved activity is not foreground.
+the launch-check interval, or the resolved activity is not foreground. Use the
+standalone `launch` command for repeated smoke-test relaunches without
+reinstalling the APK.
 
 Global options must precede the command:
 

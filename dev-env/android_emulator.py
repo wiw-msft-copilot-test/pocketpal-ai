@@ -404,6 +404,11 @@ def launch_activity(args: argparse.Namespace) -> None:
     verify_launch(args.name, package, component, args.launch_check_seconds)
 
 
+def launch_installed(args: argparse.Namespace) -> None:
+    start_container(args)
+    launch_activity(args)
+
+
 def install_apk(args: argparse.Namespace) -> None:
     apk = args.apk.expanduser().resolve()
     if not apk.is_file():
@@ -499,6 +504,19 @@ def build_parser() -> argparse.ArgumentParser:
     logs.add_argument("--tail", type=int, default=100)
     logs.add_argument("--follow", action="store_true")
     logs.set_defaults(handler=show_logs)
+
+    launch = commands.add_parser(
+        "launch",
+        help="launch an already-installed package or exact full component",
+    )
+    launch.add_argument("launch", metavar="PACKAGE_OR_FULL_COMPONENT")
+    launch.add_argument(
+        "--launch-check-seconds",
+        type=positive_float,
+        default=5,
+        help="seconds the launched package must remain alive (default: 5)",
+    )
+    launch.set_defaults(handler=launch_installed)
 
     install = commands.add_parser("install", help="install a local APK")
     install.add_argument("apk", type=Path)

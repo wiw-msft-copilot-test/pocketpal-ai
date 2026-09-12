@@ -17,6 +17,20 @@ def completed(stdout="", stderr="", returncode=0):
 
 
 class AndroidEmulatorTest(unittest.TestCase):
+    def test_launch_subcommand_parser_wires_handler_and_options(self):
+        args = android_emulator.build_parser().parse_args(
+            [
+                "launch",
+                "com.pocketpalai.e2e",
+                "--launch-check-seconds",
+                "15",
+            ]
+        )
+
+        self.assertIs(args.handler, android_emulator.launch_installed)
+        self.assertEqual(args.launch, "com.pocketpalai.e2e")
+        self.assertEqual(args.launch_check_seconds, 15)
+
     @mock.patch.object(android_emulator.time, "sleep")
     @mock.patch.object(android_emulator.time, "monotonic", side_effect=[0, 1])
     @mock.patch.object(android_emulator, "adb_shell")
