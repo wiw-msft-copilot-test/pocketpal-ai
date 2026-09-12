@@ -733,15 +733,17 @@ export const ChatView = observer(
         });
       }
 
-      baseItems.push({
-        label: reportContentLabel,
-        onPress: () => {
-          setIsReportSheetVisible(true);
-          handleMenuDismiss();
-        },
-        icon: () => <AlertIcon stroke={theme.colors.primary} />,
-        disabled: false,
-      });
+      if (__ENABLE_PALSHUB__) {
+        baseItems.push({
+          label: reportContentLabel,
+          onPress: () => {
+            setIsReportSheetVisible(true);
+            handleMenuDismiss();
+          },
+          icon: () => <AlertIcon stroke={theme.colors.primary} />,
+          disabled: false,
+        });
+      }
 
       return baseItems;
     }, [
@@ -1235,10 +1237,12 @@ export const ChatView = observer(
           </Menu>
 
           {/* Content report sheet */}
-          <ContentReportSheet
-            isVisible={isReportSheetVisible}
-            onClose={() => setIsReportSheetVisible(false)}
-          />
+          {__ENABLE_PALSHUB__ ? (
+            <ContentReportSheet
+              isVisible={isReportSheetVisible}
+              onClose={() => setIsReportSheetVisible(false)}
+            />
+          ) : null}
 
           {increaseSheetOpen && activeModel && currentNCtx !== undefined ? (
             <IncreaseContextSheet

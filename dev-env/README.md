@@ -34,7 +34,12 @@ python3 dev-env/android_emulator.py install \
 
 # Install and launch PocketPal's E2E activity.
 python3 dev-env/android_emulator.py install path/to/app.apk \
-  --launch com.pocketpalai.e2e/.MainActivity
+  --launch com.pocketpalai.e2e
+
+# Equivalently, specify the exact full component.
+python3 dev-env/android_emulator.py install path/to/app.apk \
+  --launch com.pocketpalai.e2e/com.pocketpal.MainActivity \
+  --launch-check-seconds 10
 
 # Follow emulator logs.
 python3 dev-env/android_emulator.py logs --follow
@@ -45,6 +50,10 @@ python3 dev-env/android_emulator.py stop
 
 The first `start` creates an ADB key in `~/.android` when one is not already
 present. Subsequent starts reuse the named container and its emulator state.
+When `--launch` is a package name, the script resolves its installed launcher
+activity. A full component must include the complete activity class name. The
+script fails if Android reports a launch error, the app process exits during
+the launch-check interval, or the resolved activity is not foreground.
 
 Global options must precede the command:
 

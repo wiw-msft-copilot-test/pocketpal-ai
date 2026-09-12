@@ -10,10 +10,6 @@ import {
   GOOGLE_WEB_CLIENT_ID,
 } from '@env';
 import type {User, Session} from '@supabase/supabase-js';
-import {
-  GoogleSignin,
-  statusCodes,
-} from '@react-native-google-signin/google-signin';
 
 export interface Profile {
   id: string;
@@ -85,7 +81,9 @@ class AuthService {
   }
 
   private isSupabaseConfigured(): boolean {
-    return !!(SUPABASE_URL && SUPABASE_ANON_KEY);
+    return (
+      __ENABLE_PALSHUB__ && !!(SUPABASE_URL && SUPABASE_ANON_KEY && supabase)
+    );
   }
 
   private initAuthListener() {
@@ -196,6 +194,8 @@ class AuthService {
 
   private configureGoogleSignIn() {
     try {
+      const {GoogleSignin} =
+        require('@react-native-google-signin/google-signin') as typeof import('@react-native-google-signin/google-signin');
       GoogleSignin.configure({
         webClientId: GOOGLE_WEB_CLIENT_ID,
         iosClientId: GOOGLE_IOS_CLIENT_ID,
@@ -215,6 +215,8 @@ class AuthService {
       return;
     }
 
+    const {GoogleSignin, statusCodes} =
+      require('@react-native-google-signin/google-signin') as typeof import('@react-native-google-signin/google-signin');
     try {
       runInAction(() => {
         this.isLoading = true;
@@ -381,7 +383,12 @@ class AuthService {
   }
 
   async signOut() {
+    if (!__ENABLE_PALSHUB__) {
+      return;
+    }
     try {
+      const {GoogleSignin} =
+        require('@react-native-google-signin/google-signin') as typeof import('@react-native-google-signin/google-signin');
       runInAction(() => {
         this.isLoading = true;
         this.error = null;

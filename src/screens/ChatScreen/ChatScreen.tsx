@@ -298,14 +298,16 @@ export const ChatScreen: React.FC = observer(() => {
         <ErrorSnackbar
           error={modelStore.modelLoadError}
           onDismiss={() => modelStore.clearModelLoadError()}
-          onReport={handleReportModelError}
+          onReport={__ENABLE_PALSHUB__ ? handleReportModelError : undefined}
         />
       )}
-      <ModelErrorReportSheet
-        isVisible={isErrorReportVisible}
-        onClose={handleCloseErrorReport}
-        error={errorToReport}
-      />
+      {__ENABLE_PALSHUB__ ? (
+        <ModelErrorReportSheet
+          isVisible={isErrorReportVisible}
+          onClose={handleCloseErrorReport}
+          error={errorToReport}
+        />
+      ) : null}
       {activePal && (
         <PalSheet
           isVisible={isPalSheetVisible}

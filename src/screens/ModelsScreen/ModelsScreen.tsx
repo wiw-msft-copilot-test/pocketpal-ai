@@ -454,11 +454,13 @@ export const ModelsScreen: React.FC = observer(() => {
         onClose={handleCloseSettings}
         model={selectedModel}
       />
-      <ModelErrorReportSheet
-        isVisible={isErrorReportVisible}
-        onClose={handleCloseErrorReport}
-        error={errorToReport}
-      />
+      {__ENABLE_PALSHUB__ ? (
+        <ModelErrorReportSheet
+          isVisible={isErrorReportVisible}
+          onClose={handleCloseErrorReport}
+          error={errorToReport}
+        />
+      ) : null}
       <RemoteModelSheet
         isVisible={remoteModelSheetVisible}
         onDismiss={() => setRemoteModelSheetVisible(false)}

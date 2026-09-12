@@ -66,10 +66,10 @@ Most AI apps are a thin window onto someone else's server — every message you 
 
 ## Get the app
 
-| Platform | |
-| --- | --- |
-| **iOS / iPadOS** | [![Download on the App Store](https://img.shields.io/badge/App_Store-Download-0D96F6?logo=apple&logoColor=white)](https://apps.apple.com/us/app/pocketpal-ai/id6502579498) |
-| **Android** | [![Get it on Google Play](https://img.shields.io/badge/Google_Play-Get_it-414141?logo=googleplay&logoColor=white)](https://play.google.com/store/apps/details?id=com.pocketpalai) |
+| Platform         |                                                                                                                                                                                   |
+| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **iOS / iPadOS** | [![Download on the App Store](https://img.shields.io/badge/App_Store-Download-0D96F6?logo=apple&logoColor=white)](https://apps.apple.com/us/app/pocketpal-ai/id6502579498)        |
+| **Android**      | [![Get it on Google Play](https://img.shields.io/badge/Google_Play-Get_it-414141?logo=googleplay&logoColor=white)](https://play.google.com/store/apps/details?id=com.pocketpalai) |
 
 **Three steps to your first chat:**
 
@@ -87,12 +87,12 @@ PocketPal is a four-layer stack, from the silicon up to the chat UI. Each layer 
   <img src="assets/images and logos/stack-diagram-dark.png" alt="PocketPal AI on-device stack — UI & Tool Use → Bridging → Engine → Hardware" width="100%">
 </div>
 
-| Layer | What runs here |
-| --- | --- |
+| Layer             | What runs here                                                                                                                                                                                                                                                                                                                                                                      |
+| ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **UI & Tool Use** | The React Native app (UI via React Native Paper, state via MobX, chat history in WatermelonDB). The **`AgentRunner`** drives each chat turn — streaming tokens, dispatching **Talents** (tools) when the model calls them, and feeding results back for follow-up reasoning. **Pals** are configurable personas; **PalsHub** is the in-app marketplace for sharing and buying them. |
-| **Bridging** | Native modules that connect JavaScript to the engines. [`llama.rn`](https://github.com/mybigday/llama.rn) bridges LLM inference over JSI; [`react-native-speech`](https://github.com/a-ghorbani/react-native-speech) and `onnxruntime-react-native` bridge text-to-speech. |
-| **Engine** | The inference engines. **llama.cpp** runs language models in the quantized **GGUF** format. **ONNX Runtime** runs TTS voice models in the **ONNX** format. |
-| **Hardware** | Where the math actually happens. PocketPal targets **CPU** (universal fallback), **GPU** (Metal on iOS, OpenCL on Qualcomm Adreno for Android), and **NPU** (Qualcomm Hexagon) — falling back gracefully and offloading partial layers when a full backend isn't available. |
+| **Bridging**      | Native modules that connect JavaScript to the engines. [`llama.rn`](https://github.com/mybigday/llama.rn) bridges LLM inference over JSI; [`react-native-speech`](https://github.com/a-ghorbani/react-native-speech) and `onnxruntime-react-native` bridge text-to-speech.                                                                                                          |
+| **Engine**        | The inference engines. **llama.cpp** runs language models in the quantized **GGUF** format. **ONNX Runtime** runs TTS voice models in the **ONNX** format.                                                                                                                                                                                                                          |
+| **Hardware**      | Where the math actually happens. PocketPal targets **CPU** (universal fallback), **GPU** (Metal on iOS, OpenCL on Qualcomm Adreno for Android), and **NPU** (Qualcomm Hexagon) — falling back gracefully and offloading partial layers when a full backend isn't available.                                                                                                         |
 
 ## Using the app
 
@@ -129,6 +129,7 @@ PocketPal is a four-layer stack, from the silicon up to the chat UI. Each layer 
 <br/>
 
 Create personalized assistants:
+
 - **Assistant Pal** — pick a default model, set a system prompt (write it yourself or have the app generate one), and customize the chat input color.
 - **Roleplay Pal** — everything above, plus location, the AI's role, and other contextual parameters.
 
@@ -200,7 +201,11 @@ yarn ios                      # build + run on iOS simulator
 yarn android                  # build + run on Android emulator
 ```
 
-Core on-device chat works without any backend keys; only PalsHub/auth features need additional configuration.
+Core on-device chat works without backend keys. Centralized PalsHub account,
+checkout, synchronization, feedback, and benchmark-submission integrations are
+disabled in this build. User-owned credentials remain supported for Hugging
+Face downloads, remote AI servers, and configured search providers; they are
+stored in the platform keychain.
 
 > **Native-change rule:** if you change `package.json`, a native module, `ios/`, `android/`, the Podfile, or `build.gradle`, re-run `pod install` and rebuild both platforms — a JS reload won't pick up native changes.
 
@@ -236,6 +241,7 @@ src/
 ├── locales/        # i18n JSON + lazy loader (index.ts is the registry)
 └── hooks/  api/  theme/  utils/  config/  specs/
 ```
+
 </details>
 
 <details>
@@ -245,16 +251,16 @@ src/
 
 Versions are pinned in [`package.json`](package.json); the highlights:
 
-| Area | Choice |
-| --- | --- |
-| Framework | React Native `0.82.1`, React `19.1.1` (New Architecture) |
-| Language | TypeScript `5.0.4` |
-| UI | React Native Paper `5.14.5`, React Navigation |
-| State | MobX `6` (`mobx`, `mobx-react`, `mobx-persist-store`) |
-| Persistence | WatermelonDB (chat history), AsyncStorage (settings), Keychain (secrets) |
-| LLM | `llama.rn` `0.13.0-rc.1` → llama.cpp · GGUF |
-| TTS | `react-native-speech` `2.3.1` + `onnxruntime-react-native` `1.23.2` · ONNX |
-| Tooling | Yarn 1 (Classic), ESLint, Prettier, Jest, Husky + Commitlint |
+| Area        | Choice                                                                     |
+| ----------- | -------------------------------------------------------------------------- |
+| Framework   | React Native `0.82.1`, React `19.1.1` (New Architecture)                   |
+| Language    | TypeScript `5.0.4`                                                         |
+| UI          | React Native Paper `5.14.5`, React Navigation                              |
+| State       | MobX `6` (`mobx`, `mobx-react`, `mobx-persist-store`)                      |
+| Persistence | WatermelonDB (chat history), AsyncStorage (settings), Keychain (secrets)   |
+| LLM         | `llama.rn` `0.13.0-rc.1` → llama.cpp · GGUF                                |
+| TTS         | `react-native-speech` `2.3.1` + `onnxruntime-react-native` `1.23.2` · ONNX |
+| Tooling     | Yarn 1 (Classic), ESLint, Prettier, Jest, Husky + Commitlint               |
 
 </details>
 
@@ -265,13 +271,14 @@ Versions are pinned in [`package.json`](package.json); the highlights:
 
 A **Talent** is a tool the model can call mid-conversation. Engines are registered in a `TalentRegistry`, exposed to the model as tool schemas; the `AgentRunner` detects a call, runs the engine, and returns the result for the next turn.
 
-| Talent | Engine | Does |
-| --- | --- | --- |
-| `calculate` | `CalculateEngine` | Arithmetic / expression evaluation |
-| `datetime` | `DatetimeEngine` | Current date / time |
+| Talent        | Engine             | Does                                |
+| ------------- | ------------------ | ----------------------------------- |
+| `calculate`   | `CalculateEngine`  | Arithmetic / expression evaluation  |
+| `datetime`    | `DatetimeEngine`   | Current date / time                 |
 | `render_html` | `RenderHtmlEngine` | Renders model-produced HTML in chat |
 
 Good first contributions:
+
 - A new **Talent** — implement a `TalentEngine` and register it in `src/services/talents/`.
 - A new **TTS engine** — add it under `src/services/tts/engines/`.
 - A new **locale** — add a JSON file in `src/locales/` (or translate on [Weblate](https://hosted.weblate.org/projects/pocketpal-ai/)).

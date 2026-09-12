@@ -14,8 +14,6 @@ import {Text, Button, SegmentedButtons} from 'react-native-paper';
 import {SafeAreaView, useSafeAreaInsets} from 'react-native-safe-area-context';
 import {BuildInfo} from 'llama.rn';
 
-import {submitFeedback} from '../../api/feedback';
-
 import {
   CopyIcon,
   GithubIcon,
@@ -74,6 +72,10 @@ export const AboutScreen: React.FC = () => {
   };
 
   const handleSubmit = async () => {
+    if (!__ENABLE_PALSHUB__) {
+      return;
+    }
+    const {submitFeedback} = require('../../api/feedback');
     if (!useCase && !featureRequests && !generalFeedback) {
       Alert.alert(l10n.feedback.validation.required);
       return;
@@ -165,15 +167,19 @@ export const AboutScreen: React.FC = () => {
                 </TouchableOpacity>
               </>
             )}
-            <Text style={styles.orText}>{l10n.about.orBy}</Text>
-            <Button
-              mode="outlined"
-              style={styles.actionButton}
-              contentStyle={styles.feedbackButtonContent}
-              icon={ChevronRightButtonIcon}
-              onPress={() => setShowFeedback(true)}>
-              {l10n.feedback.shareThoughtsButton}
-            </Button>
+            {__ENABLE_PALSHUB__ ? (
+              <>
+                <Text style={styles.orText}>{l10n.about.orBy}</Text>
+                <Button
+                  mode="outlined"
+                  style={styles.actionButton}
+                  contentStyle={styles.feedbackButtonContent}
+                  icon={ChevronRightButtonIcon}
+                  onPress={() => setShowFeedback(true)}>
+                  {l10n.feedback.shareThoughtsButton}
+                </Button>
+              </>
+            ) : null}
           </View>
 
           <View style={styles.section}>
@@ -208,93 +214,95 @@ export const AboutScreen: React.FC = () => {
         </View>
       </ScrollView>
 
-      <Sheet
-        title={l10n.feedback.title}
-        isVisible={showFeedback}
-        displayFullHeight
-        onClose={() => setShowFeedback(false)}>
-        <Sheet.ScrollView contentContainerStyle={styles.feedbackForm}>
-          <View style={styles.field}>
-            <Text style={styles.label}>{l10n.feedback.useCase.label}</Text>
-            <TextInput
-              defaultValue={useCase}
-              onChangeText={setUseCase}
-              placeholder={l10n.feedback.useCase.placeholder}
-              multiline
-              numberOfLines={4}
-            />
-          </View>
+      {__ENABLE_PALSHUB__ ? (
+        <Sheet
+          title={l10n.feedback.title}
+          isVisible={showFeedback}
+          displayFullHeight
+          onClose={() => setShowFeedback(false)}>
+          <Sheet.ScrollView contentContainerStyle={styles.feedbackForm}>
+            <View style={styles.field}>
+              <Text style={styles.label}>{l10n.feedback.useCase.label}</Text>
+              <TextInput
+                defaultValue={useCase}
+                onChangeText={setUseCase}
+                placeholder={l10n.feedback.useCase.placeholder}
+                multiline
+                numberOfLines={4}
+              />
+            </View>
 
-          <View style={styles.field}>
-            <Text style={styles.label}>
-              {l10n.feedback.featureRequests.label}
-            </Text>
-            <TextInput
-              defaultValue={featureRequests}
-              onChangeText={setFeatureRequests}
-              placeholder={l10n.feedback.featureRequests.placeholder}
-              multiline
-              numberOfLines={4}
-            />
-          </View>
+            <View style={styles.field}>
+              <Text style={styles.label}>
+                {l10n.feedback.featureRequests.label}
+              </Text>
+              <TextInput
+                defaultValue={featureRequests}
+                onChangeText={setFeatureRequests}
+                placeholder={l10n.feedback.featureRequests.placeholder}
+                multiline
+                numberOfLines={4}
+              />
+            </View>
 
-          <View style={styles.field}>
-            <Text style={styles.label}>
-              {l10n.feedback.generalFeedback.label}
-            </Text>
-            <TextInput
-              defaultValue={generalFeedback}
-              onChangeText={setGeneralFeedback}
-              placeholder={l10n.feedback.generalFeedback.placeholder}
-              multiline
-              numberOfLines={4}
-            />
-          </View>
+            <View style={styles.field}>
+              <Text style={styles.label}>
+                {l10n.feedback.generalFeedback.label}
+              </Text>
+              <TextInput
+                defaultValue={generalFeedback}
+                onChangeText={setGeneralFeedback}
+                placeholder={l10n.feedback.generalFeedback.placeholder}
+                multiline
+                numberOfLines={4}
+              />
+            </View>
 
-          <View style={styles.field}>
-            <Text style={styles.label}>
-              {l10n.feedback.usageFrequency.label}
-            </Text>
-            <SegmentedButtons
-              value={usageFrequency}
-              onValueChange={setUsageFrequency}
-              buttons={[
-                {
-                  value: 'daily',
-                  label: l10n.feedback.usageFrequency.options.daily,
-                },
-                {
-                  value: 'weekly',
-                  label: l10n.feedback.usageFrequency.options.weekly,
-                },
-                {
-                  value: 'monthly',
-                  label: l10n.feedback.usageFrequency.options.monthly,
-                },
-                {
-                  value: 'rarely',
-                  label: l10n.feedback.usageFrequency.options.rarely,
-                },
-              ]}
-              style={styles.segmentedButtons}
-            />
-          </View>
-        </Sheet.ScrollView>
-        <Sheet.Actions>
-          <View style={styles.secondaryButtons}>
-            <Button mode="text" onPress={() => setShowFeedback(false)}>
-              {l10n.common.cancel}
+            <View style={styles.field}>
+              <Text style={styles.label}>
+                {l10n.feedback.usageFrequency.label}
+              </Text>
+              <SegmentedButtons
+                value={usageFrequency}
+                onValueChange={setUsageFrequency}
+                buttons={[
+                  {
+                    value: 'daily',
+                    label: l10n.feedback.usageFrequency.options.daily,
+                  },
+                  {
+                    value: 'weekly',
+                    label: l10n.feedback.usageFrequency.options.weekly,
+                  },
+                  {
+                    value: 'monthly',
+                    label: l10n.feedback.usageFrequency.options.monthly,
+                  },
+                  {
+                    value: 'rarely',
+                    label: l10n.feedback.usageFrequency.options.rarely,
+                  },
+                ]}
+                style={styles.segmentedButtons}
+              />
+            </View>
+          </Sheet.ScrollView>
+          <Sheet.Actions>
+            <View style={styles.secondaryButtons}>
+              <Button mode="text" onPress={() => setShowFeedback(false)}>
+                {l10n.common.cancel}
+              </Button>
+            </View>
+            <Button
+              mode="contained"
+              onPress={handleSubmit}
+              loading={isSubmitting}
+              disabled={isSubmitting}>
+              {l10n.feedback.submit}
             </Button>
-          </View>
-          <Button
-            mode="contained"
-            onPress={handleSubmit}
-            loading={isSubmitting}
-            disabled={isSubmitting}>
-            {l10n.feedback.submit}
-          </Button>
-        </Sheet.Actions>
-      </Sheet>
+          </Sheet.Actions>
+        </Sheet>
+      ) : null}
     </SafeAreaView>
   );
 };

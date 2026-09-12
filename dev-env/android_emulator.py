@@ -4,6 +4,7 @@ import argparse
 import json
 import os
 from pathlib import Path
+import re
 import subprocess
 import sys
 import time
@@ -16,6 +17,9 @@ DEFAULT_IMAGE = (
 )
 DEFAULT_CONTAINER = "pocketpal-android-emulator"
 ADB = "/android/sdk/platform-tools/adb"
+SUBPROCESS_TIMEOUT = 15
+ADB_INSTALL_TIMEOUT = 300
+LAUNCH_CHECK_INTERVAL = 0.5
 
 
 def format_command(command: list[str]) -> str:
@@ -44,19 +48,40 @@ def run(
 def docker_available() -> None:
     try:
         run(["docker", "info"], capture=True, timeout=15)
-    except (FileNotFoundError, subprocess.CalledProcessError, subprocess.TimeoutExpired):
+    except (
+        FileNotFoundError,
+        subprocess.CalledProcessError,
+        subprocess.TimeoutExpired,
+    ):
         raise SystemExit("Docker is unavailable. Start Docker Desktop and try again.")
 
 
 def inspect_container(name: str) -> dict | None:
-    result = subprocess.run(
-        ["docker", "inspect", name],
-        text=True,
-        capture_output=True,
-    )
+    try:
+        result = subprocess.run(
+            ["docker", "inspect", name],
+            text=True,
+            capture_output=True,
+            timeout=SUBPROCESS_TIMEOUT,
+        )
+    except subprocess.TimeoutExpired as error:
+        raise SystemExit(
+            f"Timed out inspecting Docker container {name!r}."
+        ) from error
     if result.returncode != 0:
-        return None
-    return json.loads(result.stdout)[0]
+        error = result.stderr.strip()
+        if "No such object:" in error or "No such container:" in error:
+            return None
+        raise SystemExit(
+            f"Could not inspect Docker container {name!r}: "
+            f"{error or f'docker exited with code {result.returncode}'}"
+        )
+    try:
+        return json.loads(result.stdout)[0]
+    except (json.JSONDecodeError, IndexError, TypeError) as error:
+        raise SystemExit(
+            f"Docker returned invalid inspection data for container {name!r}."
+        ) from error
 
 
 def pull_image(image: str) -> None:
@@ -80,6 +105,11 @@ def ensure_adb_key(image: str) -> Path:
     public_key = android_dir / "adbkey.pub"
     if private_key.is_file() and public_key.is_file():
         return private_key
+    if private_key.exists() or public_key.exists():
+        raise SystemExit(
+            f"Refusing to overwrite an existing partial ADB key pair in {android_dir}. "
+            "Restore the missing key file or move the existing file first."
+        )
 
     android_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
     run(
@@ -96,7 +126,8 @@ def ensure_adb_key(image: str) -> Path:
             image,
             "keygen",
             "/keys/adbkey",
-        ]
+        ],
+        timeout=SUBPROCESS_TIMEOUT,
     )
     private_key.chmod(0o600)
     public_key.chmod(0o644)
@@ -106,20 +137,24 @@ def ensure_adb_key(image: str) -> Path:
 def wait_for_boot(name: str, timeout: int) -> None:
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
-        result = subprocess.run(
-            [
-                "docker",
-                "exec",
-                name,
-                ADB,
-                "shell",
-                "getprop",
-                "sys.boot_completed",
-            ],
-            text=True,
-            capture_output=True,
-        )
-        if result.returncode == 0 and result.stdout.strip() == "1":
+        try:
+            result = subprocess.run(
+                [
+                    "docker",
+                    "exec",
+                    name,
+                    ADB,
+                    "shell",
+                    "getprop",
+                    "sys.boot_completed",
+                ],
+                text=True,
+                capture_output=True,
+                timeout=SUBPROCESS_TIMEOUT,
+            )
+        except subprocess.TimeoutExpired:
+            result = None
+        if result and result.returncode == 0 and result.stdout.strip() == "1":
             version = run(
                 [
                     "docker",
@@ -131,6 +166,7 @@ def wait_for_boot(name: str, timeout: int) -> None:
                     "ro.build.version.release",
                 ],
                 capture=True,
+                timeout=SUBPROCESS_TIMEOUT,
             ).stdout.strip()
             api = run(
                 [
@@ -143,6 +179,7 @@ def wait_for_boot(name: str, timeout: int) -> None:
                     "ro.build.version.sdk",
                 ],
                 capture=True,
+                timeout=SUBPROCESS_TIMEOUT,
             ).stdout.strip()
             print(f"Android {version} (API {api}) is ready.")
             return
@@ -223,7 +260,10 @@ def show_status(args: argparse.Namespace) -> None:
     print(f"status: {state['Status']}")
     print(f"health: {health}")
     if state["Running"]:
-        run(["docker", "exec", args.name, ADB, "devices", "-l"])
+        run(
+            ["docker", "exec", args.name, ADB, "devices", "-l"],
+            timeout=SUBPROCESS_TIMEOUT,
+        )
 
 
 def show_logs(args: argparse.Namespace) -> None:
@@ -238,6 +278,132 @@ def show_logs(args: argparse.Namespace) -> None:
         pass
 
 
+def adb_shell(
+    name: str,
+    *arguments: str,
+    capture: bool = True,
+) -> subprocess.CompletedProcess[str]:
+    return run(
+        ["docker", "exec", name, ADB, "shell", *arguments],
+        capture=capture,
+        timeout=SUBPROCESS_TIMEOUT,
+    )
+
+
+def resolve_launch_component(name: str, target: str) -> tuple[str, str]:
+    if "/" in target:
+        package, activity = target.split("/", 1)
+        if (
+            not package
+            or not activity
+            or activity.startswith(".")
+            or "." not in package
+            or "." not in activity
+        ):
+            raise SystemExit(
+                "--launch must be an installed package or an exact full "
+                "component such as "
+                "com.pocketpalai.e2e/com.pocketpal.MainActivity."
+            )
+        return package, target
+
+    result = adb_shell(
+        name,
+        "cmd",
+        "package",
+        "resolve-activity",
+        "--brief",
+        "-a",
+        "android.intent.action.MAIN",
+        "-c",
+        "android.intent.category.LAUNCHER",
+        target,
+    )
+    candidates = [
+        line.strip()
+        for line in result.stdout.splitlines()
+        if "/" in line and not line.lstrip().startswith(("Error:", "Warning:"))
+    ]
+    if not candidates:
+        raise SystemExit(
+            f"No launcher activity found for installed package {target!r}."
+        )
+    component = candidates[-1]
+    package, activity = component.split("/", 1)
+    if activity.startswith("."):
+        component = f"{package}/{package}{activity}"
+    return package, component
+
+
+def check_am_start_output(result: subprocess.CompletedProcess[str]) -> None:
+    output = "\n".join(part for part in (result.stdout, result.stderr) if part)
+    if re.search(
+        r"(?im)^\s*(?:error:|exception\b|security exception\b)|"
+        r"\b(?:ActivityNotFoundException|SecurityException)\b",
+        output,
+    ):
+        raise SystemExit(f"Android activity launch failed: {output.strip()}")
+
+
+def foreground_component(output: str) -> str | None:
+    for line in output.splitlines():
+        if "mResumedActivity" not in line and "topResumedActivity" not in line:
+            continue
+        match = re.search(r"([A-Za-z0-9_.$]+/[A-Za-z0-9_.$]+)", line)
+        if match:
+            package, activity = match.group(1).split("/", 1)
+            if activity.startswith("."):
+                activity = package + activity
+            return f"{package}/{activity}"
+    return None
+
+
+def verify_launch(
+    name: str,
+    package: str,
+    component: str,
+    interval: float,
+) -> None:
+    deadline = time.monotonic() + interval
+    while True:
+        try:
+            process = adb_shell(name, "pidof", package)
+        except subprocess.CalledProcessError:
+            process = None
+        if process is None or not process.stdout.strip():
+            raise SystemExit(
+                f"Launched package {package!r} exited before the "
+                f"{interval:g}-second readiness check completed."
+            )
+
+        activities = adb_shell(name, "dumpsys", "activity", "activities")
+        foreground = foreground_component(activities.stdout)
+        now = time.monotonic()
+        if now >= deadline:
+            if foreground != component:
+                raise SystemExit(
+                    f"Expected {component!r} to be foreground after "
+                    f"{interval:g} seconds, but found "
+                    f"{foreground or 'no resumed activity'!r}."
+                )
+            return
+        time.sleep(min(LAUNCH_CHECK_INTERVAL, deadline - now))
+
+
+def launch_activity(args: argparse.Namespace) -> None:
+    package, component = resolve_launch_component(args.name, args.launch)
+    result = adb_shell(
+        args.name,
+        "am",
+        "start",
+        "-W",
+        "-n",
+        component,
+    )
+    check_am_start_output(result)
+    verify_launch(args.name, package, component, args.launch_check_seconds)
+
+
 def install_apk(args: argparse.Namespace) -> None:
     apk = args.apk.expanduser().resolve()
     if not apk.is_file():
@@ -245,8 +411,11 @@ def install_apk(args: argparse.Namespace) -> None:
 
     start_container(args)
     destination = f"/tmp/{uuid.uuid4().hex}-{apk.name}"
+    copied = False
+    primary_error: BaseException | None = None
     try:
         run(["docker", "cp", str(apk), f"{args.name}:{destination}"])
+        copied = True
         install_command = [
             "docker",
             "exec",
@@ -259,27 +428,32 @@ def install_apk(args: argparse.Namespace) -> None:
         if args.grant_permissions:
             install_command.append("-g")
         install_command.append(destination)
-        run(install_command)
+        run(install_command, timeout=ADB_INSTALL_TIMEOUT)
         if args.launch:
-            run(
-                [
-                    "docker",
-                    "exec",
-                    args.name,
-                    ADB,
-                    "shell",
-                    "am",
-                    "start",
-                    "-n",
-                    args.launch,
-                ]
-            )
+            launch_activity(args)
+    except BaseException as error:
+        primary_error = error
+        raise
     finally:
-        subprocess.run(
-            ["docker", "exec", args.name, "rm", "-f", destination],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
+        if copied:
+            try:
+                run(
+                    ["docker", "exec", args.name, "rm", "-f", destination],
+                    capture=True,
+                    timeout=SUBPROCESS_TIMEOUT,
+                )
+            except (
+                FileNotFoundError,
+                subprocess.CalledProcessError,
+                subprocess.TimeoutExpired,
+            ) as cleanup_error:
+                message = (
+                    f"Failed to remove copied APK {destination!r}: {cleanup_error}"
+                )
+                if primary_error is not None:
+                    print(f"Warning: {message}", file=sys.stderr)
+                else:
+                    raise SystemExit(message) from cleanup_error
 
 
 def add_runtime_options(parser: argparse.ArgumentParser) -> None:
@@ -293,6 +467,13 @@ def add_runtime_options(parser: argparse.ArgumentParser) -> None:
         default=240,
         help="seconds to wait for Android to boot (default: 240)",
     )
+
+
+def positive_float(value: str) -> float:
+    parsed = float(value)
+    if parsed <= 0:
+        raise argparse.ArgumentTypeError("must be greater than zero")
+    return parsed
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -334,8 +515,14 @@ def build_parser() -> argparse.ArgumentParser:
     )
     install.add_argument(
         "--launch",
-        metavar="PACKAGE/ACTIVITY",
-        help="launch an activity after installation",
+        metavar="PACKAGE_OR_FULL_COMPONENT",
+        help="launch an installed package or exact full component after installation",
+    )
+    install.add_argument(
+        "--launch-check-seconds",
+        type=positive_float,
+        default=5,
+        help="seconds the launched package must remain alive (default: 5)",
     )
     install.set_defaults(handler=install_apk)
     return parser

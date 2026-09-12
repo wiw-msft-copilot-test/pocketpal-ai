@@ -26,6 +26,8 @@ jobs:
       # A from-source Android build uses neither. The DSP libraries under bin/
       # are tarball content and arrive regardless.
       RNLLAMA_SKIP_POSTINSTALL: '1'
+      ENABLE_PALSHUB_INTEGRATION: 'false'
+      ENABLE_AUTHENTICATION: 'false'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -46,6 +48,31 @@ jobs:
 
       - name: Install dependencies
         run: yarn install --frozen-lockfile
+
+      - name: Verify centralized native integrations are excluded
+        run: |
+          set -euo pipefail
+          node node_modules/react-native/cli.js config > react-native-config.json
+          node - <<'NODE'
+          const config = require('./react-native-config.json');
+          const disabled = [
+            '@react-native-firebase/app',
+            '@react-native-firebase/app-check',
+            '@react-native-google-signin/google-signin',
+          ];
+          const linked = disabled.filter(name => config.dependencies[name]);
+          if (linked.length > 0) {
+            throw new Error(`Disabled native dependencies are linked: ${linked.join(', ')}`);
+          }
+          console.log('OK: centralized native integrations are excluded.');
+          NODE
+
+      - name: Verify disabled integrations do not initialize
+        run: |
+          yarn jest \
+            src/services/palshub/__tests__/disabledBuild.test.ts \
+            --runInBand \
+            --coverage=false
 
       - name: Derive the rnllama variant allowlist from the payload manifest
         run: |
@@ -127,8 +154,6 @@ jobs:
         env:
           APP_RELEASE_STORE_PASSWORD: dummy-ci-password
           APP_RELEASE_KEY_PASSWORD: dummy-ci-password
-          ENABLE_PALSHUB_INTEGRATION: 'false'
-          ENABLE_AUTHENTICATION: 'false'
         run: |
           set -euo pipefail
           if [ "${ORG_GRADLE_PROJECT_rnllamaBuildFromSource:-}" != "true" ]; then
