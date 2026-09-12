@@ -101,8 +101,8 @@ jobs:
           SUPABASE_ANON_KEY=dummy-anon-key-for-ci-builds
           PALSHUB_API_BASE_URL=https://dummy-palshub-api.com
           APP_URL=pocketpal://app
-          ENABLE_PALSHUB_INTEGRATION=true
-          ENABLE_AUTHENTICATION=true
+          ENABLE_PALSHUB_INTEGRATION=false
+          ENABLE_AUTHENTICATION=false
           ENABLE_OFFLINE_MODE=true
           GOOGLE_IOS_CLIENT_ID=dummy-ios-client-id.apps.googleusercontent.com
           GOOGLE_WEB_CLIENT_ID=dummy-web-client-id.apps.googleusercontent.com
@@ -127,6 +127,8 @@ jobs:
         env:
           APP_RELEASE_STORE_PASSWORD: dummy-ci-password
           APP_RELEASE_KEY_PASSWORD: dummy-ci-password
+          ENABLE_PALSHUB_INTEGRATION: 'false'
+          ENABLE_AUTHENTICATION: 'false'
         run: |
           set -euo pipefail
           if [ "${ORG_GRADLE_PROJECT_rnllamaBuildFromSource:-}" != "true" ]; then

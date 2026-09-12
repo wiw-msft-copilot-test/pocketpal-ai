@@ -38,7 +38,6 @@ import {
   fetchModelsWithHeaders,
   detectServerType,
 } from '../../api/openai';
-import {isLocalHost} from '../../utils/network';
 import {deriveListCaps} from '../../utils/listCaps';
 import {t} from '../../locales';
 
