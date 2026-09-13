@@ -107,7 +107,12 @@ export async function streamResponses(
   return new Promise<CompletionResult>((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     const parser = new FramedSSEParser<ResponsesStreamEvent>();
-    const reducer = new ResponsesStreamReducer(diagnostics);
+    const reducer = new ResponsesStreamReducer(
+      diagnostics,
+      binding.serverType === 'GitHub Copilot'
+        ? {providerProfile: 'github-copilot'}
+        : undefined,
+    );
     const stopMatcher = new StopSequenceMatcher(params.stop);
     let lastProcessedLength = 0;
     let latestSnapshot: CompletionStreamData = {

@@ -59,6 +59,10 @@ export interface FinalizedResponsesStream {
   replay?: ResponsesReplayState;
 }
 
+export interface ResponsesStreamCompatibility {
+  providerProfile?: 'github-copilot';
+}
+
 export type ResponsesStreamErrorCode =
   | 'malformed-event'
   | 'unsupported-output'
@@ -213,12 +217,16 @@ function terminalErrorCode(
 export class ResponsesStreamReducer {
   private readonly items = new Map<number, InternalItem>();
   private readonly itemIndices = new Map<string, number>();
+  private readonly replacedItemIndices = new Set<number>();
   private terminalStatus?: ResponsesTerminalStatus;
   private incompleteReason?: CompletionResult['incomplete_reason'];
   private usage?: ResponsesUsage;
   private terminalError?: ResponsesStreamProtocolError;
 
-  constructor(private readonly diagnostics?: ResponsesDiagnostics) {}
+  constructor(
+    private readonly diagnostics?: ResponsesDiagnostics,
+    private readonly compatibility: ResponsesStreamCompatibility = {},
+  ) {}
 
   reduce(event: ResponsesStreamEvent): CompletionStreamData | undefined {
     this.diagnostics?.event(event);
@@ -366,6 +374,9 @@ export class ResponsesStreamReducer {
     const eventType = event.type as string;
     const index = requiredIndex(event, 'output_index', eventType);
     const item = requiredRecord(event, 'item', eventType);
+    if (eventType === 'response.output_item.done' && !this.items.has(index)) {
+      throw malformed(eventType, 'output item was not registered');
+    }
     this.reconcileItem(index, item, eventType);
   }
 
@@ -545,9 +556,30 @@ export class ResponsesStreamReducer {
       throw malformed(eventType, 'output item id moved to another index');
     }
     const existing = this.items.get(outputIndex);
-    if (existing && (existing.id !== id || existing.type !== type)) {
+    if (existing && existing.type !== type) {
       throw malformed(eventType, 'output item identity changed');
     }
+    const replacesId = existing !== undefined && existing.id !== id;
+    if (
+      replacesId &&
+      (eventType !== 'response.output_item.done' ||
+        this.compatibility.providerProfile !== 'github-copilot' ||
+        this.replacedItemIndices.has(outputIndex))
+    ) {
+      throw malformed(eventType, 'output item identity changed');
+    }
+    if (replacesId && existing?.type === 'function_call') {
+      const callId = optionalString(raw, 'call_id', eventType);
+      const name = optionalString(raw, 'name', eventType);
+      if (
+        (callId !== undefined && callId !== existing.callId) ||
+        (name !== undefined && name !== existing.name)
+      ) {
+        throw malformed(eventType, 'function call correlation changed');
+      }
+    }
+    const preserveAccumulated =
+      replacesId || this.replacedItemIndices.has(outputIndex);
 
     let item: InternalItem;
     if (type === 'message') {
@@ -571,7 +603,10 @@ export class ResponsesStreamReducer {
         role: 'assistant',
         status,
         phase,
-        content: new Map(),
+        content:
+          preserveAccumulated && existing?.type === 'message'
+            ? new Map(existing.content)
+            : new Map(),
       };
       if (raw.content !== undefined) {
         if (!Array.isArray(raw.content)) {
@@ -598,7 +633,10 @@ export class ResponsesStreamReducer {
         type,
         id,
         outputIndex,
-        summary: new Map(),
+        summary:
+          preserveAccumulated && existing?.type === 'reasoning'
+            ? new Map(existing.summary)
+            : new Map(),
         encryptedContent: optionalString(raw, 'encrypted_content', eventType),
       };
       if (raw.summary !== undefined) {
@@ -626,6 +664,7 @@ export class ResponsesStreamReducer {
       }
       item = reasoningItem;
     } else if (type === 'function_call') {
+      const rawArguments = optionalString(raw, 'arguments', eventType);
       item = {
         type,
         id,
@@ -637,8 +676,12 @@ export class ResponsesStreamReducer {
           optionalString(raw, 'name', eventType) ??
           (existing?.type === 'function_call' ? existing.name : ''),
         arguments:
-          optionalString(raw, 'arguments', eventType) ??
-          (existing?.type === 'function_call' ? existing.arguments : ''),
+          preserveAccumulated &&
+          existing?.type === 'function_call' &&
+          rawArguments === ''
+            ? existing.arguments
+            : (rawArguments ??
+              (existing?.type === 'function_call' ? existing.arguments : '')),
         status: this.itemStatus(raw.status, eventType),
       };
       if (!item.callId || !item.name) {
@@ -657,6 +700,9 @@ export class ResponsesStreamReducer {
 
     this.items.set(outputIndex, item);
     this.itemIndices.set(id, outputIndex);
+    if (replacesId) {
+      this.replacedItemIndices.add(outputIndex);
+    }
   }
 
   private itemStatus(
@@ -915,6 +961,7 @@ export class ResponsesStreamReducer {
 
 export function createResponsesStreamReducer(
   diagnostics?: ResponsesDiagnostics,
+  compatibility?: ResponsesStreamCompatibility,
 ): ResponsesStreamReducer {
-  return new ResponsesStreamReducer(diagnostics);
+  return new ResponsesStreamReducer(diagnostics, compatibility);
 }

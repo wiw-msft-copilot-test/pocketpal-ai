@@ -99,6 +99,7 @@ const startResponses = (
     callback?: jest.Mock;
     timeoutMs?: number;
     serverType?: string;
+    binding?: typeof binding;
     diagnosticObserver?: ResponsesDiagnosticObserver;
   } = {},
 ) =>
@@ -110,7 +111,7 @@ const startResponses = (
     options.callback,
     options.timeoutMs,
     options.serverType,
-    binding,
+    options.binding ?? binding,
     {},
     options.diagnosticObserver,
   );
@@ -196,6 +197,61 @@ describe('streamResponses', () => {
       await promise;
     },
   );
+
+  it('applies Copilot output-item done identity compatibility from the binding', async () => {
+    const promise = startResponses(params(), {
+      serverType: 'GitHub Copilot',
+      binding: {...binding, serverType: 'GitHub Copilot'},
+    });
+    const xhr = MockXHR.instances[0];
+    xhr.headers();
+    xhr.progress(
+      [
+        {
+          type: 'response.output_item.added',
+          output_index: 0,
+          item: {type: 'reasoning', id: 'reasoning-added', summary: []},
+        },
+        {
+          type: 'response.reasoning_summary_text.delta',
+          output_index: 0,
+          item_id: 'reasoning-added',
+          summary_index: 0,
+          delta: 'captured reasoning',
+        },
+        {
+          type: 'response.output_item.done',
+          output_index: 0,
+          item: {type: 'reasoning', id: 'reasoning-done', summary: []},
+        },
+        {
+          type: 'response.completed',
+          response: {
+            status: 'completed',
+            output: [{type: 'reasoning', id: 'reasoning-done', summary: []}],
+          },
+        },
+      ]
+        .map(frame)
+        .join(''),
+    );
+    xhr.load();
+
+    await expect(promise).resolves.toMatchObject({
+      reasoning_content: 'captured reasoning',
+      provider_state: {
+        responses: {
+          output: [
+            {
+              type: 'reasoning',
+              id: 'reasoning-done',
+              summary: [{type: 'summary_text', text: 'captured reasoning'}],
+            },
+          ],
+        },
+      },
+    });
+  });
 
   it('rejects insecure non-local URLs before constructing XHR', async () => {
     await expect(

@@ -275,6 +275,227 @@ describe('ResponsesStreamReducer', () => {
     );
   });
 
+  it('accepts Copilot done item ids as authoritative without losing accumulated state', () => {
+    const reducer = createResponsesStreamReducer(undefined, {
+      providerProfile: 'github-copilot',
+    });
+    reducer.reduce({
+      type: 'response.output_item.added',
+      output_index: 0,
+      item: {type: 'reasoning', id: 'reasoning-added', summary: []},
+    });
+    reducer.reduce({
+      type: 'response.reasoning_summary_text.delta',
+      output_index: 0,
+      item_id: 'reasoning-added',
+      summary_index: 0,
+      delta: 'preserved reasoning',
+    });
+    reducer.reduce({
+      type: 'response.output_item.added',
+      output_index: 1,
+      item: message('message-added'),
+    });
+    reducer.reduce({
+      type: 'response.output_text.delta',
+      output_index: 1,
+      item_id: 'message-added',
+      content_index: 0,
+      delta: 'preserved content',
+    });
+    reducer.reduce({
+      type: 'response.output_item.added',
+      output_index: 2,
+      item: {
+        type: 'function_call',
+        id: 'tool-added',
+        call_id: 'call-id',
+        name: 'lookup',
+        arguments: '',
+        status: 'in_progress',
+      },
+    });
+    reducer.reduce({
+      type: 'response.function_call_arguments.delta',
+      output_index: 2,
+      item_id: 'tool-added',
+      delta: '{"query":"preserved"}',
+    });
+
+    reducer.reduce({
+      type: 'response.output_item.done',
+      output_index: 0,
+      item: {type: 'reasoning', id: 'reasoning-done', summary: []},
+    });
+    reducer.reduce({
+      type: 'response.output_item.done',
+      output_index: 1,
+      item: {...message('message-done', 'completed'), content: []},
+    });
+    reducer.reduce({
+      type: 'response.output_item.done',
+      output_index: 2,
+      item: {
+        type: 'function_call',
+        id: 'tool-done',
+        call_id: 'call-id',
+        name: 'lookup',
+        arguments: '',
+        status: 'completed',
+      },
+    });
+    reducer.reduce({
+      type: 'response.completed',
+      response: {
+        status: 'completed',
+        output: [
+          {type: 'reasoning', id: 'reasoning-done', summary: []},
+          {...message('message-done', 'completed'), content: []},
+          {
+            type: 'function_call',
+            id: 'tool-done',
+            call_id: 'call-id',
+            name: 'lookup',
+            arguments: '',
+            status: 'completed',
+          },
+        ],
+      },
+    });
+
+    const finalized = reducer.finish(binding);
+    expect(finalized.result).toMatchObject({
+      content: 'preserved content',
+      reasoning_content: 'preserved reasoning',
+      tool_calls: [
+        {
+          id: 'call-id',
+          function: {name: 'lookup', arguments: '{"query":"preserved"}'},
+        },
+      ],
+    });
+    expect(finalized.replay?.output).toEqual([
+      {
+        type: 'reasoning',
+        id: 'reasoning-done',
+        summary: [{type: 'summary_text', text: 'preserved reasoning'}],
+      },
+      {
+        type: 'message',
+        id: 'message-done',
+        role: 'assistant',
+        status: 'completed',
+        phase: 'final_answer',
+        content: [{type: 'output_text', text: 'preserved content'}],
+      },
+      {
+        type: 'function_call',
+        id: 'tool-done',
+        call_id: 'call-id',
+        name: 'lookup',
+        arguments: '{"query":"preserved"}',
+        status: 'completed',
+      },
+    ]);
+  });
+
+  it('rejects done item id replacement without the Copilot profile', () => {
+    const reducer = createResponsesStreamReducer();
+    reducer.reduce({
+      type: 'response.output_item.added',
+      output_index: 0,
+      item: {type: 'reasoning', id: 'reasoning-added', summary: []},
+    });
+
+    expect(() =>
+      reducer.reduce({
+        type: 'response.output_item.done',
+        output_index: 0,
+        item: {type: 'reasoning', id: 'reasoning-done', summary: []},
+      }),
+    ).toThrow('output item identity changed');
+  });
+
+  it.each([
+    [
+      'missing registration',
+      {
+        type: 'response.output_item.done',
+        output_index: 1,
+        item: {type: 'reasoning', id: 'reasoning-done', summary: []},
+      },
+    ],
+    [
+      'wrong item type',
+      {
+        type: 'response.output_item.done',
+        output_index: 0,
+        item: message('message-done'),
+      },
+    ],
+  ])('rejects Copilot replacement with %s', (_label, event) => {
+    const reducer = createResponsesStreamReducer(undefined, {
+      providerProfile: 'github-copilot',
+    });
+    reducer.reduce({
+      type: 'response.output_item.added',
+      output_index: 0,
+      item: {type: 'reasoning', id: 'reasoning-added', summary: []},
+    });
+
+    expect(() => reducer.reduce(event)).toThrow(ResponsesStreamProtocolError);
+  });
+
+  it('rejects a Copilot done item id registered at a conflicting index', () => {
+    const reducer = createResponsesStreamReducer(undefined, {
+      providerProfile: 'github-copilot',
+    });
+    reducer.reduce({
+      type: 'response.output_item.added',
+      output_index: 0,
+      item: {type: 'reasoning', id: 'reasoning-zero', summary: []},
+    });
+    reducer.reduce({
+      type: 'response.output_item.added',
+      output_index: 1,
+      item: {type: 'reasoning', id: 'reasoning-one', summary: []},
+    });
+
+    expect(() =>
+      reducer.reduce({
+        type: 'response.output_item.done',
+        output_index: 1,
+        item: {type: 'reasoning', id: 'reasoning-zero', summary: []},
+      }),
+    ).toThrow('output item id moved to another index');
+  });
+
+  it('keeps content-part item ids strict after a Copilot replacement', () => {
+    const reducer = createResponsesStreamReducer(undefined, {
+      providerProfile: 'github-copilot',
+    });
+    reducer.reduce({
+      type: 'response.output_item.added',
+      output_index: 0,
+      item: message('message-added'),
+    });
+    reducer.reduce({
+      type: 'response.output_item.done',
+      output_index: 0,
+      item: {...message('message-done', 'completed'), content: []},
+    });
+
+    expect(() =>
+      reducer.reduce({
+        type: 'response.content_part.added',
+        output_index: 0,
+        item_id: 'message-added',
+        content_index: 0,
+        part: {type: 'output_text', text: ''},
+      }),
+    ).toThrow('event does not match a message item');
+  });
+
   it('backfills final snapshot-only content into result and projection', () => {
     const reducer = createResponsesStreamReducer();
     const snapshot = reducer.reduce({
