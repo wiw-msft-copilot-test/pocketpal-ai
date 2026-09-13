@@ -1016,6 +1016,103 @@ describe('streamChatCompletion', () => {
     await resultPromise;
   });
 
+  it.each([
+    ['temperature', 0, 'temperature'],
+    ['top_p', 0, 'top_p'],
+    ['max_tokens', -1, 'max_completion_tokens'],
+    ['stop', [], 'stop'],
+    ['jinja', false, 'jinja'],
+  ] as const)(
+    'retains valid explicit Send value for %s in final chat JSON',
+    async (sourceKey, value, wireKey) => {
+      const modeKey = sourceKey === 'max_tokens' ? 'n_predict' : sourceKey;
+      const resultPromise = streamChatCompletion(
+        {
+          messages: [{role: 'user', content: 'Hi'}],
+          model: 'test-model',
+          [sourceKey]: value,
+          generationParameterModes: {[modeKey]: 'send'},
+        },
+        'http://localhost:1234',
+      );
+      const xhr = MockXHR.instances[0];
+      const body = JSON.parse(xhr.requestBody);
+
+      expect(Object.prototype.hasOwnProperty.call(body, wireKey)).toBe(true);
+      expect(body[wireKey]).toEqual(value);
+      xhr.simulateHeaders(200);
+      xhr.simulateProgress(
+        'data: {"choices":[{"delta":{},"finish_reason":"stop"}]}\n\ndata: [DONE]\n\n',
+      );
+      xhr.simulateLoad();
+      await resultPromise;
+    },
+  );
+
+  it('suppresses derived reasoning aliases after provider translation', async () => {
+    const resultPromise = streamChatCompletion(
+      {
+        messages: [{role: 'user', content: 'Hi'}],
+        model: 'test-model',
+        reasoning: {enabled: false},
+        generationParameterModes: {reasoning: 'omit'},
+      },
+      'http://localhost:1234',
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      'llama.cpp',
+    );
+    const xhr = MockXHR.instances[0];
+    const body = JSON.parse(xhr.requestBody);
+
+    expect(Object.prototype.hasOwnProperty.call(body, 'reasoning_format')).toBe(
+      false,
+    );
+    expect(
+      Object.prototype.hasOwnProperty.call(body, 'chat_template_kwargs'),
+    ).toBe(false);
+    xhr.simulateHeaders(200);
+    xhr.simulateProgress(
+      'data: {"choices":[{"delta":{},"finish_reason":"stop"}]}\n\ndata: [DONE]\n\n',
+    );
+    xhr.simulateLoad();
+    await resultPromise;
+  });
+
+  it.each([
+    ['temperature', 0, 'temperature'],
+    ['top_p', 0, 'top_p'],
+    ['max_tokens', -1, 'max_completion_tokens'],
+    ['stop', ['END'], 'stop'],
+    ['jinja', false, 'jinja'],
+  ] as const)(
+    'removes explicit Omit %s from final chat JSON',
+    async (sourceKey, value, wireKey) => {
+      const modeKey = sourceKey === 'max_tokens' ? 'n_predict' : sourceKey;
+      const resultPromise = streamChatCompletion(
+        {
+          messages: [{role: 'user', content: 'Hi'}],
+          model: 'test-model',
+          [sourceKey]: value,
+          generationParameterModes: {[modeKey]: 'omit'},
+        },
+        'http://localhost:1234',
+      );
+      const xhr = MockXHR.instances[0];
+      const body = JSON.parse(xhr.requestBody);
+
+      expect(Object.prototype.hasOwnProperty.call(body, wireKey)).toBe(false);
+      xhr.simulateHeaders(200);
+      xhr.simulateProgress(
+        'data: {"choices":[{"delta":{},"finish_reason":"stop"}]}\n\ndata: [DONE]\n\n',
+      );
+      xhr.simulateLoad();
+      await resultPromise;
+    },
+  );
+
   it('uses the Copilot chat endpoint and identity headers without /v1', async () => {
     const resultPromise = streamChatCompletion(
       {messages: [{role: 'user', content: 'Hi'}], model: 'test-model'},

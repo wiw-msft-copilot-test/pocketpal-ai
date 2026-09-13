@@ -20,6 +20,7 @@ import {palStore} from './PalStore';
 import {deriveToolSchemas} from '../services/talents';
 import {AgentUiState, initialAgentUiState} from '../services/agent';
 import {isResponsesReplayState} from '../api/responsesTypes';
+import {mergeCompletionParameterLayers} from '../utils/generationParameterModes';
 
 /**
  * Update payload accepted by `updateMessage` / `updateMessageStreaming`.
@@ -1522,32 +1523,29 @@ class ChatSessionStore {
 
   /**
    * Resolves completion settings according to the precedence hierarchy:
-   * System Defaults → Global User Settings → Pal-Specific Settings → Session-Specific Settings (only if explicitly modified)
+   * System Defaults → Global User Settings → Pal-Specific Settings →
+   * Model Override → Session-Specific Settings (only if explicitly modified)
    */
   async resolveCompletionSettings(
     sessionId?: string,
     palId?: string,
+    modelCompletionSettings?: CompletionParams,
   ): Promise<CompletionParams> {
     // Start with system defaults
-    let resolvedSettings: CompletionParams = {...defaultCompletionSettings};
-
-    // Apply global user settings
-    resolvedSettings = {
-      ...resolvedSettings,
-      ...this.newChatCompletionSettings,
-    };
+    const layers: Array<CompletionParams | undefined> = [
+      defaultCompletionSettings,
+      this.newChatCompletionSettings,
+    ];
 
     // Apply pal-specific settings if available
+    let pactTools: CompletionParams['tools'];
     if (palId) {
       // Use in-memory pal store as the source of truth (avoids cache invalidation issues)
       const pal = palStore.pals.find(p => p.id === palId);
       const palSettings = pal?.completionSettings;
 
       if (palSettings) {
-        resolvedSettings = {
-          ...resolvedSettings,
-          ...palSettings,
-        };
+        layers.push(palSettings);
       }
 
       // Inject tool schemas from pact.talents (PACT → completionSettings.tools)
@@ -1555,12 +1553,18 @@ class ChatSessionStore {
       if (talentNames && talentNames.length > 0) {
         const tools = deriveToolSchemas(talentNames);
         if (tools.length > 0) {
-          resolvedSettings = {
-            ...resolvedSettings,
-            tools,
-          };
+          pactTools = tools;
         }
       }
+    }
+
+    // Model settings are an explicit override layer for both local and remote
+    // models. Remote records normally contain an empty object.
+    layers.push(modelCompletionSettings);
+
+    let resolvedSettings = mergeCompletionParameterLayers(...layers);
+    if (pactTools) {
+      resolvedSettings = {...resolvedSettings, tools: pactTools};
     }
 
     // No-session-only: apply user's explicit thinking override last so it
@@ -1589,10 +1593,13 @@ class ChatSessionStore {
         // Preserve PACT-derived tools — custom settings control generation
         // params (temperature, etc.) but pact.talents is the source of truth
         // for tool availability.
-        const pactTools = resolvedSettings.tools;
-        resolvedSettings = session.completionSettings;
-        if (pactTools) {
-          resolvedSettings = {...resolvedSettings, tools: pactTools};
+        const resolvedPactTools = resolvedSettings.tools;
+        resolvedSettings = mergeCompletionParameterLayers(
+          resolvedSettings,
+          session.completionSettings,
+        );
+        if (resolvedPactTools) {
+          resolvedSettings = {...resolvedSettings, tools: resolvedPactTools};
         }
       }
     }
@@ -1603,7 +1610,9 @@ class ChatSessionStore {
   /**
    * Gets the effective completion settings for the current context
    */
-  async getCurrentCompletionSettings(): Promise<CompletionParams> {
+  async getCurrentCompletionSettings(
+    modelCompletionSettings?: CompletionParams,
+  ): Promise<CompletionParams> {
     const activePalId = this.activeSessionId
       ? this.sessions.find(s => s.id === this.activeSessionId)?.activePalId
       : this.newChatPalId;
@@ -1611,6 +1620,7 @@ class ChatSessionStore {
     return this.resolveCompletionSettings(
       this.activeSessionId || undefined,
       activePalId,
+      modelCompletionSettings,
     );
   }
 }

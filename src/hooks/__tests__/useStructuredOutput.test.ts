@@ -3,6 +3,9 @@ import {useStructuredOutput} from '../useStructuredOutput';
 import {modelStore} from '../../store';
 
 jest.mock('../../store', () => ({
+  chatSessionStore: {
+    getCurrentCompletionSettings: jest.fn().mockResolvedValue({}),
+  },
   modelStore: {
     engine: {
       completion: jest.fn(),

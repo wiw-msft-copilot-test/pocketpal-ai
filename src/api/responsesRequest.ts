@@ -7,6 +7,7 @@ import type {
 import type {ReasoningIntent} from '../utils/completionTypes';
 import type {ChatMessage} from '../utils/types';
 import type {ResponsesHistoryInputItem} from '../utils/responsesReplay';
+import {applyGenerationParameterModes} from '../utils/generationParameterModes';
 
 type ToolCall = NonNullable<ChatMessage['tool_calls']>[number];
 
@@ -350,34 +351,38 @@ export function encodeResponsesRequest(
   params: ResponsesRequestParams,
   options: ResponsesRequestOptions = {},
 ): ResponsesRequestBody {
-  const tools = encodeTools(params.tools);
-  const toolChoice = encodeToolChoice(params.tool_choice, tools);
-  const text = encodeTextFormat(params.response_format);
-  const maxOutputTokens = positiveTokenLimit(params);
+  const effectiveParams = applyGenerationParameterModes(params);
+  const tools = encodeTools(effectiveParams.tools);
+  const toolChoice = encodeToolChoice(effectiveParams.tool_choice, tools);
+  const text = encodeTextFormat(effectiveParams.response_format);
+  const maxOutputTokens = positiveTokenLimit(effectiveParams);
 
-  return {
-    model: assertNonEmptyString(params.model, 'Model'),
+  return applyGenerationParameterModes({
+    model: assertNonEmptyString(effectiveParams.model, 'Model'),
     // Replay items are validated plain JSON. JSON cloning keeps the encoder
     // immutable without relying on structuredClone, which Hermes lacks.
     input: options.input
       ? (JSON.parse(
           JSON.stringify(options.input),
         ) as ResponsesHistoryInputItem[])
-      : encodeInput(params.messages),
+      : encodeInput(effectiveParams.messages),
     stream: true,
     store: false,
-    ...(params.temperature !== undefined
-      ? {temperature: params.temperature}
+    ...(effectiveParams.temperature !== undefined
+      ? {temperature: effectiveParams.temperature}
       : {}),
-    ...(params.top_p !== undefined ? {top_p: params.top_p} : {}),
+    ...(effectiveParams.top_p !== undefined
+      ? {top_p: effectiveParams.top_p}
+      : {}),
     ...(maxOutputTokens !== undefined
       ? {max_output_tokens: maxOutputTokens}
       : {}),
     ...(tools ? {tools} : {}),
     ...(toolChoice !== undefined ? {tool_choice: toolChoice} : {}),
     ...(text ? {text} : {}),
-    ...encodeReasoning(params.reasoning, options),
-  };
+    ...encodeReasoning(effectiveParams.reasoning, options),
+    generationParameterModes: params.generationParameterModes,
+  });
 }
 
 export const buildResponsesRequest = encodeResponsesRequest;

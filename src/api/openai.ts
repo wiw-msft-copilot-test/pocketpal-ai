@@ -5,10 +5,12 @@ import {
   CompletionResult,
   CompletionStreamData,
   ReasoningIntent,
+  GenerationParameterModes,
   ToolCall,
 } from '../utils/completionTypes';
 import {RemoteModelCaps} from '../utils/types';
 import {resolveRequestTimeout, xhrHttpError} from './xhrStream';
+import {applyGenerationParameterModes} from '../utils/generationParameterModes';
 
 /**
  * Raw API response shape from OpenAI /v1/models. The optional fields are what
@@ -83,6 +85,23 @@ export interface StreamChatParams {
   response_format?: OpenAIResponseFormat;
   /** Reasoning on/off + effort intent; translated to a per-serverType payload. */
   reasoning?: ReasoningIntent;
+  generationParameterModes?: GenerationParameterModes;
+  top_k?: number;
+  min_p?: number;
+  xtc_threshold?: number;
+  xtc_probability?: number;
+  typical_p?: number;
+  penalty_last_n?: number;
+  penalty_repeat?: number;
+  penalty_freq?: number;
+  penalty_present?: number;
+  mirostat?: number;
+  mirostat_tau?: number;
+  mirostat_eta?: number;
+  seed?: number;
+  n_probs?: number;
+  jinja?: boolean;
+  enable_thinking?: boolean;
 }
 
 /**
@@ -1065,55 +1084,91 @@ export async function streamChatCompletion(
 
     // Only include params with meaningful values — some providers (e.g. OpenAI
     // with newer models) reject unsupported or empty params with 400 errors.
+    const effectiveParams = applyGenerationParameterModes(params);
     const requestBody: Record<string, any> = {
-      model: params.model,
+      model: effectiveParams.model,
       messages: encodedMessages,
       stream: true,
     };
-    if (params.temperature != null) {
-      requestBody.temperature = params.temperature;
+    if (effectiveParams.temperature !== undefined) {
+      requestBody.temperature = effectiveParams.temperature;
     }
-    if (params.top_p != null) {
-      requestBody.top_p = params.top_p;
+    if (effectiveParams.top_p !== undefined) {
+      requestBody.top_p = effectiveParams.top_p;
     }
-    if (params.max_tokens != null) {
-      requestBody.max_completion_tokens = params.max_tokens;
+    if (effectiveParams.max_tokens !== undefined) {
+      requestBody.max_completion_tokens = effectiveParams.max_tokens;
     }
-    if (params.stop && params.stop.length > 0) {
-      requestBody.stop = params.stop;
+    if (
+      effectiveParams.stop !== undefined &&
+      (effectiveParams.stop.length > 0 ||
+        params.generationParameterModes?.stop === 'send')
+    ) {
+      requestBody.stop = effectiveParams.stop;
+    }
+    const extensionKeys = [
+      'top_k',
+      'min_p',
+      'xtc_threshold',
+      'xtc_probability',
+      'typical_p',
+      'mirostat',
+      'mirostat_tau',
+      'mirostat_eta',
+      'seed',
+      'n_probs',
+      'jinja',
+      'enable_thinking',
+    ] as const;
+    for (const key of extensionKeys) {
+      if (effectiveParams[key] !== undefined) {
+        requestBody[key] = effectiveParams[key];
+      }
+    }
+    if (effectiveParams.penalty_last_n !== undefined) {
+      requestBody.repeat_last_n = effectiveParams.penalty_last_n;
+    }
+    if (effectiveParams.penalty_repeat !== undefined) {
+      requestBody.repeat_penalty = effectiveParams.penalty_repeat;
+    }
+    if (effectiveParams.penalty_freq !== undefined) {
+      requestBody.frequency_penalty = effectiveParams.penalty_freq;
+    }
+    if (effectiveParams.penalty_present !== undefined) {
+      requestBody.presence_penalty = effectiveParams.penalty_present;
     }
     // Only attach when the caller actually supplied them — empty arrays
     // cause some servers (and their schema validators) to choke.
-    if (params.tools && params.tools.length > 0) {
-      requestBody.tools = params.tools;
+    if (effectiveParams.tools && effectiveParams.tools.length > 0) {
+      requestBody.tools = effectiveParams.tools;
     }
-    if (params.tool_choice !== undefined) {
-      requestBody.tool_choice = params.tool_choice;
+    if (effectiveParams.tool_choice !== undefined) {
+      requestBody.tool_choice = effectiveParams.tool_choice;
     }
-    if (params.response_format) {
+    if (effectiveParams.response_format) {
       // OpenAI requires `name` inside json_schema; llama.cpp / Ollama /
       // LM Studio ignore it. Inject a default so the same call works
       // everywhere.
       if (
-        params.response_format.type === 'json_schema' &&
-        !params.response_format.json_schema.name
+        effectiveParams.response_format.type === 'json_schema' &&
+        !effectiveParams.response_format.json_schema.name
       ) {
         requestBody.response_format = {
-          ...params.response_format,
+          ...effectiveParams.response_format,
           json_schema: {
-            ...params.response_format.json_schema,
+            ...effectiveParams.response_format.json_schema,
             name: 'response',
           },
         };
       } else {
-        requestBody.response_format = params.response_format;
+        requestBody.response_format = effectiveParams.response_format;
       }
     }
     // Per-serverType reasoning controls. Merge chat_template_kwargs rather than
     // overwrite so a future caller-supplied kwarg is preserved.
     const reasoningPayload = buildReasoningPayload(
       serverType,
-      params.reasoning,
+      effectiveParams.reasoning,
     );
     for (const [key, value] of Object.entries(reasoningPayload)) {
       if (key === 'chat_template_kwargs') {
@@ -1125,6 +1180,10 @@ export async function streamChatCompletion(
         requestBody[key] = value;
       }
     }
-    xhr.send(JSON.stringify(requestBody));
+    const finalRequestBody = applyGenerationParameterModes({
+      ...requestBody,
+      generationParameterModes: params.generationParameterModes,
+    });
+    xhr.send(JSON.stringify(finalRequestBody));
   });
 }

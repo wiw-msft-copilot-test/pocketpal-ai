@@ -265,6 +265,59 @@ describe('encodeResponsesRequest', () => {
   });
 
   it.each([
+    ['temperature', 0, 'temperature'],
+    ['top_p', 0, 'top_p'],
+    ['n_predict', -1, 'max_output_tokens'],
+  ] as const)(
+    'omits %s from final Responses JSON when mode is Omit',
+    (sourceKey, value, wireKey) => {
+      const body = encodeResponsesRequest({
+        ...baseParams(),
+        [sourceKey]: value,
+        generationParameterModes: {[sourceKey]: 'omit'},
+      });
+
+      expect(Object.prototype.hasOwnProperty.call(body, wireKey)).toBe(false);
+    },
+  );
+
+  it.each([
+    ['temperature', 0],
+    ['top_p', 0],
+  ] as const)('retains valid zero Send value for %s', (key, value) => {
+    const body = encodeResponsesRequest({
+      ...baseParams(),
+      [key]: value,
+      generationParameterModes: {[key]: 'send'},
+    });
+
+    expect(Object.prototype.hasOwnProperty.call(body, key)).toBe(true);
+    expect(body[key]).toBe(0);
+  });
+
+  it('suppresses the nested reasoning alias at the final encoder', () => {
+    const body = encodeResponsesRequest(
+      {
+        ...baseParams(),
+        reasoning: {enabled: true, effort: 'high'},
+        generationParameterModes: {reasoning: 'omit'},
+      },
+      {
+        parameterPolicy: {
+          reasoning: {
+            supportsEffort: true,
+            supportsEncryptedContent: true,
+          },
+        },
+        includeReasoningEncryptedContent: true,
+      },
+    );
+
+    expect(Object.prototype.hasOwnProperty.call(body, 'reasoning')).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(body, 'include')).toBe(false);
+  });
+
+  it.each([
     [
       'conflicting token limits',
       {...baseParams(), max_tokens: 10, n_predict: 20},

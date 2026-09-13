@@ -139,6 +139,42 @@ describe('LocalCompletionEngine', () => {
     await engine.stopCompletion();
     expect(mockContext.stopCompletion).toHaveBeenCalled();
   });
+
+  it('removes omitted native arguments while preserving valid Send sentinels', async () => {
+    (mockContext.completion as jest.Mock).mockResolvedValueOnce({
+      text: '',
+      content: '',
+    });
+
+    await engine.completion({
+      temperature: 0.7,
+      top_p: 0,
+      seed: -1,
+      jinja: false,
+      generationParameterModes: {
+        temperature: 'omit',
+        top_p: 'send',
+        seed: 'send',
+        jinja: 'send',
+      },
+    });
+
+    const nativeParams = (mockContext.completion as jest.Mock).mock.calls[0][0];
+    expect(
+      Object.prototype.hasOwnProperty.call(nativeParams, 'temperature'),
+    ).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(nativeParams, 'top_p')).toBe(
+      true,
+    );
+    expect(Object.prototype.hasOwnProperty.call(nativeParams, 'seed')).toBe(
+      true,
+    );
+    expect(Object.prototype.hasOwnProperty.call(nativeParams, 'jinja')).toBe(
+      true,
+    );
+    expect(nativeParams).toMatchObject({top_p: 0, seed: -1, jinja: false});
+    expect(nativeParams).not.toHaveProperty('generationParameterModes');
+  });
 });
 
 describe('OpenAICompletionEngine', () => {

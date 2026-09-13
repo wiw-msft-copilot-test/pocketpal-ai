@@ -13,6 +13,10 @@ import {
   CompletionEngine,
   toApiCompletionParams,
 } from '../utils/completionTypes';
+import {
+  applyGenerationParameterModes,
+  mergeCompletionParameterLayers,
+} from '../utils/generationParameterModes';
 
 import {fetchModelFilesDetails} from '../api/hf';
 import {
@@ -3847,8 +3851,12 @@ class ModelStore {
         this.isStreaming = true;
       });
 
-      const completionParams =
+      const globalCompletionParams =
         await chatSessionRepository.getGlobalCompletionSettings();
+      const completionParams = mergeCompletionParameterLayers(
+        globalCompletionParams,
+        this.activeModel?.completionSettings,
+      );
       const stopWords = toJS(modelStore.activeModel?.stopWords);
 
       // Create completion params with app-specific properties
@@ -3868,7 +3876,7 @@ class ModelStore {
 
       // Create the completion promise and register it for safe context release
       const completionPromise = this.context.completion(
-        cleanCompletionParams,
+        applyGenerationParameterModes(cleanCompletionParams),
         data => {
           if (data.token) {
             params.onToken?.(data.token);

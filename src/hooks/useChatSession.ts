@@ -73,7 +73,9 @@ const prepareCompletion = async ({
   currentMessages: MessageType.Any[];
 }) => {
   const sessionCompletionSettings =
-    await chatSessionStore.getCurrentCompletionSettings();
+    await chatSessionStore.getCurrentCompletionSettings(
+      modelStore.activeModel?.completionSettings,
+    );
   const stopWords = toJS(modelStore.activeModel?.stopWords);
 
   // Check if we have images and if multimodal is enabled

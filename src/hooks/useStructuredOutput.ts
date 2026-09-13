@@ -2,7 +2,7 @@ import {useCallback, useRef, useState, useContext} from 'react';
 
 import {toJS} from 'mobx';
 
-import {modelStore} from '../store';
+import {chatSessionStore, modelStore} from '../store';
 import {safeParseJSON} from '../utils';
 import {L10nContext} from '../utils';
 
@@ -50,7 +50,12 @@ export const useStructuredOutput = () => {
           engine.stopCompletion().catch(() => {});
         };
 
+        const resolvedSettings =
+          await chatSessionStore.getCurrentCompletionSettings(
+            modelStore.activeModel?.completionSettings,
+          );
         const result = await engine.completion({
+          ...resolvedSettings,
           messages: [{role: 'user', content: prompt}],
           response_format: {
             type: 'json_schema',
@@ -66,6 +71,12 @@ export const useStructuredOutput = () => {
 
           stop: stopWords,
           enable_thinking: false,
+          ...(resolvedSettings.generationParameterModes
+            ? {
+                generationParameterModes:
+                  resolvedSettings.generationParameterModes,
+              }
+            : {}),
         });
 
         stopRef.current = null;
