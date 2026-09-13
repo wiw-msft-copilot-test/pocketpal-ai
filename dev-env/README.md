@@ -26,41 +26,166 @@ translate WSL file paths for APK copies and key mounts.
 
 ## Usage
 
-### Fast local emulator operations
+### Step-by-step: reload an APK and playtest it
 
-Use `android_emulator.py` while developing or when an APK is already on disk.
-It does not dispatch GitHub Actions or inspect the app's feature policy.
+Follow these steps from the repository root. The commands below use the
+retained default emulator:
 
-Run commands from the repository root:
+| Setting | Value |
+| --- | --- |
+| Container | `pocketpal-android-emulator` |
+| Android version | Android 11 / API 30 |
+| ADB address | `127.0.0.1:5555` |
+| PocketPal E2E package | `com.pocketpalai.e2e` |
+
+#### 1. Open a terminal in the repository and check prerequisites
 
 ```bash
-# Download the default Android 11 / API 30 image.
-python3 dev-env/android_emulator.py pull
+cd /home/wiw/workspace/pocketpal-ai
+python3 --version
+docker info >/dev/null && echo "Docker is reachable"
+test -e /dev/kvm && echo "/dev/kvm is available"
+adb version
+scrcpy --version
+```
 
-# Start the container and wait until Android has booted.
+**Verify:** Python, ADB, and scrcpy each print a version. The Docker check
+prints `Docker is reachable`, and the KVM check prints `/dev/kvm is
+available`. If Docker is not reachable, start Docker Desktop (and enable WSL
+integration when using WSL 2) before continuing. If `adb` or `scrcpy` is
+missing on Ubuntu/Debian, install them with:
+
+```bash
+sudo apt update
+sudo apt install -y adb scrcpy
+```
+
+#### 2. Get the APK
+
+For the source-matching APK from the verified GitHub Actions build, authenticate
+the GitHub CLI and download the artifact:
+
+```bash
+gh auth status
+rm -rf /tmp/pocketpal-apk-34751845630
+mkdir -p /tmp/pocketpal-apk-34751845630
+gh run download 34751845630 \
+  --repo wiw-msft-copilot-test/pocketpal-ai \
+  --name e2e-android-apk \
+  --dir /tmp/pocketpal-apk-34751845630
+export APK=/tmp/pocketpal-apk-34751845630/app-e2e-releaseE2e.apk
+test -f "$APK" && echo "APK found: $APK"
+sha256sum "$APK"
+```
+
+**Verify:** The final command prints this SHA-256 for that exact artifact:
+
+```text
+26b53311d5906d5c35d77eaa8e9c8d5c673bee648c64132ca7bbfeb66a4c5f2f
+```
+
+For an APK already on disk, skip the download and set `APK` to its path
+instead:
+
+```bash
+export APK=/absolute/path/to/app-e2e-releaseE2e.apk
+test -f "$APK" && echo "APK found: $APK"
+```
+
+#### 3. Restart the emulator and wait for Android to boot
+
+The `stop` command intentionally keeps the container and its Android data. The
+following block stops the existing container when present and also works on
+first use when the container does not exist:
+
+```bash
+if python3 dev-env/android_emulator.py status | grep -q "does not exist"; then
+  echo "No existing emulator container; creating it now."
+else
+  python3 dev-env/android_emulator.py stop
+fi
 python3 dev-env/android_emulator.py start
+```
 
-# Inspect the container and attached emulator.
+**Verify:** `start` ends with an Android readiness message such as
+`Android 11 (API 30) is ready.`. Then confirm the retained container and ADB
+connection:
+
+```bash
 python3 dev-env/android_emulator.py status
+adb connect 127.0.0.1:5555
+adb -s 127.0.0.1:5555 get-state
+adb -s 127.0.0.1:5555 shell getprop sys.boot_completed
+```
 
-# Install or update a local APK.
-python3 dev-env/android_emulator.py install \
-  android/app/build/outputs/apk/e2e/releaseE2e/app-e2e-releaseE2e.apk
+The expected results are `status: running`, `device`, and `1`.
 
-# Install and launch PocketPal's E2E activity.
-python3 dev-env/android_emulator.py install path/to/app.apk \
-  --launch com.pocketpalai.e2e
+#### 4. Install the APK and launch PocketPal
 
-# Equivalently, specify the exact full component.
-python3 dev-env/android_emulator.py install path/to/app.apk \
-  --launch com.pocketpalai.e2e/com.pocketpal.MainActivity \
+```bash
+python3 dev-env/android_emulator.py install "$APK" \
+  --launch com.pocketpalai.e2e \
   --launch-check-seconds 10
+```
 
-# Relaunch an installed app without reinstalling its APK.
+The command replaces the installed APK, launches PocketPal, and checks that
+the process remains alive and in the foreground.
+
+**Verify:** The command ends successfully. For an additional explicit check:
+
+```bash
+adb -s 127.0.0.1:5555 shell pm path com.pocketpalai.e2e
+adb -s 127.0.0.1:5555 shell dumpsys activity activities \
+  | grep -m1 -E 'mResumedActivity|topResumedActivity'
+```
+
+The first command must print a `package:/data/app/...` path, and the second
+must contain `com.pocketpalai.e2e/com.pocketpal.MainActivity`.
+
+#### 5. Open the emulator window with scrcpy
+
+Leave the terminal running the emulator, open a second terminal, and run:
+
+```bash
+cd /home/wiw/workspace/pocketpal-ai
+adb connect 127.0.0.1:5555
+scrcpy --serial 127.0.0.1:5555 --window-title "PocketPal Android emulator"
+```
+
+**Verify:** A window titled **PocketPal Android emulator** appears. Use the
+mouse and keyboard to playtest the APK. Close the scrcpy window or press
+`Ctrl+C` in its terminal when finished; this does not stop the emulator.
+
+On Windows 11 with WSLg, scrcpy should display a window automatically. If no
+window appears, verify that the Linux GUI environment is available:
+
+```bash
+echo "DISPLAY=$DISPLAY"
+echo "WAYLAND_DISPLAY=$WAYLAND_DISPLAY"
+```
+
+At least one of these values should be populated. Run scrcpy from a WSLg
+terminal rather than an SSH-only shell.
+
+#### Reload a different APK later
+
+Once the emulator is running, repeat only Steps 2, 4, and 5. The shortest
+reload command is:
+
+```bash
+python3 dev-env/android_emulator.py install "$APK" \
+  --launch com.pocketpalai.e2e \
+  --launch-check-seconds 10
+```
+
+The emulator can also be controlled directly:
+
+```bash
+# Relaunch the currently installed APK without reinstalling it.
 python3 dev-env/android_emulator.py launch com.pocketpalai.e2e \
   --launch-check-seconds 15
 
-# Follow emulator logs.
+# Follow emulator logs when diagnosing a failed launch.
 python3 dev-env/android_emulator.py logs --follow
 
 # Stop the container without deleting it.
