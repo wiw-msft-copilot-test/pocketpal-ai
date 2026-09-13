@@ -103,6 +103,67 @@ manually when its state is no longer needed:
 docker rm pocketpal-android-emulator
 ```
 
+### View and control the emulator from Linux or WSL
+
+The Google emulator container is headless. To open an interactive window
+without using Windows tools, install ADB and scrcpy in Linux:
+
+```bash
+sudo apt update
+sudo apt install -y adb scrcpy
+```
+
+Connect to the loopback-only ADB port and open the display:
+
+```bash
+adb connect 127.0.0.1:5555
+adb devices
+scrcpy --serial 127.0.0.1:5555
+```
+
+On Windows 11 with WSLg, the scrcpy window should appear automatically. If it
+does not, verify that GUI forwarding is available:
+
+```bash
+echo "$DISPLAY"
+echo "$WAYLAND_DISPLAY"
+```
+
+Both should normally be populated in a WSLg session. Run the commands from a
+WSLg-capable terminal rather than an SSH-only shell.
+
+For a non-interactive screenshot, no host ADB installation is required:
+
+```bash
+python3 - <<'PY'
+import subprocess
+from pathlib import Path
+import sys
+
+sys.path.insert(0, str(Path("dev-env").resolve()))
+from docker_cli import docker_command
+
+with open("/tmp/pocketpal-emulator.png", "wb") as screenshot:
+    subprocess.run(
+        docker_command(
+            "exec",
+            "pocketpal-android-emulator",
+            "/android/sdk/platform-tools/adb",
+            "exec-out",
+            "screencap",
+            "-p",
+        ),
+        stdout=screenshot,
+        check=True,
+    )
+PY
+```
+
+Open `/tmp/pocketpal-emulator.png` with any Linux image viewer. Port `8554`
+exposes the emulator's gRPC/WebRTC service endpoint; it is not a standalone
+browser UI. A browser viewer requires Google's separate WebRTC gateway and
+frontend.
+
 ## Full GitHub artifact acceptance
 
 Use `verify_android_artifact.py` after changing native dependencies, feature
@@ -194,9 +255,6 @@ The skip options are for diagnosis only and are recorded as `skipped` in
 `8556` are occupied, override `--clean-adb-port` and
 `--clean-webrtc-port`. The persistent emulator is left running, while the
 run-specific clean-test emulator is always removed.
-
-Port `8554` exposes the emulator's gRPC/WebRTC service endpoint. It is not a
-standalone browser UI.
 
 ## Troubleshooting Docker Desktop on WSL
 
