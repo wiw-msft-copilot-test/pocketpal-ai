@@ -3,7 +3,7 @@ import {render, fireEvent, waitFor} from '@testing-library/react-native';
 import {Alert, Keyboard} from 'react-native';
 
 import {ChatPalModelPickerSheet} from '../ChatPalModelPickerSheet';
-import {modelStore, chatSessionStore, palStore} from '../../../store';
+import {modelStore, chatSessionStore} from '../../../store';
 import {user} from '../../../../jest/fixtures';
 import {UserContext, L10nContext} from '../../../utils';
 import {l10n} from '../../../locales';
@@ -120,21 +120,6 @@ const defaultProps = {
 describe('ChatPalModelPickerSheet', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    (chatSessionStore as any).activePalId = 'pal1';
-    palStore.pals = [
-      {
-        id: 'pal1',
-        name: 'Test Assistant',
-        palType: 'assistant',
-        defaultModel: {id: 'model1', name: 'Test Model 1'},
-      },
-      {
-        id: 'pal2',
-        name: 'Test Roleplay',
-        palType: 'roleplay',
-        defaultModel: {id: 'model2', name: 'Test Model 2'},
-      },
-    ] as any;
   });
 
   it('renders correctly when visible', () => {
@@ -289,43 +274,6 @@ describe('ChatPalModelPickerSheet', () => {
       expect(defaultProps.onPalSelect).toHaveBeenCalledWith('pal1');
       expect(defaultProps.onClose).toHaveBeenCalled();
     });
-  });
-
-  it('closes the picker before opening active Pal settings', () => {
-    (chatSessionStore as any).activePalId = 'pal-1';
-    palStore.pals = [
-      {
-        id: 'pal-1',
-        name: 'Test Pal',
-        type: 'local',
-      } as any,
-    ];
-    const onClose = jest.fn();
-    const onPalSettingsSelect = jest.fn();
-    const {getByTestId} = render(
-      <UserContext.Provider value={user}>
-        <L10nContext.Provider value={l10n.en}>
-          <ChatPalModelPickerSheet
-            isVisible
-            chatInputHeight={0}
-            onClose={onClose}
-            onPalSettingsSelect={onPalSettingsSelect}
-          />
-        </L10nContext.Provider>
-      </UserContext.Provider>,
-    );
-
-    fireEvent.press(getByTestId('pal-settings-Test Pal'), {
-      stopPropagation: jest.fn(),
-    });
-
-    expect(onClose).toHaveBeenCalledTimes(1);
-    expect(onPalSettingsSelect).toHaveBeenCalledWith(
-      expect.objectContaining({id: 'pal-1'}),
-    );
-    expect(onClose.mock.invocationCallOrder[0]).toBeLessThan(
-      onPalSettingsSelect.mock.invocationCallOrder[0],
-    );
   });
 
   it('shows model switch confirmation when pal has different default model', async () => {

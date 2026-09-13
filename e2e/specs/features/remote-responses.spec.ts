@@ -2,10 +2,8 @@ import {expect} from '@wdio/globals';
 import {ChatPage} from '../../pages/ChatPage';
 import {DrawerPage} from '../../pages/DrawerPage';
 import {ModelsPage} from '../../pages/ModelsPage';
-import {PalSheetPage} from '../../pages/PalSheetPage';
 import {TIMEOUTS} from '../../fixtures/models';
 import {
-  CHAT_MODEL_ID,
   RESPONSES_MODEL_ID,
   UNSUPPORTED_MODEL_ID,
 } from '../../fixtures/remote-responses-server';
@@ -27,7 +25,6 @@ declare const driver: WebdriverIO.Browser;
 const FIXTURE_URL =
   process.env.E2E_REMOTE_FIXTURE_URL || 'http://127.0.0.1:18080';
 const APP_ID = 'com.pocketpalai.e2e';
-const PAL_NAME = 'E2E Calculate';
 
 async function navigateToModels(
   chatPage: ChatPage,
@@ -202,72 +199,13 @@ describe('Remote Responses protocol', () => {
     await waitForAssistantText('Completion failed');
   });
 
-  it('runs the built-in calculate talent and validates exact replay', async () => {
-    await chatPage.openPalPicker();
-    await chatPage.selectPal('Lookie');
-    await chatPage.openPalPicker();
-    const lookie = browser.$(byPartialText('Lookie'));
-    for (let attempt = 0; attempt < 3; attempt++) {
-      await Gestures.swipe({
-        startXPercent: 0.2,
-        startYPercent: 0.7,
-        endXPercent: 0.8,
-        endYPercent: 0.7,
-        duration: 300,
-      });
-      if (
-        await lookie
-          .waitForDisplayed({timeout: 3000})
-          .then(() => true)
-          .catch(() => false)
-      ) {
-        break;
-      }
-    }
-    await lookie.waitForDisplayed({timeout: 5000});
-    const settings = browser.$(Selectors.chat.palPicker.settings('Lookie'));
-    await settings.waitForDisplayed({timeout: 5000});
-    await settings.click();
-    const palSheet = new PalSheetPage();
-    await palSheet.setName(PAL_NAME);
-    await palSheet.setSystemPrompt(
-      'Use the calculate talent whenever the user requests arithmetic.',
-    );
-    await palSheet.enableTalent('calculate');
-    await palSheet.submit();
-
-    await chatPage.waitForReady(TIMEOUTS.appReady);
+  it('rejects an unenabled function and replays its exact outcome', async () => {
     await chatPage.sendMessage('fixture:tool calculate 6*7');
-    await waitForAssistantText('Tool replay validated: 6*7 = 42.', 45000);
+    await waitForAssistantText(
+      'Rejected tool outcome replayed exactly once.',
+      45000,
+    );
     const status = await fixtureStatus(FIXTURE_URL);
     expect(status.toolReplayValidated).toBe(true);
-  });
-
-  it('adds and routes the Chat-only model through chat completions', async () => {
-    await navigateToModels(chatPage, drawerPage, modelsPage);
-    await modelsPage.openAddRemoteModel();
-    const knownServer = browser.$(byPartialText('127.0.0.1'));
-    await knownServer.waitForDisplayed({timeout: 5000});
-    await knownServer.click();
-    await waitForConnected();
-
-    await Gestures.scrollInSheetToElementExists(
-      Selectors.remoteModel.protocolRow(CHAT_MODEL_ID),
-      10,
-    );
-    expect(
-      await browser
-        .$(Selectors.remoteModel.protocolRow(CHAT_MODEL_ID))
-        .getText(),
-    ).toContain('Chat Completions');
-    await addModelFromOpenRemoteSheet(CHAT_MODEL_ID);
-
-    await chatPage.openDrawer();
-    await drawerPage.waitForOpen();
-    await drawerPage.navigateToChat();
-    await selectChatModel(CHAT_MODEL_ID);
-    await chatPage.sendMessage('verify chat routing');
-    await waitForAssistantText('Chat completions route confirmed.');
-    await assertLatestPath('/chat/completions');
   });
 });

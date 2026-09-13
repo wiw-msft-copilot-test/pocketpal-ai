@@ -279,7 +279,7 @@ function validateToolReplay(body: any): {ok: boolean; detail: string} {
   }
   if (
     output?.call_id !== 'call-calculate-42' ||
-    output?.output !== '6*7 = 42'
+    output?.output !== 'Talent "calculate" is not enabled for this Pal'
   ) {
     return {ok: false, detail: 'function_call_output did not match'};
   }
@@ -408,7 +408,9 @@ function streamResponsesScenario(
         response.end();
         return;
       }
-      complete(response, [message('Tool replay validated: 6*7 = 42.')]);
+      complete(response, [
+        message('Rejected tool outcome replayed exactly once.'),
+      ]);
       return;
     }
     complete(response, [

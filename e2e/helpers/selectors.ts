@@ -138,10 +138,6 @@ export const Selectors = {
       return byTestId('chat-input');
     },
 
-    palPicker: {
-      settings: (palName: string): string =>
-        byTestId(`pal-settings-${palName}`),
-    },
     get sendButton(): string {
       return byTestId('send-button');
     },

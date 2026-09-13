@@ -120,17 +120,17 @@ describe('remote responses fixture', () => {
           {
             type: 'function_call_output',
             call_id: 'call-calculate-42',
-            output: '6*7 = 42',
+            output: 'Talent "calculate" is not enabled for this Pal',
           },
         ],
         stream: true,
       }),
     });
-    assert.match(await readSse(second), /Tool replay validated/);
+    assert.match(await readSse(second), /Rejected tool outcome replayed/);
     assert.equal(server.state.toolReplayValidated, true);
     assert.equal(
       (server.state.requests[1].body as any).input.at(-1).output,
-      '6*7 = 42',
+      'Talent "calculate" is not enabled for this Pal',
     );
   });
 

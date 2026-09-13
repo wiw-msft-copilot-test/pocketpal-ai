@@ -293,7 +293,6 @@ export const ChatPalModelPickerSheet = observer(
                   testID={`pal-settings-${pal.name}`}
                   onPress={e => {
                     e.stopPropagation();
-                    onClose();
                     onPalSettingsSelect(pal);
                   }}>
                   <SettingsIcon
