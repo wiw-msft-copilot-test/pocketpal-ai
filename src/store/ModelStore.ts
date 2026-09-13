@@ -2708,6 +2708,17 @@ class ModelStore {
     // tear down the currently active session.
     await this.releaseContext();
 
+    const activeBinding = {
+      modelId: model.id,
+      serverId: model.serverId!,
+      remoteModelId: model.remoteModelId!,
+      url: bindingSnapshot.url,
+      serverType: bindingSnapshot.serverType,
+      wireApi: bindingSnapshot.wireApi,
+      protocolCapabilities: bindingSnapshot.protocolCapabilities,
+      credentialRevision: bindingSnapshot.credentialRevision,
+    };
+
     runInAction(() => {
       this.engine = new OpenAICompletionEngine(
         bindingSnapshot.url,
@@ -2715,17 +2726,9 @@ class ModelStore {
         apiKey,
         bindingSnapshot.requestTimeoutMs,
         bindingSnapshot.serverType,
+        activeBinding,
       );
-      this.activeRemoteBinding = {
-        modelId: model.id,
-        serverId: model.serverId!,
-        remoteModelId: model.remoteModelId!,
-        url: bindingSnapshot.url,
-        serverType: bindingSnapshot.serverType,
-        wireApi: bindingSnapshot.wireApi,
-        protocolCapabilities: bindingSnapshot.protocolCapabilities,
-        credentialRevision: bindingSnapshot.credentialRevision,
-      };
+      this.activeRemoteBinding = activeBinding;
       this.setActiveModel(model.id);
       // Do NOT set lastUsedModelId for remote models -- server may be offline on next launch
     });

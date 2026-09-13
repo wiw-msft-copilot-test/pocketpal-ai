@@ -6,6 +6,7 @@ import type {
 } from './openai';
 import type {ReasoningIntent} from '../utils/completionTypes';
 import type {ChatMessage} from '../utils/types';
+import type {ResponsesHistoryInputItem} from '../utils/responsesReplay';
 
 type ToolCall = NonNullable<ChatMessage['tool_calls']>[number];
 
@@ -24,7 +25,7 @@ export interface ResponsesChatMessage {
 
 export type ResponsesInputItem =
   | {
-      role: string;
+      role: 'system' | 'developer' | 'user' | 'assistant';
       content:
         | string
         | Array<
@@ -57,6 +58,7 @@ export interface ResponsesParameterPolicy {
 export interface ResponsesRequestOptions {
   parameterPolicy?: ResponsesParameterPolicy;
   includeReasoningEncryptedContent?: boolean;
+  input?: ResponsesHistoryInputItem[];
 }
 
 export type ResponsesRequestParams = Omit<StreamChatParams, 'messages'> & {
@@ -66,7 +68,7 @@ export type ResponsesRequestParams = Omit<StreamChatParams, 'messages'> & {
 
 export interface ResponsesRequestBody {
   model: string;
-  input: ResponsesInputItem[];
+  input: ResponsesHistoryInputItem[];
   stream: true;
   store: false;
   temperature?: number;
@@ -169,6 +171,14 @@ function encodeInput(messages: ResponsesChatMessage[]): ResponsesInputItem[] {
       return;
     }
 
+    if (
+      message.role !== 'system' &&
+      message.role !== 'developer' &&
+      message.role !== 'user' &&
+      message.role !== 'assistant'
+    ) {
+      throw new Error(`Unsupported message role at messages[${index}]`);
+    }
     if (message.content !== undefined) {
       input.push({
         role: message.role,
@@ -347,7 +357,9 @@ export function encodeResponsesRequest(
 
   return {
     model: assertNonEmptyString(params.model, 'Model'),
-    input: encodeInput(params.messages),
+    input: options.input
+      ? structuredClone(options.input)
+      : encodeInput(params.messages),
     stream: true,
     store: false,
     ...(params.temperature !== undefined

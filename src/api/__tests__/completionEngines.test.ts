@@ -5,12 +5,17 @@ import {
   OpenAICompletionEngine,
 } from '../completionEngines';
 import * as openaiModule from '../openai';
+import * as responsesModule from '../responses';
 
 jest.mock('../openai', () => ({
   streamChatCompletion: jest.fn(),
 }));
+jest.mock('../responses', () => ({
+  streamResponses: jest.fn(),
+}));
 
 const mockedStreamChat = openaiModule.streamChatCompletion as jest.Mock;
+const mockedStreamResponses = responsesModule.streamResponses as jest.Mock;
 
 describe('LocalCompletionEngine', () => {
   let mockContext: LlamaContext;
@@ -388,6 +393,106 @@ describe('OpenAICompletionEngine', () => {
       undefined,
       undefined,
       'GitHub Copilot',
+    );
+  });
+
+  it('dispatches Responses with replay input and immutable binding', async () => {
+    const responsesEngine = new OpenAICompletionEngine(
+      'https://api.githubcopilot.com',
+      'gpt-5.6-terra',
+      'test-key',
+      45000,
+      'GitHub Copilot',
+      {
+        modelId: 'server-1/gpt-5.6-terra',
+        serverId: 'server-1',
+        remoteModelId: 'gpt-5.6-terra',
+        url: 'https://api.githubcopilot.com',
+        serverType: 'GitHub Copilot',
+        wireApi: 'responses',
+        credentialRevision: 3,
+        protocolCapabilities: {
+          advertisedEndpoints: ['responses'],
+          reasoningEffortValues: ['low', 'high'],
+        },
+      },
+    );
+    mockedStreamResponses.mockResolvedValueOnce({
+      text: 'done',
+      content: 'done',
+      terminal_status: 'completed',
+    });
+
+    const result = await responsesEngine.completion({
+      messages: [{role: 'user', content: 'Synthetic request'}],
+      tools: [],
+      reasoning: {enabled: true, effort: 'high'},
+    } as any);
+
+    expect(mockedStreamChat).not.toHaveBeenCalled();
+    expect(mockedStreamResponses).toHaveBeenCalledWith(
+      expect.objectContaining({
+        model: 'gpt-5.6-terra',
+        messages: [{role: 'user', content: 'Synthetic request'}],
+        reasoning: {enabled: true, effort: 'high'},
+      }),
+      'https://api.githubcopilot.com',
+      'test-key',
+      expect.any(AbortSignal),
+      undefined,
+      45000,
+      'GitHub Copilot',
+      expect.objectContaining({
+        wireApi: 'responses',
+        serverId: 'server-1',
+        modelId: 'gpt-5.6-terra',
+        credentialRevision: 3,
+      }),
+      expect.objectContaining({
+        input: [{role: 'user', content: 'Synthetic request'}],
+        includeReasoningEncryptedContent: true,
+        parameterPolicy: {
+          reasoning: expect.objectContaining({
+            supportsEffort: true,
+            supportsEncryptedContent: true,
+          }),
+        },
+      }),
+    );
+    expect(result.content).toBe('done');
+  });
+
+  it('strips Responses metadata before Chat Completions', async () => {
+    mockedStreamChat.mockResolvedValueOnce({text: 'ok', content: 'ok'});
+    await engine.completion({
+      messages: [
+        {
+          role: 'assistant',
+          content: 'prior',
+          responsesState: {
+            version: 1,
+            binding: {
+              wireApi: 'responses',
+              serverUrl: 'https://other.test',
+              modelId: 'other',
+            },
+            output: [],
+            terminalStatus: 'completed',
+          },
+        },
+      ],
+    } as any);
+
+    expect(mockedStreamChat).toHaveBeenCalledWith(
+      expect.objectContaining({
+        messages: [{role: 'assistant', content: 'prior'}],
+      }),
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+      undefined,
+      undefined,
+      undefined,
     );
   });
 });

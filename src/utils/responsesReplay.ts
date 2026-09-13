@@ -28,7 +28,7 @@ export type ResponsesInputContent =
     >;
 
 export interface ResponsesInputMessage {
-  role: 'system' | 'user' | 'assistant';
+  role: 'system' | 'developer' | 'user' | 'assistant';
   content: ResponsesInputContent;
 }
 
