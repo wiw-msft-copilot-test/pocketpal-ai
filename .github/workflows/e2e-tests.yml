@@ -5,9 +5,15 @@ on:
   # "Use workflow from" selector (or `gh workflow run --ref <branch>`);
   # checkout below builds whatever ref the run was dispatched on.
   workflow_dispatch:
+    inputs:
+      artifact_run_id:
+        description: Existing successful build run to smoke-test without rebuilding
+        required: false
+        type: string
 
 permissions:
   contents: read
+  actions: read
 
 env:
   NODE_VERSION: '22'
@@ -15,6 +21,7 @@ env:
 
 jobs:
   build-android:
+    if: inputs.artifact_run_id == ''
     runs-on: ubuntu-latest
     env:
       # Declared here rather than in android/gradle.properties: llama.rn's own
@@ -214,6 +221,9 @@ jobs:
   smoke-android:
     name: install-and-launch
     needs: build-android
+    if: >-
+      always() &&
+      (needs.build-android.result == 'success' || inputs.artifact_run_id != '')
     runs-on: ubuntu-24.04
     timeout-minutes: 30
 
@@ -223,6 +233,8 @@ jobs:
         with:
           name: e2e-android-apk
           path: apk
+          run-id: ${{ inputs.artifact_run_id || github.run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Enable KVM
         run: |
