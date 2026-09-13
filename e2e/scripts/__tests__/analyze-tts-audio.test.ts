@@ -158,11 +158,7 @@ test('short click (edge case) FAILS on duration and silence', () => {
   // 5ms of energy padded by silence: too short and overwhelmingly silent.
   const samples = silence(0.1);
   const clickStart = Math.floor(0.02 * SAMPLE_RATE);
-  for (
-    let i = clickStart;
-    i < clickStart + Math.floor(0.005 * SAMPLE_RATE);
-    i++
-  ) {
+  for (let i = clickStart; i < clickStart + Math.floor(0.005 * SAMPLE_RATE); i++) {
     samples[i] = 0.9;
   }
   const file = path.join(tmpDir, 'click.wav');
@@ -214,12 +210,7 @@ test('leading/trailing silence are measured', () => {
 
 test('computeStats reports -inf dBFS for empty audio', () => {
   const stats = computeStats(
-    {
-      sampleRate: SAMPLE_RATE,
-      bitDepth: 16,
-      channels: 1,
-      samples: new Float32Array(0),
-    },
+    {sampleRate: SAMPLE_RATE, bitDepth: 16, channels: 1, samples: new Float32Array(0)},
     DEFAULT_THRESHOLDS.silenceFloor,
   );
   assert.equal(stats.rmsDbfs, -Infinity);

@@ -127,8 +127,7 @@ describe('Remote Vision Capability', () => {
       const addBtn = browser.$(Selectors.remoteModel.addModelButton);
       const alreadyEnabled = await addBtn.isEnabled().catch(() => false);
       if (!alreadyEnabled) {
-        const radio =
-          '-ios predicate string:value == "radio button, unchecked"';
+        const radio = '-ios predicate string:value == "radio button, unchecked"';
         await Gestures.scrollInSheetToElementExists(radio, 12);
         const firstRadio = browser.$(radio);
         const radioExists = await firstRadio
@@ -185,11 +184,7 @@ describe('Remote Vision Capability', () => {
       .action('pointer', {parameters: {pointerType: 'touch'}})
       .move({x: Math.round(width * 0.8), y: Math.round(height * 0.65)})
       .down()
-      .move({
-        x: Math.round(width * 0.2),
-        y: Math.round(height * 0.65),
-        duration: 300,
-      })
+      .move({x: Math.round(width * 0.2), y: Math.round(height * 0.65), duration: 300})
       .up()
       .perform();
     await browser.pause(1000);

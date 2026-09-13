@@ -552,9 +552,7 @@ function buildApps(
     if (dryRun) {
       console.log(`[DRY RUN] Would run: ${cmd} (cwd: ${REPO_ROOT})`);
     } else {
-      console.log(
-        'Building Android E2E APK (e2e flavor, releaseE2e buildType)...',
-      );
+      console.log('Building Android E2E APK (e2e flavor, releaseE2e buildType)...');
       execSync(cmd, {stdio: 'inherit', cwd: REPO_ROOT});
     }
   }
@@ -1115,7 +1113,9 @@ async function main(): Promise<void> {
   console.log(
     `Platform: ${args.platform} | Spec: ${args.spec} | Mode: ${args.mode}`,
   );
-  console.log(`Devices: ${devices[0] === null ? 'default' : devices.length}`);
+  console.log(
+    `Devices: ${devices[0] === null ? 'default' : devices.length}`,
+  );
   console.log(
     `Models: ${models[0] === null ? 'default' : (models as ModelTestConfig[]).map(m => m.id).join(', ')}`,
   );

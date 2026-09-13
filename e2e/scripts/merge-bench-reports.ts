@@ -136,10 +136,7 @@ function parseArgs(argv: string[]): Args {
     } else if (a === '--os-version') {
       out.osVersion = argv[++i];
     } else if (a === '--drop-models') {
-      out.dropModels = argv[++i]
-        .split(',')
-        .map(s => s.trim())
-        .filter(Boolean);
+      out.dropModels = argv[++i].split(',').map(s => s.trim()).filter(Boolean);
     } else if (a === '--help' || a === '-h') {
       printHelpAndExit();
     } else {
@@ -292,7 +289,9 @@ function reconcileBench(reports: RawReport[]): BenchParams | null {
  * values appended). Axis declaration order across inputs follows the
  * first input that declared each axis.
  */
-function mergeAxesUsed(reports: RawReport[]): SettingsAxis[] | undefined {
+function mergeAxesUsed(
+  reports: RawReport[],
+): SettingsAxis[] | undefined {
   const merged = new Map<string, SettingsAxis>();
   let anyHadAxes = false;
   for (const rep of reports) {

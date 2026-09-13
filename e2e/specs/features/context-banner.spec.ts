@@ -168,8 +168,7 @@ describe('Context-Limit Banner', () => {
     // The sheet shows either the confirm action (a larger size fits) or the
     // no-fit state. Either proves the sheet opened.
     await browser.waitUntil(
-      async () =>
-        (await exists(B.sheetConfirm)) || (await exists(B.sheetNoFit)),
+      async () => (await exists(B.sheetConfirm)) || (await exists(B.sheetNoFit)),
       {
         timeout: TIMEOUTS.element,
         interval: 500,

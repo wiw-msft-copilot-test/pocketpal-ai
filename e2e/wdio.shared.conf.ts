@@ -6,7 +6,8 @@
 import type {Options} from '@wdio/types';
 
 // Output directories - use Device Farm paths when available
-export const OUTPUT_DIR = process.env.DEVICEFARM_LOG_DIR || './debug-output';
+export const OUTPUT_DIR =
+  process.env.DEVICEFARM_LOG_DIR || './debug-output';
 export const SCREENSHOT_DIR =
   process.env.DEVICEFARM_SCREENSHOT_PATH || './debug-output/screenshots';
 
@@ -41,9 +42,7 @@ export const config: Options.Testrunner = {
         outputDir: OUTPUT_DIR,
         outputFileFormat: () => {
           // Use model ID from TEST_MODELS env var for unique filenames
-          const modelId =
-            process.env.TEST_MODELS?.replace(/[^a-zA-Z0-9.-]/g, '-') ||
-            'unknown';
+          const modelId = process.env.TEST_MODELS?.replace(/[^a-zA-Z0-9.-]/g, '-') || 'unknown';
           return `junit-${modelId}.xml`;
         },
       },

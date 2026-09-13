@@ -19,7 +19,11 @@ import {ChatPage} from '../../pages/ChatPage';
 import {DrawerPage} from '../../pages/DrawerPage';
 import {ModelsPage} from '../../pages/ModelsPage';
 import {PalSheetPage} from '../../pages/PalSheetPage';
-import {Selectors, byText, byPartialText} from '../../helpers/selectors';
+import {
+  Selectors,
+  byText,
+  byPartialText,
+} from '../../helpers/selectors';
 import {
   downloadAndLoadModel,
   dismissPerformanceWarningIfPresent,
@@ -32,9 +36,7 @@ declare const browser: WebdriverIO.Browser;
 
 const GREETING_MODEL = ALL_MODELS.find(m => m.id === 'qwen3-0.6b');
 if (!GREETING_MODEL) {
-  throw new Error(
-    'qwen3-0.6b model fixture missing — update e2e/fixtures/models.ts',
-  );
+  throw new Error('qwen3-0.6b model fixture missing — update e2e/fixtures/models.ts');
 }
 
 const PAL_NAME = 'Greeter';

@@ -139,9 +139,9 @@ describe('Onboarding flow', () => {
     expect(
       await onboarding.palModel(CODIE_BALANCED_MODEL_ID).isExisting(),
     ).toBe(true);
-    expect(await onboarding.palModel(PIP_BALANCED_MODEL_ID).isExisting()).toBe(
-      false,
-    );
+    expect(
+      await onboarding.palModel(PIP_BALANCED_MODEL_ID).isExisting(),
+    ).toBe(false);
 
     await onboarding.tapPalModel(CODIE_BALANCED_MODEL_ID);
     await onboarding.tapPrimary();

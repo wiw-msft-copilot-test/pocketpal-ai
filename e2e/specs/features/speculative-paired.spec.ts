@@ -217,9 +217,7 @@ async function forceCpuIfRequested(settingsPage: SettingsPage): Promise<void> {
     (await Gestures.nativeScrollIntoView(cpuOption)) ||
     (await Gestures.scrollToElement(cpuOption, 10));
   if (!reached) {
-    console.log(
-      '[paired] CPU device option not present; leaving backend as-is',
-    );
+    console.log('[paired] CPU device option not present; leaving backend as-is');
     return;
   }
   await browser.pause(700);
@@ -249,7 +247,9 @@ async function forceCpuIfRequested(settingsPage: SettingsPage): Promise<void> {
   if ((browser as any).isAndroid) {
     await (browser as any).pressKeyCode(111).catch(() => undefined);
   } else {
-    await browser.execute('mobile: hideKeyboard' as any).catch(() => undefined);
+    await browser
+      .execute('mobile: hideKeyboard' as any)
+      .catch(() => undefined);
   }
   await browser.pause(500);
   console.log('[paired] draft gpu layers set to 0');

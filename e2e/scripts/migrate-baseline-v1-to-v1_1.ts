@@ -156,7 +156,9 @@ function main() {
     const raw = JSON.parse(fs.readFileSync(f, 'utf8'));
     const before = raw.version ?? '1.0';
     const out = migrateReport(raw);
-    const target = args.outDir ? path.join(args.outDir, path.basename(f)) : f;
+    const target = args.outDir
+      ? path.join(args.outDir, path.basename(f))
+      : f;
     fs.writeFileSync(target, JSON.stringify(out, null, 2) + '\n');
     if (before === '1.1') {
       unchangedCount++;

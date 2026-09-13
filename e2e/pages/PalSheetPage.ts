@@ -46,7 +46,10 @@ export class PalSheetPage extends BasePage {
    * Scroll down within the sheet to reach the talent section
    */
   async scrollToTalents(): Promise<void> {
-    await Gestures.scrollInSheetToElement(Selectors.palSheet.talentSection, 10);
+    await Gestures.scrollInSheetToElement(
+      Selectors.palSheet.talentSection,
+      10,
+    );
   }
 
   /**
