@@ -239,8 +239,8 @@ type TtsRunState = {
 };
 
 // Normalise a finished turn's result into the snapshot the banner reads.
-// `contextFull` is frozen here as the OR of the native full/truncated flags
-// and (remote only) a 'length' finish reason derived from `stopped_limit`.
+// Responses output-token exhaustion is not evidence that the input context is
+// full. Chat Completions retains its legacy length mapping.
 function deriveSnapshotFromResult(
   result: CompletionResult,
   effectiveNCtx: number | undefined,
@@ -251,7 +251,13 @@ function deriveSnapshotFromResult(
   // the remote engine's signal (stopped_limit) into the OR predicate below, so
   // it is intentionally remote-only.
   const finishReason =
-    isRemote && result.stopped_limit === 1 ? 'length' : undefined;
+    result.incomplete_reason === 'max_output_tokens'
+      ? 'output-limit'
+      : isRemote &&
+          result.terminal_status === undefined &&
+          result.stopped_limit === 1
+        ? 'length'
+        : undefined;
   const contextFull =
     result.context_full === true ||
     result.truncated === true ||
@@ -263,6 +269,9 @@ function deriveSnapshotFromResult(
     contextFull,
     tokensPredicted: result.tokens_predicted,
     finishReason,
+    terminalStatus: result.terminal_status,
+    incompleteReason: result.incomplete_reason,
+    refusal: result.refusal,
     isRemote,
   };
 }
@@ -436,6 +445,14 @@ async function applyEventToStore(
             ...draftTimings,
           },
           copyable: true,
+          ...(finalResult.interrupted ? {interrupted: true} : {}),
+          ...(finalResult.refusal ? {responseStatus: 'refused'} : {}),
+          ...(!finalResult.refusal && finalResult.terminal_status
+            ? {responseStatus: finalResult.terminal_status}
+            : {}),
+          ...(finalResult.incomplete_reason
+            ? {incompleteReason: finalResult.incomplete_reason}
+            : {}),
           multimodal: ctx.hasImages && ctx.isMultimodalEnabled,
           completionResult: snapshot,
           ...(event.result.hitMaxTurns ? {hitMaxTurns: true} : {}),
@@ -740,6 +757,10 @@ export const useChatSession = (
       });
 
       const errorMessage = (error as Error).message;
+      const responseErrorCode =
+        typeof (error as {code?: unknown}).code === 'string'
+          ? (error as {code: string}).code
+          : undefined;
       // Native tool-call parser throws on truncated JSON when the model
       // ran out of context mid-args (most often `render_html` with a
       // long string). Detect by error shape and route through the
@@ -810,6 +831,9 @@ export const useChatSession = (
             {
               metadata: {
                 interrupted: true,
+                ...(responseErrorCode
+                  ? {responseErrorCode, responseStatus: 'failed'}
+                  : {}),
                 copyable: true,
                 completionResult: abortSnapshot,
                 ...(isToolArgsParseError ? {truncationLikely: true} : {}),

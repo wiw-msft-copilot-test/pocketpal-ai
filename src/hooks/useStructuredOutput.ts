@@ -69,8 +69,28 @@ export const useStructuredOutput = () => {
         });
 
         stopRef.current = null;
-        // Parse the completion text as JSON
-        return safeParseJSON(result.text);
+        if (result.refusal) {
+          throw new Error('The model refused the structured output request');
+        }
+        if (
+          result.interrupted ||
+          (result.terminal_status && result.terminal_status !== 'completed')
+        ) {
+          const reason =
+            result.incomplete_reason === 'max_output_tokens'
+              ? 'output token limit reached'
+              : result.terminal_status || 'interrupted';
+          throw new Error(`Structured output was not completed: ${reason}`);
+        }
+        const parsed = safeParseJSON(result.text);
+        if (
+          parsed &&
+          typeof parsed === 'object' &&
+          parsed.error instanceof Error
+        ) {
+          throw parsed.error;
+        }
+        return parsed;
       } catch (err) {
         const errorMessage =
           err instanceof Error ? err.message : l10n.generation.failedToGenerate;

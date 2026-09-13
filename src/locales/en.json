@@ -582,7 +582,11 @@
       "ttft": "{{value}}ms TTFT",
       "draftAccepted": "draft: {{accepted}}/{{total}} ({{pct}}%)",
       "interrupted": "Interrupted",
-      "truncated": "Cut off — likely context full"
+      "truncated": "Cut off — likely context full",
+      "outputLimitReached": "Output limit reached",
+      "responseRefused": "Response refused",
+      "responseIncomplete": "Response incomplete",
+      "responseFailed": "Response failed"
     },
     "exportUtils": {
       "fileSaved": "File Saved",

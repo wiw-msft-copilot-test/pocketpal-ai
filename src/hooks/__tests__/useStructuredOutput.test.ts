@@ -87,7 +87,7 @@ describe('useStructuredOutput', () => {
     );
   });
 
-  it('should handle invalid JSON response', async () => {
+  it('rejects invalid JSON response', async () => {
     const mockResponse = {text: 'invalid json'};
     (modelStore.engine!.completion as jest.Mock).mockResolvedValueOnce(
       mockResponse,
@@ -95,12 +95,41 @@ describe('useStructuredOutput', () => {
 
     const {result} = renderHook(() => useStructuredOutput());
 
-    let output;
+    let error;
     await act(async () => {
-      output = await result.current.generate('test', {});
+      try {
+        await result.current.generate('test', {});
+      } catch (caught) {
+        error = caught;
+      }
     });
 
-    expect(output).toEqual({prompt: '', error: expect.any(Error)});
+    expect(error).toBeInstanceOf(Error);
+    expect(result.current.isGenerating).toBe(false);
+  });
+
+  it.each([
+    {
+      text: '{}',
+      terminal_status: 'incomplete',
+      incomplete_reason: 'max_output_tokens',
+      interrupted: true,
+    },
+    {
+      text: 'No',
+      terminal_status: 'incomplete',
+      refusal: 'No',
+      interrupted: true,
+    },
+  ])('rejects non-completed Responses output', async completionResult => {
+    (modelStore.engine!.completion as jest.Mock).mockResolvedValueOnce(
+      completionResult,
+    );
+    const {result} = renderHook(() => useStructuredOutput());
+
+    await expect(
+      act(async () => result.current.generate('test', {})),
+    ).rejects.toThrow();
     expect(result.current.isGenerating).toBe(false);
   });
 

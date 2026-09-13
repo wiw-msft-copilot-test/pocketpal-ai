@@ -98,6 +98,9 @@ export interface CompletionResultSnapshot {
   contextFull: boolean;
   tokensPredicted?: number;
   finishReason?: string;
+  terminalStatus?: ResponsesTerminalStatus;
+  incompleteReason?: ResponsesIncompleteReason;
+  refusal?: string;
   isRemote: boolean;
 }
 
