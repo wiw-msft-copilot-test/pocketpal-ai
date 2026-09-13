@@ -76,6 +76,9 @@ describe('normalizeRemoteCatalogModel', () => {
             tool_calls: false,
             structured_outputs: true,
             reasoning_effort: ['none', 'low', 'high', 'low'],
+            temperature: false,
+            top_p: true,
+            max_output_tokens: true,
           },
           limits: {
             max_context_window_tokens: 128000,
@@ -90,6 +93,22 @@ describe('normalizeRemoteCatalogModel', () => {
       contextLength: 128000,
       maxOutputTokens: 32768,
       reasoningEffortValues: ['none', 'low', 'high'],
+      responsesSampling: {
+        temperature: {supported: false, source: 'live-catalog'},
+        topP: {supported: true, source: 'live-catalog'},
+        maxOutputTokens: {supported: true, source: 'live-catalog'},
+      },
+    });
+  });
+
+  it('preserves cached catalog provenance on sampling evidence', () => {
+    expect(
+      normalizeRemoteCatalogModel(
+        {capabilities: {supports: {temperature: false}}},
+        'cached',
+      ).capabilities.responsesSampling,
+    ).toEqual({
+      temperature: {supported: false, source: 'cached-catalog'},
     });
   });
 
@@ -102,6 +121,9 @@ describe('normalizeRemoteCatalogModel', () => {
             tool_calls: 1,
             structured_outputs: null,
             reasoning_effort: ['low', 2],
+            temperature: 'false',
+            top_p: 1,
+            max_output_tokens: null,
           },
           limits: {
             max_context_window_tokens: '128000',

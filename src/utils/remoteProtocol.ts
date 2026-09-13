@@ -9,6 +9,24 @@ export type RemoteProtocolSource =
   | 'cached-catalog'
   | 'compatibility-default';
 
+export type ResponsesSerializedReasoningMode = 'absent' | 'effort';
+export type RemoteCapabilityEvidenceSource =
+  | 'live-catalog'
+  | 'cached-catalog'
+  | 'provider-verification';
+
+export interface RemoteParameterSupportEvidence {
+  supported: boolean;
+  source: RemoteCapabilityEvidenceSource;
+  reasoningModes?: ResponsesSerializedReasoningMode[];
+}
+
+export interface RemoteResponsesSamplingCapabilities {
+  temperature?: RemoteParameterSupportEvidence;
+  topP?: RemoteParameterSupportEvidence;
+  maxOutputTokens?: RemoteParameterSupportEvidence;
+}
+
 export interface RemoteProtocolCapabilities {
   advertisedEndpoints?: RemoteWireApi[];
   supportsVision?: boolean;
@@ -17,6 +35,7 @@ export interface RemoteProtocolCapabilities {
   contextLength?: number;
   maxOutputTokens?: number;
   reasoningEffortValues?: string[];
+  responsesSampling?: RemoteResponsesSamplingCapabilities;
 }
 
 export interface RemoteModelPreference {
@@ -61,6 +80,47 @@ export function normalizePositiveInteger(value: unknown): number | undefined {
   return typeof value === 'number' && Number.isSafeInteger(value) && value > 0
     ? value
     : undefined;
+}
+
+const VERIFIED_COPILOT_TERRA_RESPONSES_SAMPLING: RemoteResponsesSamplingCapabilities =
+  {
+    temperature: {
+      supported: false,
+      source: 'provider-verification',
+      reasoningModes: ['absent'],
+    },
+  };
+
+export interface ResolveResponsesSamplingCapabilitiesOptions {
+  serverType?: string;
+  modelId: string;
+  wireApi?: RemoteWireApi;
+  catalogCapabilities?: RemoteProtocolCapabilities;
+}
+
+/**
+ * Combines explicit catalog claims with narrowly scoped, reproduced provider
+ * evidence. Unknown fields stay unknown so callers continue sending them.
+ */
+export function resolveResponsesSamplingCapabilities({
+  serverType,
+  modelId,
+  wireApi,
+  catalogCapabilities,
+}: ResolveResponsesSamplingCapabilitiesOptions): RemoteResponsesSamplingCapabilities {
+  const verified =
+    serverType === 'GitHub Copilot' &&
+    modelId === 'gpt-5.6-terra' &&
+    wireApi === 'responses'
+      ? VERIFIED_COPILOT_TERRA_RESPONSES_SAMPLING
+      : undefined;
+  const catalog = catalogCapabilities?.responsesSampling;
+
+  return {
+    temperature: catalog?.temperature ?? verified?.temperature,
+    topP: catalog?.topP ?? verified?.topP,
+    maxOutputTokens: catalog?.maxOutputTokens ?? verified?.maxOutputTokens,
+  };
 }
 
 function catalogSource(

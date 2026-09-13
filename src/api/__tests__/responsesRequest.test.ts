@@ -295,6 +295,19 @@ describe('encodeResponsesRequest', () => {
     expect(body[key]).toBe(0);
   });
 
+  it('preserves legacy sampling fields when capability evidence is unknown', () => {
+    const body = encodeResponsesRequest({
+      ...baseParams(),
+      temperature: 0.7,
+      top_p: 0.9,
+      n_predict: 100,
+    });
+
+    expect(Object.hasOwnProperty.call(body, 'temperature')).toBe(true);
+    expect(Object.hasOwnProperty.call(body, 'top_p')).toBe(true);
+    expect(Object.hasOwnProperty.call(body, 'max_output_tokens')).toBe(true);
+  });
+
   it('suppresses the nested reasoning alias at the final encoder', () => {
     const body = encodeResponsesRequest(
       {
@@ -315,6 +328,69 @@ describe('encodeResponsesRequest', () => {
 
     expect(Object.prototype.hasOwnProperty.call(body, 'reasoning')).toBe(false);
     expect(Object.prototype.hasOwnProperty.call(body, 'include')).toBe(false);
+  });
+
+  it.each([
+    ['default', undefined, undefined, false],
+    ['On without effort', {enabled: true}, undefined, false],
+    ['Off without serialized effort', {enabled: false}, undefined, false],
+    ['Off serialized as none', {enabled: false}, 'none', true],
+    ['explicit effort', {enabled: true, effort: 'high'}, undefined, true],
+  ] as const)(
+    'applies conditional sampling evidence to effective %s reasoning',
+    (_label, reasoning, disabledEffort, expectsTemperature) => {
+      const body = encodeResponsesRequest(
+        {
+          ...baseParams(),
+          temperature: 0.7,
+          top_p: 0.9,
+          reasoning,
+        },
+        {
+          parameterPolicy: {
+            reasoning: {
+              supportsEffort: true,
+              disabledEffort,
+            },
+            sampling: {
+              temperature: {
+                supported: false,
+                source: 'provider-verification',
+                reasoningModes: ['absent'],
+              },
+            },
+          },
+        },
+      );
+
+      expect(Object.hasOwnProperty.call(body, 'temperature')).toBe(
+        expectsTemperature,
+      );
+      expect(body).toHaveProperty('top_p', 0.9);
+    },
+  );
+
+  it('lets explicit Omit win over catalog support and preserves unknown fields', () => {
+    const body = encodeResponsesRequest(
+      {
+        ...baseParams(),
+        temperature: 0.7,
+        top_p: 0.9,
+        n_predict: 100,
+        generationParameterModes: {temperature: 'omit'},
+      },
+      {
+        parameterPolicy: {
+          sampling: {
+            temperature: {supported: true, source: 'live-catalog'},
+          },
+        },
+      },
+    );
+
+    expect(body).not.toHaveProperty('temperature');
+    expect(body).toHaveProperty('top_p', 0.9);
+    expect(body).toHaveProperty('max_output_tokens', 100);
   });
 
   it.each([

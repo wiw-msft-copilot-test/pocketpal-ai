@@ -3,6 +3,7 @@ import {
   isRemoteWireApi,
   normalizePositiveInteger,
   REMOTE_WIRE_APIS,
+  resolveResponsesSamplingCapabilities,
   resolveRemoteProtocol,
 } from '../remoteProtocol';
 import {normalizeRemoteCatalogModel} from '../remoteCatalog';
@@ -16,6 +17,49 @@ describe('remote protocol contracts', () => {
     expect(isRemoteWireApi('messages')).toBe(false);
     expect(isRemoteApiMode('auto')).toBe(true);
     expect(isRemoteApiMode(undefined)).toBe(false);
+  });
+
+  describe('resolveResponsesSamplingCapabilities', () => {
+    it('uses exact provider/model/protocol evidence without hostname matching', () => {
+      expect(
+        resolveResponsesSamplingCapabilities({
+          serverType: 'GitHub Copilot',
+          modelId: 'gpt-5.6-terra',
+          wireApi: 'responses',
+        }).temperature,
+      ).toEqual({
+        supported: false,
+        source: 'provider-verification',
+        reasoningModes: ['absent'],
+      });
+
+      expect(
+        resolveResponsesSamplingCapabilities({
+          serverType: 'GitHub Copilot',
+          modelId: 'prefix-gpt-5.6-terra',
+          wireApi: 'responses',
+        }).temperature,
+      ).toBeUndefined();
+    });
+
+    it('prefers explicit catalog evidence and leaves unknown fields unknown', () => {
+      const result = resolveResponsesSamplingCapabilities({
+        serverType: 'GitHub Copilot',
+        modelId: 'gpt-5.6-terra',
+        wireApi: 'responses',
+        catalogCapabilities: {
+          responsesSampling: {
+            temperature: {supported: true, source: 'live-catalog'},
+          },
+        },
+      });
+
+      expect(result.temperature).toEqual({
+        supported: true,
+        source: 'live-catalog',
+      });
+      expect(result.topP).toBeUndefined();
+    });
   });
 
   it('normalizes only safe positive integer limits', () => {

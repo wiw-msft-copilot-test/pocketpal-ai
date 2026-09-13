@@ -12,6 +12,7 @@ import {
 } from '../utils/completionTypes';
 import type {ChatMessage, RemoteSessionBinding} from '../utils/types';
 import {applyGenerationParameterModes} from '../utils/generationParameterModes';
+import {resolveResponsesSamplingCapabilities} from '../utils/remoteProtocol';
 
 function explicitRemoteGenerationParams(
   params: ApiCompletionParams,
@@ -178,6 +179,12 @@ export class OpenAICompletionEngine implements CompletionEngine {
             })),
           }),
           parameterPolicy: {
+            sampling: resolveResponsesSamplingCapabilities({
+              serverType: this.serverType,
+              modelId: this.modelId,
+              wireApi: this.binding.wireApi,
+              catalogCapabilities: capabilities,
+            }),
             reasoning: {
               supportsEffort: effortValues.length > 0,
               disabledEffort: effortValues.includes('none')

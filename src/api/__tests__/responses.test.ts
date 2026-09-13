@@ -436,6 +436,20 @@ describe('streamResponses', () => {
     await expect(promise).rejects.toThrow('Server error: 429 — rate limited');
   });
 
+  it('does not retry a rejected Responses request', async () => {
+    const promise = startResponses({
+      ...params(),
+      temperature: 0.7,
+      top_p: 0.9,
+    });
+    MockXHR.instances[0].httpError(400, {
+      error: {message: 'temperature is not supported'},
+    });
+
+    await expect(promise).rejects.toThrow('temperature is not supported');
+    expect(MockXHR.instances).toHaveLength(1);
+  });
+
   it('diagnoses success and HTTP errors without recording response secrets', async () => {
     const successRecorder = new ResponsesDiagnosticRecorder();
     const success = startResponses(params(), {

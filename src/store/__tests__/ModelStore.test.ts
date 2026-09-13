@@ -5012,7 +5012,12 @@ describe('ModelStore', () => {
             owned_by: 'system',
             supported_endpoints: ['/responses'],
             capabilities: {
-              supports: {vision: true, reasoning_effort: ['low', 'high']},
+              supports: {
+                vision: true,
+                reasoning_effort: ['low', 'high'],
+                temperature: false,
+                top_p: true,
+              },
               limits: {max_context_window_tokens: 128000},
             },
           },
@@ -5029,6 +5034,10 @@ describe('ModelStore', () => {
           supportsVision: true,
           contextLength: 128000,
           reasoningEffortValues: ['low', 'high'],
+          responsesSampling: {
+            temperature: {supported: false, source: 'live-catalog'},
+            topP: {supported: true, source: 'live-catalog'},
+          },
         },
       });
     });

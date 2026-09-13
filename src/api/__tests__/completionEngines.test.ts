@@ -488,6 +488,13 @@ describe('OpenAICompletionEngine', () => {
         input: [{role: 'user', content: 'Synthetic request'}],
         includeReasoningEncryptedContent: true,
         parameterPolicy: {
+          sampling: {
+            temperature: {
+              supported: false,
+              source: 'provider-verification',
+              reasoningModes: ['absent'],
+            },
+          },
           reasoning: expect.objectContaining({
             supportsEffort: true,
             supportsEncryptedContent: true,
@@ -496,6 +503,34 @@ describe('OpenAICompletionEngine', () => {
       }),
     );
     expect(result.content).toBe('done');
+  });
+
+  it('does not apply provider evidence to Chat Completions', async () => {
+    const chatEngine = new OpenAICompletionEngine(
+      'https://api.githubcopilot.com',
+      'gpt-5.6-terra',
+      'test-key',
+      undefined,
+      'GitHub Copilot',
+    );
+    mockedStreamChat.mockResolvedValueOnce({text: 'ok', content: 'ok'});
+
+    await chatEngine.completion({
+      messages: [{role: 'user', content: 'test'}],
+      temperature: 0.7,
+      top_p: 0.9,
+    } as any);
+
+    expect(mockedStreamChat).toHaveBeenCalledWith(
+      expect.objectContaining({temperature: 0.7, top_p: 0.9}),
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+      undefined,
+      undefined,
+      'GitHub Copilot',
+    );
+    expect(mockedStreamResponses).not.toHaveBeenCalled();
   });
 
   it('strips Responses metadata before Chat Completions', async () => {

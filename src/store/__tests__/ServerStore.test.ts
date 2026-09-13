@@ -616,6 +616,55 @@ describe('ServerStore', () => {
       });
     });
 
+    it('keeps sampling capability provenance tied to live and cached catalogs', () => {
+      const id = addCatalogServer();
+      const modelId = `${id}/model`;
+      const row = {
+        id: 'model',
+        object: 'model',
+        owned_by: 'system',
+        supported_endpoints: ['/responses'],
+        capabilities: {supports: {temperature: false, top_p: true}},
+      };
+      runInAction(() => {
+        serverStore.serverModels.set(id, [row]);
+        serverStore.remoteCatalogMetadata[modelId] = {
+          serverId: id,
+          normalizedUrl: 'https://api.example.com',
+          serverType: 'GitHub Copilot',
+          credentialRevision: 0,
+          endpointSupport: 'known',
+          provenance: 'cached',
+          capabilities: {
+            advertisedEndpoints: ['responses'],
+            responsesSampling: {
+              temperature: {supported: false, source: 'cached-catalog'},
+              topP: {supported: true, source: 'cached-catalog'},
+            },
+          },
+        };
+      });
+
+      expect(
+        serverStore.getRemoteCatalogModel(modelId)?.capabilities
+          .responsesSampling,
+      ).toEqual({
+        temperature: {supported: false, source: 'live-catalog'},
+        topP: {supported: true, source: 'live-catalog'},
+      });
+
+      runInAction(() => {
+        serverStore.serverModels.delete(id);
+      });
+      expect(
+        serverStore.getRemoteCatalogModel(modelId)?.capabilities
+          .responsesSampling,
+      ).toEqual({
+        temperature: {supported: false, source: 'cached-catalog'},
+        topP: {supported: true, source: 'cached-catalog'},
+      });
+    });
+
     it('rejects cached metadata from another credential revision', () => {
       const id = addCatalogServer();
       const modelId = `${id}/model`;

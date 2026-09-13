@@ -2,6 +2,7 @@ import {
   normalizePositiveInteger,
   type NormalizedRemoteCatalogModel,
   type RemoteCatalogProvenance,
+  type RemoteParameterSupportEvidence,
   type RemoteProtocolCapabilities,
   type RemoteWireApi,
 } from './remoteProtocol';
@@ -74,6 +75,7 @@ function normalizeReasoningEfforts(value: unknown): string[] | undefined {
 
 function normalizeObjectCapabilities(
   value: Record<string, unknown>,
+  provenance: RemoteCatalogProvenance,
 ): Omit<RemoteProtocolCapabilities, 'advertisedEndpoints'> {
   const supports = isRecord(value.supports) ? value.supports : undefined;
   const limits = isRecord(value.limits) ? value.limits : undefined;
@@ -94,6 +96,20 @@ function normalizeObjectCapabilities(
   const reasoningEffortValues = normalizeReasoningEfforts(
     supports?.reasoning_effort,
   );
+  const evidence = (
+    supported: boolean | undefined,
+  ): RemoteParameterSupportEvidence | undefined =>
+    supported === undefined
+      ? undefined
+      : {
+          supported,
+          source: provenance === 'live' ? 'live-catalog' : 'cached-catalog',
+        };
+  const temperature = evidence(booleanField(supports, 'temperature'));
+  const topP = evidence(booleanField(supports, 'top_p'));
+  const maxOutputTokensSupport = evidence(
+    booleanField(supports, 'max_output_tokens'),
+  );
 
   if (supportsVision !== undefined) {
     capabilities.supportsVision = supportsVision;
@@ -112,6 +128,15 @@ function normalizeObjectCapabilities(
   }
   if (reasoningEffortValues !== undefined) {
     capabilities.reasoningEffortValues = reasoningEffortValues;
+  }
+  if (temperature || topP || maxOutputTokensSupport) {
+    capabilities.responsesSampling = {
+      ...(temperature ? {temperature} : {}),
+      ...(topP ? {topP} : {}),
+      ...(maxOutputTokensSupport
+        ? {maxOutputTokens: maxOutputTokensSupport}
+        : {}),
+    };
   }
 
   return capabilities;
@@ -155,6 +180,15 @@ function freezeCapabilities(
   if (capabilities.reasoningEffortValues) {
     Object.freeze(capabilities.reasoningEffortValues);
   }
+  if (capabilities.responsesSampling) {
+    for (const evidence of Object.values(capabilities.responsesSampling)) {
+      if (evidence?.reasoningModes) {
+        Object.freeze(evidence.reasoningModes);
+      }
+      Object.freeze(evidence);
+    }
+    Object.freeze(capabilities.responsesSampling);
+  }
   return Object.freeze(capabilities);
 }
 
@@ -170,7 +204,7 @@ export function normalizeRemoteCatalogModel(
   const endpoints = normalizeEndpoints(record?.supported_endpoints);
   const rawCapabilities = record?.capabilities;
   const modelCapabilities = isRecord(rawCapabilities)
-    ? normalizeObjectCapabilities(rawCapabilities)
+    ? normalizeObjectCapabilities(rawCapabilities, provenance)
     : Array.isArray(rawCapabilities)
       ? normalizeArrayCapabilities(rawCapabilities)
       : {};

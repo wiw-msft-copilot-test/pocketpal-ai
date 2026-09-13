@@ -8,6 +8,10 @@ import type {ReasoningIntent} from '../utils/completionTypes';
 import type {ChatMessage} from '../utils/types';
 import type {ResponsesHistoryInputItem} from '../utils/responsesReplay';
 import {applyGenerationParameterModes} from '../utils/generationParameterModes';
+import type {
+  RemoteResponsesSamplingCapabilities,
+  ResponsesSerializedReasoningMode,
+} from '../utils/remoteProtocol';
 
 type ToolCall = NonNullable<ChatMessage['tool_calls']>[number];
 
@@ -54,6 +58,7 @@ export interface ResponsesReasoningPolicy {
 
 export interface ResponsesParameterPolicy {
   reasoning?: ResponsesReasoningPolicy;
+  sampling?: RemoteResponsesSamplingCapabilities;
 }
 
 export interface ResponsesRequestOptions {
@@ -347,6 +352,21 @@ function encodeReasoning(
   };
 }
 
+function samplingFieldSupported(
+  evidence:
+    | RemoteResponsesSamplingCapabilities[keyof RemoteResponsesSamplingCapabilities]
+    | undefined,
+  reasoningMode: ResponsesSerializedReasoningMode,
+): boolean {
+  if (!evidence || evidence.supported) {
+    return true;
+  }
+  return (
+    evidence.reasoningModes !== undefined &&
+    !evidence.reasoningModes.includes(reasoningMode)
+  );
+}
+
 export function encodeResponsesRequest(
   params: ResponsesRequestParams,
   options: ResponsesRequestOptions = {},
@@ -356,6 +376,10 @@ export function encodeResponsesRequest(
   const toolChoice = encodeToolChoice(effectiveParams.tool_choice, tools);
   const text = encodeTextFormat(effectiveParams.response_format);
   const maxOutputTokens = positiveTokenLimit(effectiveParams);
+  const reasoningFields = encodeReasoning(effectiveParams.reasoning, options);
+  const reasoningMode: ResponsesSerializedReasoningMode =
+    reasoningFields.reasoning === undefined ? 'absent' : 'effort';
+  const sampling = options.parameterPolicy?.sampling;
 
   return applyGenerationParameterModes({
     model: assertNonEmptyString(effectiveParams.model, 'Model'),
@@ -368,19 +392,22 @@ export function encodeResponsesRequest(
       : encodeInput(effectiveParams.messages),
     stream: true,
     store: false,
-    ...(effectiveParams.temperature !== undefined
+    ...(effectiveParams.temperature !== undefined &&
+    samplingFieldSupported(sampling?.temperature, reasoningMode)
       ? {temperature: effectiveParams.temperature}
       : {}),
-    ...(effectiveParams.top_p !== undefined
+    ...(effectiveParams.top_p !== undefined &&
+    samplingFieldSupported(sampling?.topP, reasoningMode)
       ? {top_p: effectiveParams.top_p}
       : {}),
-    ...(maxOutputTokens !== undefined
+    ...(maxOutputTokens !== undefined &&
+    samplingFieldSupported(sampling?.maxOutputTokens, reasoningMode)
       ? {max_output_tokens: maxOutputTokens}
       : {}),
     ...(tools ? {tools} : {}),
     ...(toolChoice !== undefined ? {tool_choice: toolChoice} : {}),
     ...(text ? {text} : {}),
-    ...encodeReasoning(effectiveParams.reasoning, options),
+    ...reasoningFields,
     generationParameterModes: params.generationParameterModes,
   });
 }
