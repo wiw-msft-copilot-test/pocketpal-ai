@@ -301,7 +301,7 @@ function streamResponsesScenario(
       response,
       'Streaming fixture complete.',
       ['Streaming ', 'fixture ', 'complete.'],
-      500,
+      1500,
     );
     return;
   }
@@ -459,13 +459,13 @@ function streamResponsesScenario(
         delta: `tick-${count} `,
       }),
     );
-    if (count === 30) {
+    if (count === 120) {
       clearInterval(timer);
       complete(response, [
         message(`Slow fixture started. tick-${count}`, 'msg-slow'),
       ]);
     }
-  }, 500);
+  }, 1000);
 }
 
 function streamChatCompletion(

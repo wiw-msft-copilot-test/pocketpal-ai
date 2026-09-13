@@ -9,7 +9,7 @@ import {
   RESPONSES_MODEL_ID,
   UNSUPPORTED_MODEL_ID,
 } from '../../fixtures/remote-responses-server';
-import {Selectors, byPartialText, byText} from '../../helpers/selectors';
+import {Selectors, byPartialText} from '../../helpers/selectors';
 import {Gestures} from '../../helpers/gestures';
 import {saveFailureScreenshot} from '../../helpers/screenshots';
 import {
@@ -151,10 +151,14 @@ describe('Remote Responses protocol', () => {
     await browser.pause(800);
     await driver.activateApp(APP_ID);
     await chatPage.waitForReady(TIMEOUTS.appReady);
+    await chatPage.openDrawer();
+    await drawerPage.waitForOpen();
+    await drawerPage.tapSession('fixture:incremental');
     expect(await latestAssistantText()).toContain(
       'Streaming fixture complete.',
     );
 
+    await selectChatModel(RESPONSES_MODEL_ID);
     await chatPage.sendMessage('fixture:final-only');
     await waitForAssistantText('Final-only fixture output.');
     const status = await fixtureStatus(FIXTURE_URL);
@@ -195,22 +199,35 @@ describe('Remote Responses protocol', () => {
     await waitForAssistantText('Synthetic fixture refusal.');
 
     await chatPage.sendMessage('fixture:failure');
-    const error = browser.$(Selectors.common.errorSnackbar);
-    await error.waitForDisplayed({timeout: 15000});
-    const text = await error.getText();
-    expect(text.toLowerCase()).toContain('fail');
+    await waitForAssistantText('Completion failed');
   });
 
   it('runs the built-in calculate talent and validates exact replay', async () => {
-    await chatPage.openDrawer();
-    await drawerPage.waitForOpen();
-    await drawerPage.navigateToPals();
-    await browser
-      .$(Selectors.palsScreen.addButton)
-      .waitForDisplayed({timeout: 10000});
-    await browser.$(Selectors.palsScreen.addButton).click();
-    await browser.$(byText('Assistant')).click();
-
+    await chatPage.openPalPicker();
+    await chatPage.selectPal('Lookie');
+    await chatPage.openPalPicker();
+    const lookie = browser.$(byPartialText('Lookie'));
+    for (let attempt = 0; attempt < 3; attempt++) {
+      await Gestures.swipe({
+        startXPercent: 0.2,
+        startYPercent: 0.7,
+        endXPercent: 0.8,
+        endYPercent: 0.7,
+        duration: 300,
+      });
+      if (
+        await lookie
+          .waitForDisplayed({timeout: 3000})
+          .then(() => true)
+          .catch(() => false)
+      ) {
+        break;
+      }
+    }
+    await lookie.waitForDisplayed({timeout: 5000});
+    const settings = browser.$(Selectors.chat.palPicker.settings('Lookie'));
+    await settings.waitForDisplayed({timeout: 5000});
+    await settings.click();
     const palSheet = new PalSheetPage();
     await palSheet.setName(PAL_NAME);
     await palSheet.setSystemPrompt(
@@ -219,12 +236,7 @@ describe('Remote Responses protocol', () => {
     await palSheet.enableTalent('calculate');
     await palSheet.submit();
 
-    await driver.terminateApp(APP_ID);
-    await browser.pause(800);
-    await driver.activateApp(APP_ID);
     await chatPage.waitForReady(TIMEOUTS.appReady);
-    await chatPage.openPalPicker();
-    await chatPage.selectPal(PAL_NAME);
     await chatPage.sendMessage('fixture:tool calculate 6*7');
     await waitForAssistantText('Tool replay validated: 6*7 = 42.', 45000);
     const status = await fixtureStatus(FIXTURE_URL);

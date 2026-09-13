@@ -290,6 +290,7 @@ export const ChatPalModelPickerSheet = observer(
               {isActivePal && pal.type === 'local' && onPalSettingsSelect && (
                 <Pressable
                   style={styles.settingsButton}
+                  testID={`pal-settings-${pal.name}`}
                   onPress={e => {
                     e.stopPropagation();
                     onPalSettingsSelect(pal);

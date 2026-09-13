@@ -93,7 +93,9 @@ export async function latestAssistantText(timeout = 30000): Promise<string> {
       if (count === 0) {
         return false;
       }
-      const latest = messages[count - 1];
+      // Chat uses an inverted FlatList; native accessibility order exposes
+      // the newest assistant turn first.
+      const latest = messages[0];
       text =
         (await latest
           .$(nativeTextElement())

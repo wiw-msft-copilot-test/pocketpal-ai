@@ -119,7 +119,7 @@ export const Selectors = {
       return byText('Models');
     },
     get palsTab(): string {
-      return byText('Pals');
+      return byTestId('drawer-item-pals');
     },
     get openIndicator(): string {
       return byTestId('drawer-item-chat');
@@ -136,6 +136,11 @@ export const Selectors = {
   chat: {
     get input(): string {
       return byTestId('chat-input');
+    },
+
+    palPicker: {
+      settings: (palName: string): string =>
+        byTestId(`pal-settings-${palName}`),
     },
     get sendButton(): string {
       return byTestId('send-button');
