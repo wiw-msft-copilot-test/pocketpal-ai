@@ -39,10 +39,21 @@ import {
   detectServerType,
 } from '../../api/openai';
 import {deriveListCaps} from '../../utils/listCaps';
+import {
+  resolveRemoteProtocol,
+  type RemoteApiMode,
+} from '../../utils/remoteProtocol';
+import {normalizeRemoteCatalogModel} from '../../utils/remoteCatalog';
 import {t} from '../../locales';
 
 import {createStyles} from './styles';
 import {ChatIcon, EyeIcon, EyeOffIcon} from '../../assets/icons';
+import {
+  API_MODE_VALUES,
+  protocolLabel,
+  protocolSourceLabel,
+  protocolWarningKey,
+} from './protocolUi';
 
 interface RemoteModelSheetProps {
   isVisible: boolean;
@@ -62,6 +73,7 @@ export const RemoteModelSheet: React.FC<RemoteModelSheetProps> = observer(
     const [apiKey, setApiKey] = useState('');
     const [timeoutSeconds, setTimeoutSeconds] = useState('');
     const [serverType, setServerType] = useState('unknown');
+    const [apiMode, setApiMode] = useState<RemoteApiMode>('auto');
     const [secureTextEntry, setSecureTextEntry] = useState(true);
 
     // Auto-probe
@@ -121,6 +133,7 @@ export const RemoteModelSheet: React.FC<RemoteModelSheetProps> = observer(
         setTimeoutSeconds('');
         timeoutSecondsRef.current = '';
         setServerType('unknown');
+        setApiMode('auto');
         serverTypeRef.current = 'unknown';
         serverTypeManuallySelectedRef.current = false;
         setSecureTextEntry(true);
@@ -271,6 +284,7 @@ export const RemoteModelSheet: React.FC<RemoteModelSheetProps> = observer(
       const probeGeneration = ++probeGenerationRef.current;
       serverTypeManuallySelectedRef.current = false;
       serverTypeRef.current = server.serverType || 'unknown';
+      setApiMode(server.apiMode || 'auto');
       setSelectedServerId(server.id);
       setServerName(server.name);
       setUrl(server.url);
@@ -320,6 +334,7 @@ export const RemoteModelSheet: React.FC<RemoteModelSheetProps> = observer(
       setApiKey('');
       apiKeyRef.current = '';
       setServerType('unknown');
+      setApiMode('auto');
       serverTypeRef.current = 'unknown';
       serverTypeManuallySelectedRef.current = false;
       setProbeResult(null);
@@ -343,6 +358,7 @@ export const RemoteModelSheet: React.FC<RemoteModelSheetProps> = observer(
             url: url.trim(),
             requestTimeoutMs: parseTimeoutMs(timeoutSeconds),
             serverType,
+            apiMode,
           });
           if (apiKey.trim()) {
             await serverStore.setApiKey(serverId, apiKey.trim());
@@ -365,6 +381,7 @@ export const RemoteModelSheet: React.FC<RemoteModelSheetProps> = observer(
       apiKey,
       timeoutSeconds,
       serverType,
+      apiMode,
       onModelAdded,
       onDismiss,
     ]);
@@ -383,6 +400,28 @@ export const RemoteModelSheet: React.FC<RemoteModelSheetProps> = observer(
     // This lets users enter an API key after a 401, then retry
     const showServerFields =
       probeResult !== null && !isProbing && !selectedServerId;
+    const protocolOptions = API_MODE_VALUES.map(value => ({
+      value,
+      label:
+        value === 'auto'
+          ? l10n.settings.apiProtocolAuto
+          : value === 'chat-completions'
+            ? l10n.settings.apiProtocolChatCompletions
+            : l10n.settings.apiProtocolResponses,
+      testID: `api-protocol-option-${value}`,
+    }));
+    const protocolLabels = {
+      chatCompletions: l10n.settings.apiProtocolChatCompletions,
+      responses: l10n.settings.apiProtocolResponses,
+      unsupported: l10n.settings.apiProtocolUnsupported,
+    };
+    const protocolSourceLabels = {
+      modelOverride: l10n.settings.apiProtocolSourceModel,
+      serverOverride: l10n.settings.apiProtocolSourceServer,
+      liveCatalog: l10n.settings.apiProtocolSourceLiveCatalog,
+      cachedCatalog: l10n.settings.apiProtocolSourceCachedCatalog,
+      compatibilityDefault: l10n.settings.apiProtocolSourceCompatibility,
+    };
 
     return (
       <Sheet
@@ -524,6 +563,19 @@ export const RemoteModelSheet: React.FC<RemoteModelSheetProps> = observer(
                 </Text>
               </View>
 
+              <View style={styles.inputSpacing}>
+                <Text>{l10n.settings.apiProtocol}</Text>
+                <Dropdown
+                  testID="api-protocol-dropdown"
+                  value={apiMode}
+                  options={protocolOptions}
+                  onChange={value => setApiMode(value as RemoteApiMode)}
+                />
+                <Text style={styles.apiKeyDescription}>
+                  {l10n.settings.apiProtocolHelp}
+                </Text>
+              </View>
+
               {/* Probe status */}
               {isProbing && (
                 <View style={styles.probeStatusContainer}>
@@ -650,6 +702,16 @@ export const RemoteModelSheet: React.FC<RemoteModelSheetProps> = observer(
                 const alreadyAdded =
                   !!selectedServerId && isModelAlreadyAdded(servId, model.id);
                 const listCaps = deriveListCaps(model, serverTypeInEffect);
+                const protocol = resolveRemoteProtocol({
+                  modelPreference: selectedServerId
+                    ? serverStore.getRemoteModelPreference?.(
+                        `${selectedServerId}/${model.id}`,
+                      )
+                    : undefined,
+                  apiMode: selectedServer?.apiMode ?? apiMode,
+                  catalog: normalizeRemoteCatalogModel(model),
+                });
+                const warning = protocolWarningKey(protocol);
                 return (
                   <TouchableOpacity
                     key={model.id}
@@ -680,7 +742,34 @@ export const RemoteModelSheet: React.FC<RemoteModelSheetProps> = observer(
                       disabled={alreadyAdded}
                       uncheckedColor={theme.colors.onSurfaceVariant}
                     />
-                    <Text style={styles.modelName}>{model.id}</Text>
+                    <View style={styles.modelDetails}>
+                      <Text style={styles.modelName}>{model.id}</Text>
+                      <Text
+                        testID={`remote-model-row-protocol-${model.id}`}
+                        style={styles.protocolText}>
+                        {t(l10n.settings.apiProtocolEffective, {
+                          protocol: protocolLabel(
+                            protocol.wireApi,
+                            protocolLabels,
+                          ),
+                          source: protocolSourceLabel(
+                            protocol.source,
+                            protocolSourceLabels,
+                          ),
+                        })}
+                      </Text>
+                      {warning && (
+                        <Text
+                          testID={`remote-model-row-warning-${model.id}`}
+                          style={styles.protocolWarning}>
+                          {warning === 'unsupported'
+                            ? l10n.settings.apiProtocolWarningUnsupported
+                            : warning === 'contradiction'
+                              ? l10n.settings.apiProtocolWarningContradiction
+                              : l10n.settings.apiProtocolWarningUnknown}
+                        </Text>
+                      )}
+                    </View>
                     {alreadyAdded && (
                       <Text style={styles.alreadyAddedText}>
                         {l10n.settings.alreadyAdded}

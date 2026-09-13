@@ -1,4 +1,4 @@
-import React, {useState, useEffect, memo, useContext} from 'react';
+import React, {useState, useEffect, memo, useContext, useCallback} from 'react';
 import {Button, Text, Divider, Switch, Chip} from 'react-native-paper';
 
 import {ModelSettings} from '../../screens/ModelsScreen/ModelSettings';
@@ -17,6 +17,19 @@ import {
 import {styles} from './styles';
 import {View} from 'react-native';
 import {L10nContext} from '../../utils';
+import {Dropdown} from '../ui';
+import {
+  resolveRemoteProtocol,
+  type RemoteModelPreference,
+} from '../../utils/remoteProtocol';
+import {t} from '../../locales';
+import {
+  MODEL_API_MODE_VALUES,
+  type ModelApiMode,
+  protocolLabel,
+  protocolSourceLabel,
+  protocolWarningKey,
+} from '../RemoteModelSheet/protocolUi';
 
 interface ModelSettingsSheetProps {
   isVisible: boolean;
@@ -38,11 +51,33 @@ export const ModelSettingsSheet: React.FC<ModelSettingsSheetProps> = memo(
     // Remote models have no local-only settings (chat template, stop words,
     // tokens) — only the reasoning override applies to them.
     const isRemote = model?.origin === ModelOrigin.REMOTE;
+    const seedPreference = (): RemoteModelPreference =>
+      model ? serverStore.getRemoteModelPreference?.(model.id) || {} : {};
+    const [remoteApiMode, setRemoteApiMode] = useState<ModelApiMode>(
+      () => seedPreference().wireApi || 'inherit',
+    );
+    const [remoteVision, setRemoteVision] = useState<'auto' | 'on' | 'off'>(
+      () => seedPreference().vision || 'auto',
+    );
+    const [remotePreferenceDirty, setRemotePreferenceDirty] = useState(false);
 
     // Reasoning override (seeded from the resolver so the controls show the
     // effective state). Axis-1 is reasoning yes/no; axis-2 graded effort + set.
+    const capabilitySnapshot = useCallback(() => {
+      if (!model || model.origin !== ModelOrigin.REMOTE) {
+        return undefined;
+      }
+      const binding = modelStore.activeRemoteBinding;
+      return binding?.modelId === model.id
+        ? binding.protocolCapabilities
+        : serverStore.getRemoteCatalogModel?.(model.id)?.capabilities;
+    }, [model]);
     const seedReasoning = () =>
-      resolveReasoningCapability(model, serverStore.remoteReasoning);
+      resolveReasoningCapability(
+        model,
+        serverStore.remoteReasoning,
+        capabilitySnapshot(),
+      );
     const [isReasoningModel, setIsReasoningModel] = useState(
       () => seedReasoning().isReasoning === 'yes',
     );
@@ -89,16 +124,22 @@ export const ModelSettingsSheet: React.FC<ModelSettingsSheetProps> = memo(
         setTempModelName(model.name);
         setTempChatTemplate(model.chatTemplate);
         setTempStopWords(model.stopWords || []);
+        const preference =
+          serverStore.getRemoteModelPreference?.(model.id) || {};
+        setRemoteApiMode(preference.wireApi || 'inherit');
+        setRemoteVision(preference.vision || 'auto');
+        setRemotePreferenceDirty(false);
         const cap = resolveReasoningCapability(
           model,
           serverStore.remoteReasoning,
+          capabilitySnapshot(),
         );
         setIsReasoningModel(cap.isReasoning === 'yes');
         setSupportsEffort(cap.supportsEffort);
         setEffortSet(orderEffortValues(cap.effortValues));
         setReasoningDirty(false);
       }
-    }, [model]);
+    }, [model, capabilitySnapshot]);
 
     const handleSettingsUpdate = (name: string, value: any) => {
       setTempChatTemplate(prev => {
@@ -133,6 +174,13 @@ export const ModelSettingsSheet: React.FC<ModelSettingsSheetProps> = memo(
             effortSource: isReasoningModel && supportsEffort ? 'user' : 'none',
           });
         }
+        if (isRemote && remotePreferenceDirty) {
+          serverStore.setRemoteModelPreference?.(model.id, {
+            ...serverStore.getRemoteModelPreference?.(model.id),
+            wireApi: remoteApiMode === 'inherit' ? undefined : remoteApiMode,
+            vision: remoteVision,
+          });
+        }
         onClose();
       }
     };
@@ -162,6 +210,54 @@ export const ModelSettingsSheet: React.FC<ModelSettingsSheetProps> = memo(
     if (!model) {
       return null;
     }
+    const modelServer = isRemote
+      ? serverStore.servers.find(candidate => candidate.id === model.serverId)
+      : undefined;
+    const protocol = isRemote
+      ? resolveRemoteProtocol({
+          modelPreference: {
+            ...serverStore.getRemoteModelPreference?.(model.id),
+            wireApi: remoteApiMode === 'inherit' ? undefined : remoteApiMode,
+          },
+          apiMode: modelServer?.apiMode,
+          catalog: serverStore.getRemoteCatalogModel?.(model.id),
+        })
+      : undefined;
+    const binding = modelStore.activeRemoteBinding;
+    const reselectRequired =
+      isRemote &&
+      binding?.modelId === model.id &&
+      (remotePreferenceDirty ||
+        (protocol?.wireApi !== undefined &&
+          binding.wireApi !== protocol.wireApi));
+    const protocolWarning = protocol ? protocolWarningKey(protocol) : undefined;
+    const apiOptions = MODEL_API_MODE_VALUES.map(value => ({
+      value,
+      label:
+        value === 'inherit'
+          ? l10n.settings.apiProtocolInherit
+          : value === 'chat-completions'
+            ? l10n.settings.apiProtocolChatCompletions
+            : l10n.settings.apiProtocolResponses,
+      testID: `model-api-protocol-option-${value}`,
+    }));
+    const visionOptions = [
+      {
+        value: 'auto',
+        label: l10n.components.modelSettingsSheet.remoteVisionAuto,
+        testID: 'remote-vision-option-auto',
+      },
+      {
+        value: 'on',
+        label: l10n.components.modelSettingsSheet.remoteVisionOn,
+        testID: 'remote-vision-option-on',
+      },
+      {
+        value: 'off',
+        label: l10n.components.modelSettingsSheet.remoteVisionOff,
+        testID: 'remote-vision-option-off',
+      },
+    ];
 
     return (
       <Sheet
@@ -183,6 +279,74 @@ export const ModelSettingsSheet: React.FC<ModelSettingsSheetProps> = memo(
               onStopWordsChange={value => setTempStopWords(value || [])}
               onModelNameChange={handleModelNameChange}
             />
+          )}
+
+          {isRemote && protocol && (
+            <>
+              <Text style={styles.multimodalSectionTitle}>
+                {l10n.components.modelSettingsSheet.remoteProtocolSection}
+              </Text>
+              <Text>{l10n.settings.apiProtocol}</Text>
+              <Dropdown
+                testID="model-api-protocol-dropdown"
+                value={remoteApiMode}
+                options={apiOptions}
+                onChange={value => {
+                  setRemoteApiMode(value as ModelApiMode);
+                  setRemotePreferenceDirty(true);
+                }}
+              />
+              <Text variant="bodySmall" style={styles.reasoningHelp}>
+                {l10n.components.modelSettingsSheet.remoteProtocolHelp}
+              </Text>
+              <Text testID="model-effective-protocol" style={styles.statusText}>
+                {t(l10n.settings.apiProtocolEffective, {
+                  protocol: protocolLabel(protocol.wireApi, {
+                    chatCompletions: l10n.settings.apiProtocolChatCompletions,
+                    responses: l10n.settings.apiProtocolResponses,
+                    unsupported: l10n.settings.apiProtocolUnsupported,
+                  }),
+                  source: protocolSourceLabel(protocol.source, {
+                    modelOverride: l10n.settings.apiProtocolSourceModel,
+                    serverOverride: l10n.settings.apiProtocolSourceServer,
+                    liveCatalog: l10n.settings.apiProtocolSourceLiveCatalog,
+                    cachedCatalog: l10n.settings.apiProtocolSourceCachedCatalog,
+                    compatibilityDefault:
+                      l10n.settings.apiProtocolSourceCompatibility,
+                  }),
+                })}
+              </Text>
+              {protocolWarning && (
+                <Text style={styles.warningText}>
+                  {protocolWarning === 'unsupported'
+                    ? l10n.settings.apiProtocolWarningUnsupported
+                    : protocolWarning === 'contradiction'
+                      ? l10n.settings.apiProtocolWarningContradiction
+                      : l10n.settings.apiProtocolWarningUnknown}
+                </Text>
+              )}
+              <Text>{l10n.components.modelSettingsSheet.remoteVision}</Text>
+              <Dropdown
+                testID="remote-vision-dropdown"
+                value={remoteVision}
+                options={visionOptions}
+                onChange={value => {
+                  setRemoteVision(value as 'auto' | 'on' | 'off');
+                  setRemotePreferenceDirty(true);
+                }}
+              />
+              <Text variant="bodySmall" style={styles.reasoningHelp}>
+                {l10n.components.modelSettingsSheet.remoteVisionHelp}
+              </Text>
+              {reselectRequired && (
+                <Text
+                  testID="remote-reselect-required"
+                  style={styles.warningText}>
+                  {l10n.components.modelSettingsSheet.reselectRequired}
+                </Text>
+              )}
+              <Divider style={styles.multimodalDivider} />
+            </>
           )}
 
           {/* Multimodal Settings Section */}
@@ -216,6 +380,7 @@ export const ModelSettingsSheet: React.FC<ModelSettingsSheetProps> = memo(
               testID="reasoning-is-reasoning-switch"
               value={isReasoningModel}
               onValueChange={onIsReasoningModelChange}
+              disabled={isRemote && protocol?.supported === false}
             />
           </View>
           <Text variant="bodySmall" style={styles.reasoningHelp}>
@@ -229,6 +394,7 @@ export const ModelSettingsSheet: React.FC<ModelSettingsSheetProps> = memo(
                   testID="reasoning-supports-effort-switch"
                   value={supportsEffort}
                   onValueChange={onSupportsEffortChange}
+                  disabled={isRemote && protocol?.supported === false}
                 />
               </View>
               {supportsEffort && (
@@ -243,6 +409,7 @@ export const ModelSettingsSheet: React.FC<ModelSettingsSheetProps> = memo(
                         testID={`effort-chip-${level}`}
                         selected={effortSet.includes(level)}
                         showSelectedCheck
+                        disabled={isRemote && protocol?.supported === false}
                         onPress={() => onEffortLevelToggle(level)}>
                         {l10n.components.modelSettingsSheet.effortLevels[level]}
                       </Chip>

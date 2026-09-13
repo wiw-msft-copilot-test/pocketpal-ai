@@ -8,6 +8,7 @@ import {
   ToolCall,
 } from '../utils/completionTypes';
 import {RemoteModelCaps} from '../utils/types';
+import {resolveRequestTimeout, xhrHttpError} from './xhrStream';
 
 /**
  * Raw API response shape from OpenAI /v1/models. The optional fields are what
@@ -173,10 +174,7 @@ function resolveTimeout(
   timeoutMs: number | undefined,
   fallback: number,
 ): number {
-  if (timeoutMs == null || !Number.isFinite(timeoutMs) || timeoutMs <= 0) {
-    return fallback;
-  }
-  return timeoutMs;
+  return resolveRequestTimeout(timeoutMs, fallback);
 }
 
 /**
@@ -208,7 +206,7 @@ const GITHUB_COPILOT_HEADERS = {
   'Editor-Version': 'copilot/1.0.83-test',
 } as const;
 
-function buildHeaders(
+export function buildHeaders(
   apiKey?: string,
   serverType?: string,
 ): Record<string, string> {
@@ -227,7 +225,7 @@ function buildHeaders(
 /**
  * Normalize server URL: remove trailing slash.
  */
-function normalizeUrl(serverUrl: string): string {
+export function normalizeUrl(serverUrl: string): string {
   const parsed = new URL(serverUrl);
   const isLocal =
     parsed.hostname === 'localhost' ||
@@ -242,9 +240,9 @@ function normalizeUrl(serverUrl: string): string {
   return serverUrl.replace(/\/+$/, '');
 }
 
-function buildOpenAIUrl(
+export function buildOpenAIUrl(
   serverUrl: string,
-  endpoint: 'models' | 'chat/completions',
+  endpoint: 'models' | 'chat/completions' | 'responses',
   serverType?: string,
 ): string {
   const prefix = serverType === GITHUB_COPILOT_SERVER_TYPE ? '' : '/v1';
@@ -580,7 +578,9 @@ function isLocalImageUrl(url: string | undefined): url is string {
 }
 
 /** True when any message carries a local-path image that must be encoded. */
-function hasLocalImageAttachment(messages: OpenAIChatMessage[]): boolean {
+export function hasLocalImageAttachment(
+  messages: OpenAIChatMessage[],
+): boolean {
   return messages.some(
     m =>
       Array.isArray(m.content) &&
@@ -699,11 +699,15 @@ async function encodeImagePart(part: {
  * Encodes sequentially (outer messages and inner parts) so peak heap is one
  * base64 buffer at a time on a long or multi-image history.
  */
-async function encodeMessagesForRemote(
-  messages: OpenAIChatMessage[],
-): Promise<OpenAIChatMessage[]> {
-  const encoded: OpenAIChatMessage[] = [];
+export async function encodeMessagesForRemote<T extends OpenAIChatMessage>(
+  messages: T[],
+  signal?: AbortSignal,
+): Promise<T[]> {
+  const encoded: T[] = [];
   for (const message of messages) {
+    if (signal?.aborted) {
+      throw new Error('Completion aborted');
+    }
     if (!Array.isArray(message.content)) {
       encoded.push(message);
       continue;
@@ -711,8 +715,11 @@ async function encodeMessagesForRemote(
     const content: typeof message.content = [];
     for (const part of message.content) {
       content.push(await encodeImagePart(part));
+      if (signal?.aborted) {
+        throw new Error('Completion aborted');
+      }
     }
-    encoded.push({...message, content});
+    encoded.push({...message, content} as T);
   }
   return encoded;
 }
@@ -726,6 +733,9 @@ export async function streamChatCompletion(
   timeoutMs?: number,
   serverType?: string,
 ): Promise<CompletionResult> {
+  if (signal?.aborted) {
+    throw new Error('Completion aborted');
+  }
   const url = buildOpenAIUrl(serverUrl, 'chat/completions', serverType);
   const connectionTimeoutMs = resolveTimeout(timeoutMs, CONNECTION_TIMEOUT_MS);
   const idleTimeoutMs = resolveTimeout(timeoutMs, IDLE_TIMEOUT_MS);
@@ -733,8 +743,11 @@ export async function streamChatCompletion(
   // common text path stays synchronous so callers see the request built in the
   // same tick.
   const encodedMessages = hasLocalImageAttachment(params.messages)
-    ? await encodeMessagesForRemote(params.messages)
+    ? await encodeMessagesForRemote(params.messages, signal)
     : params.messages;
+  if (signal?.aborted) {
+    throw new Error('Completion aborted');
+  }
 
   return new Promise<CompletionResult>((resolve, reject) => {
     const xhr = new XMLHttpRequest();
@@ -764,6 +777,7 @@ export async function streamChatCompletion(
     const connectionTimer = setTimeout(() => {
       if (!settled) {
         settled = true;
+        cleanup();
         xhr.abort();
         reject(new Error('Connection timed out'));
       }
@@ -897,31 +911,7 @@ export async function streamChatCompletion(
         settled = true;
         cleanup();
 
-        let errorMessage = `Server error: ${xhr.status}`;
-        try {
-          const errorBody = JSON.parse(xhr.responseText);
-          const detail =
-            errorBody?.error?.message || errorBody?.error || xhr.responseText;
-          errorMessage = `Server error: ${xhr.status} — ${detail}`;
-          console.log(
-            '[OpenAI] Error:',
-            errorBody?.error?.message || errorBody?.error,
-          );
-        } catch {
-          if (xhr.responseText) {
-            errorMessage = `Server error: ${xhr.status} — ${xhr.responseText.substring(0, 200)}`;
-            console.log(
-              '[OpenAI] Error (raw):',
-              xhr.responseText.substring(0, 200),
-            );
-          }
-        }
-
-        if (xhr.status === 401) {
-          reject(new Error('Unauthorized: Invalid or missing API key'));
-        } else {
-          reject(new Error(errorMessage));
-        }
+        reject(xhrHttpError(xhr.status, xhr.responseText));
         xhr.abort();
       }
     };

@@ -380,6 +380,113 @@ describe('RemoteModelSheet', () => {
         );
       });
     });
+
+    it('selects a protocol before probing and persists it without an extra models request', async () => {
+      mockedFetchModelsWithHeaders.mockResolvedValue({
+        models: [{id: 'response-model', object: 'model', owned_by: 'system'}],
+        headers: {},
+      });
+      const {getByTestId} = render(
+        <RemoteModelSheet isVisible={true} onDismiss={jest.fn()} />,
+      );
+
+      fireEvent.press(getByTestId('api-protocol-dropdown'));
+      fireEvent.press(getByTestId('api-protocol-option-responses'));
+      expect(mockedFetchModelsWithHeaders).not.toHaveBeenCalled();
+
+      fireEvent.changeText(
+        getByTestId('remote-url-input'),
+        'http://localhost:1234',
+      );
+      await waitFor(() => {
+        expect(mockedFetchModelsWithHeaders).toHaveBeenCalledTimes(1);
+        expect(
+          getByTestId('add-model-button').props.accessibilityState?.disabled,
+        ).toBe(false);
+      });
+      fireEvent.press(getByTestId('add-model-button'));
+      await waitFor(() =>
+        expect(serverStore.addServer).toHaveBeenCalledWith(
+          expect.objectContaining({apiMode: 'responses'}),
+        ),
+      );
+      expect(mockedFetchModelsWithHeaders).toHaveBeenCalledTimes(1);
+    });
+
+    it('labels catalog, unsupported, and compatibility-default protocol states', async () => {
+      mockedFetchModelsWithHeaders.mockResolvedValue({
+        models: [
+          {
+            id: 'responses-only',
+            object: 'model',
+            owned_by: 'system',
+            supported_endpoints: ['/responses'],
+          },
+          {
+            id: 'unsupported',
+            object: 'model',
+            owned_by: 'system',
+            supported_endpoints: ['/embeddings'],
+          },
+          {id: 'legacy', object: 'model', owned_by: 'system'},
+        ],
+        headers: {},
+      });
+      const {getByTestId} = render(
+        <RemoteModelSheet isVisible={true} onDismiss={jest.fn()} />,
+      );
+      fireEvent.changeText(
+        getByTestId('remote-url-input'),
+        'http://localhost:1234',
+      );
+
+      await waitFor(() => {
+        expect(
+          getByTestId('remote-model-row-protocol-responses-only'),
+        ).toHaveTextContent('Effective endpoint: Responses · live catalog');
+        expect(
+          getByTestId('remote-model-row-warning-unsupported'),
+        ).toHaveTextContent(
+          'This model does not advertise a supported endpoint. Choose a manual protocol override to use it.',
+        );
+        expect(
+          getByTestId('remote-model-row-warning-legacy'),
+        ).toHaveTextContent(
+          'Endpoint support is unknown. Chat Completions is selected for compatibility; this does not confirm generation will succeed.',
+        );
+      });
+    });
+
+    it('warns when a manual server protocol contradicts the catalog', async () => {
+      mockedFetchModelsWithHeaders.mockResolvedValue({
+        models: [
+          {
+            id: 'chat-only',
+            object: 'model',
+            owned_by: 'system',
+            supported_endpoints: ['/chat/completions'],
+          },
+        ],
+        headers: {},
+      });
+      const {getByTestId} = render(
+        <RemoteModelSheet isVisible={true} onDismiss={jest.fn()} />,
+      );
+      fireEvent.press(getByTestId('api-protocol-dropdown'));
+      fireEvent.press(getByTestId('api-protocol-option-responses'));
+      fireEvent.changeText(
+        getByTestId('remote-url-input'),
+        'http://localhost:1234',
+      );
+
+      await waitFor(() =>
+        expect(
+          getByTestId('remote-model-row-warning-chat-only'),
+        ).toHaveTextContent(
+          'The manual protocol conflicts with the model catalog and may fail.',
+        ),
+      );
+    });
   });
 
   // Tapping a saved server's chip probes via fetchModels using THAT server's

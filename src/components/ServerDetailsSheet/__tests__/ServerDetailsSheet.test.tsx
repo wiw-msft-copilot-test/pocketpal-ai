@@ -448,6 +448,63 @@ describe('ServerDetailsSheet', () => {
     });
   });
 
+  it('treats a missing legacy apiMode as Auto and restores the saved value', async () => {
+    const view = render(
+      <ServerDetailsSheet
+        isVisible={true}
+        onDismiss={jest.fn()}
+        serverId="srv-1"
+      />,
+    );
+    expect(
+      view.getByTestId('api-protocol-dropdown').props.accessibilityLabel,
+    ).toBe('Auto');
+
+    serverStore.servers = [{...testServer, apiMode: 'responses'}];
+    view.rerender(
+      <ServerDetailsSheet
+        isVisible={false}
+        onDismiss={jest.fn()}
+        serverId="srv-1"
+      />,
+    );
+    view.rerender(
+      <ServerDetailsSheet
+        isVisible={true}
+        onDismiss={jest.fn()}
+        serverId="srv-1"
+      />,
+    );
+    await waitFor(() =>
+      expect(
+        view.getByTestId('api-protocol-dropdown').props.accessibilityLabel,
+      ).toBe('Responses'),
+    );
+  });
+
+  it('saves a protocol-only edit without probing models', async () => {
+    const {getByTestId} = render(
+      <ServerDetailsSheet
+        isVisible={true}
+        onDismiss={jest.fn()}
+        serverId="srv-1"
+      />,
+    );
+    mockedTestConnection.mockClear();
+    fireEvent.press(getByTestId('api-protocol-dropdown'));
+    fireEvent.press(getByTestId('api-protocol-option-responses'));
+    expect(mockedTestConnection).not.toHaveBeenCalled();
+
+    fireEvent.press(getByTestId('save-server-button'));
+    await waitFor(() =>
+      expect(serverStore.updateServer).toHaveBeenCalledWith(
+        'srv-1',
+        expect.objectContaining({apiMode: 'responses'}),
+      ),
+    );
+    expect(mockedTestConnection).not.toHaveBeenCalled();
+  });
+
   it('persists a user-selected serverType on save', async () => {
     const {getByTestId} = render(
       <ServerDetailsSheet

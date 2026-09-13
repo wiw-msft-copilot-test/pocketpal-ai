@@ -1730,6 +1730,7 @@ describe('streamChatCompletion', () => {
   it('rejects immediately if signal already aborted', async () => {
     const controller = new AbortController();
     controller.abort();
+    const timerSpy = jest.spyOn(global, 'setTimeout');
 
     await expect(
       streamChatCompletion(
@@ -1739,6 +1740,36 @@ describe('streamChatCompletion', () => {
         controller.signal,
       ),
     ).rejects.toThrow('Completion aborted');
+    expect(timerSpy).not.toHaveBeenCalled();
+    expect(MockXHR.instances).toHaveLength(0);
+    timerSpy.mockRestore();
+  });
+
+  it('stops after an abort during local-image encoding without sending XHR', async () => {
+    const RNFS = require('@dr.pogodin/react-native-fs');
+    let finishRead!: (value: string) => void;
+    (RNFS.readFile as jest.Mock).mockReturnValueOnce(
+      new Promise<string>(resolve => {
+        finishRead = resolve;
+      }),
+    );
+    const controller = new AbortController();
+    const resultPromise = streamChatCompletion(
+      {
+        messages: [imageMessage('file:///image.png')],
+        model: 'test-model',
+      },
+      'http://localhost:1234',
+      undefined,
+      controller.signal,
+    );
+
+    await Promise.resolve();
+    controller.abort();
+    finishRead('QUJD');
+
+    await expect(resultPromise).rejects.toThrow('Completion aborted');
+    expect(MockXHR.instances).toHaveLength(0);
   });
 
   // PACT support over OpenAI-compatible remote engines.
@@ -1979,15 +2010,20 @@ describe('streamChatCompletion', () => {
     // With no timeoutMs supplied, the connection guard still fires at the
     // existing 30s default.
     it('aborts at the 30s default connection timeout when timeoutMs is omitted', async () => {
+      const controller = new AbortController();
+      const removeSpy = jest.spyOn(controller.signal, 'removeEventListener');
       const resultPromise = streamChatCompletion(
         {messages: [{role: 'user', content: 'Hi'}], model: 'test-model'},
         'http://localhost:1234',
+        undefined,
+        controller.signal,
       );
 
       // Drive past the 30s default — no headers received.
       jest.advanceTimersByTime(30000);
 
       await expect(resultPromise).rejects.toThrow('Connection timed out');
+      expect(removeSpy).toHaveBeenCalledTimes(1);
     });
 
     // Once connected, an idle stall longer than the configured value aborts

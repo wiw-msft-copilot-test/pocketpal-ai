@@ -463,6 +463,8 @@ export type ChatMessage = {
   reasoning_content?: string;
   tool_calls?: Array<import('llama.rn').ToolCall>;
   tool_call_id?: string;
+  /** Internal provider replay metadata; never serialized to Chat/llama.rn. */
+  responsesState?: ResponsesReplayState;
 };
 
 export enum ModelOrigin {

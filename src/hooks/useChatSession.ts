@@ -368,8 +368,8 @@ async function applyEventToStore(
       // this delta to avoid clobbering existing content with empty.
       // toolCalls are not written here — the reducer still consumes
       // `event.delta.toolCalls` for pendingTalentNames, but the
-      // canonical step.toolCalls write happens after step_finished via
-      // appendToolCall so ids match outcomes by construction.
+      // canonical step.toolCalls write is part of the atomic
+      // step_finished snapshot so ids match outcomes by construction.
       const partial: Partial<MessageType.AssistantTurn['steps'][number]> = {};
       if (event.delta.content) {
         partial.content = event.delta.content.replace(/^\s+/, '');
@@ -401,18 +401,15 @@ async function applyEventToStore(
       );
       return;
     case 'step_finished':
-      // Land step.toolCalls AFTER step_finished with the runner's
-      // authoritative normalized ids so they match outcomes' callIds by
-      // construction. Skipped for text-only and final-of-chain steps
-      // (no payload attached).
-      if (event.toolCalls && event.toolCalls.length > 0) {
-        await chatSessionStore.appendToolCall(
-          ctx.messageId,
-          ctx.sessionId,
-          event.toolCalls,
-        );
-      }
-      await chatSessionStore.finalizeActiveStep(ctx.messageId, ctx.sessionId);
+      // This awaited writer first consumes any throttled streaming
+      // partial, then atomically persists the authoritative final
+      // snapshot. The generator remains suspended at its yield until
+      // this resolves, so a rejection halts the run before any tool.
+      await chatSessionStore.persistFinalActiveStep(
+        ctx.messageId,
+        ctx.sessionId,
+        event.step,
+      );
       return;
     case 'run_finished': {
       // Final timings + observability for hit-max-turns. Kept here
