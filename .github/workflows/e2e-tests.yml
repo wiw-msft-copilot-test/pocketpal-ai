@@ -228,6 +228,9 @@ jobs:
     timeout-minutes: 30
 
     steps:
+      - name: Checkout smoke script
+        uses: actions/checkout@v4
+
       - name: Download APK artifact
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
@@ -254,49 +257,4 @@ jobs:
           emulator-options: >-
             -no-window -gpu swiftshader_indirect -no-snapshot
             -noaudio -no-boot-anim -camera-back none -partition-size 4096
-          script: |
-            set -eu
-
-            APK="$GITHUB_WORKSPACE/apk/app-e2e-releaseE2e.apk"
-            PKG="com.pocketpalai.e2e"
-            COMP="$PKG/com.pocketpal.MainActivity"
-
-            test -s "$APK"
-            adb wait-for-device
-            adb shell input keyevent 82 || true
-            adb uninstall "$PKG" >/dev/null 2>&1 || true
-            timeout 300 adb install -t "$APK"
-
-            PACKAGE_PATH="$(adb shell pm path "$PKG" | tr -d '\r')"
-            case "$PACKAGE_PATH" in
-              package:*) ;;
-              *) echo "Package was not installed: $PACKAGE_PATH"; exit 1 ;;
-            esac
-
-            adb logcat -c
-            adb shell am force-stop "$PKG"
-            START="$(
-              timeout 90 adb shell am start -W \
-                -a android.intent.action.MAIN \
-                -c android.intent.category.LAUNCHER \
-                -n "$COMP" | tr -d '\r'
-            )"
-            printf '%s\n' "$START"
-            printf '%s\n' "$START" | grep -q '^Status: ok$'
-
-            sleep 10
-            PID="$(adb shell pidof "$PKG" 2>/dev/null | tr -d '\r' || true)"
-            RESUMED="$(
-              adb shell dumpsys activity activities |
-                tr -d '\r' |
-                grep -E 'topResumedActivity|mResumedActivity|ResumedActivity' ||
-                true
-            )"
-            printf 'PACKAGE_PATH=%s\nPID=%s\nRESUMED=%s\n' \
-              "$PACKAGE_PATH" "$PID" "$RESUMED"
-
-            if [ -z "$PID" ] || ! printf '%s\n' "$RESUMED" | grep -Fq "$COMP"; then
-              adb shell dumpsys activity top || true
-              adb logcat -d -t 300 '*:E' || true
-              exit 1
-            fi
+          script: bash .github/scripts/smoke-e2e-apk.sh
