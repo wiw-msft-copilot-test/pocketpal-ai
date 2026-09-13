@@ -43,28 +43,68 @@ Modells need to be downloaded before use. You can download and use these models 
 ### Loading a Model
 After downloading, tap *Load* to bring the model into memory. Now you’re ready to chat!
 
+### Using Remote API Protocols
+
+Remote servers can select **Auto**, **Chat Completions**, or **Responses** as
+their API protocol. An individual remote model can inherit that setting or
+override it with Chat Completions or Responses. Set the server default while
+adding or managing a server and use the model settings for an override.
+PocketPal resolves the effective protocol in this order:
+
+1. model override;
+2. server override;
+3. endpoint support advertised by the model catalog; then
+4. compatibility default: Chat Completions.
+
+A catalog entry can be incomplete or inaccurate. PocketPal warns when an
+override contradicts advertised support, and listing a model does not prove
+that your credential is entitled to run it.
+
+The Responses transport supports PocketPal text streaming, image-to-input
+conversion, reasoning summaries, structured output, cancellation, usage, and
+completed, incomplete, refusal, and failure outcomes. Local function talents
+can execute in the agent loop and their outcomes are replayed to the provider.
+Chats and the validated replay data needed to continue them are stored locally,
+so completed conversations survive an app restart.
+
+PocketPal sends Responses requests with `store: false`; it does not ask the
+provider to retain a conversation. Instead, it explicitly replays local
+history. A versioned, opaque provider-state block may be retained in local
+messages and JSON chat backups when needed for faithful continuation. Copy and
+Markdown export include visible text only, not that state. PocketPal will not
+reuse opaque state after the provider server, model, or protocol changes.
+
+Hosted OpenAI tools, background responses, WebSocket mode, and the Conversations
+API are outside this integration's scope.
+
 ### Using a GitHub Copilot Remote Model
 
-PocketPal can connect to the GitHub Copilot API through its OpenAI-compatible
-Chat Completions endpoint:
+PocketPal can connect to GitHub Copilot through either supported remote
+protocol:
 
 1. Open **Models**, tap **+**, then select **Add Remote Model**.
 2. Set **Server Type** to **GitHub Copilot** before connecting.
 3. Enter `https://api.githubcopilot.com` as the server URL. Do not append
-   `/v1`; PocketPal uses `/models` and `/chat/completions` for this server type.
+   `/v1`; PocketPal uses unversioned `/models`, `/responses`, and
+   `/chat/completions` for this server type. Other server types retain their
+   `/v1/models`, `/v1/responses`, and `/v1/chat/completions` routes.
 4. Enter a supported GitHub credential, select an available model, and add it.
 
 GitHub documents fine-grained personal access tokens with the **Copilot
 Requests** permission for Copilot CLI authentication. PocketPal stores the
-credential in the device keychain, but it does not sign you in or refresh the
-credential. Your account must have the required Copilot access and comply with
-any organization policy.
+credential in the platform Keychain/Keystore, but it does not implement GitHub
+sign-in or refresh the credential. Your account must have the required Copilot
+access and comply with any organization policy.
 
 This option sends a pinned, test-suffixed Copilot CLI-derived identification
 profile. GitHub may reject the custom `copilot-developer-cli-test` integration
 ID, and PocketPal will not retry with the original identity. A model appearing
-in `/models` also does not guarantee that it supports Chat Completions; models
-that require another API cannot be used through this integration.
+in `/models` does not prove entitlement or successful inference.
+
+The Copilot integration was verified with deterministic local fixtures, not
+live Copilot inference, because no explicit GitHub credential was supplied.
+Fixture behavior validates PocketPal's transport and UI; it is not a GitHub API
+contract.
 
 To change the URL, credential, or server type later, open **Models**, tap **+**,
 then **Manage Servers**. Re-select the remote model after editing its server so

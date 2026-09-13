@@ -96,6 +96,35 @@ The defaults are:
 | Host ADB endpoint    | `127.0.0.1:5555`                                                        |
 | Host WebRTC endpoint | `127.0.0.1:8554`                                                        |
 
+### Run the remote protocol acceptance suite
+
+After installing the E2E APK in the retained API 30 emulator, run the
+deterministic split-session suite from the repository root:
+
+```bash
+cd e2e
+E2E_DEVICE_NAME=127.0.0.1:5555 \
+E2E_PLATFORM_VERSION=11 \
+E2E_DEVICE_UDID=127.0.0.1:5555 \
+E2E_APP_PATH=../android/app/build/outputs/apk/e2e/releaseE2e/app-e2e-releaseE2e.apk \
+yarn e2e:remote-responses:android
+```
+
+The runner owns the fixture lifecycle and `adb reverse` setup. By default it
+maps device loopback ports `18080` and `18081` to the host fixture on `18080`,
+then removes both mappings. `E2E_REMOTE_FIXTURE_PORT` changes the base port.
+No provider key is used.
+
+The full suite passed locally in this Docker API 30 environment for source
+`f174a6c`. The source-matching application APK came from build run
+`34751845630` and has SHA-256
+`26b53311d5906d5c35d77eaa8e9c8d5c673bee648c64132ca7bbfeb66a4c5f2f`.
+Artifact-only hosted run `34758311979` separately passed API 35 install,
+foreground, deterministic fixture, and Appium checks. iOS was not verified on
+the Linux host because Xcode was unavailable. Live GitHub Copilot inference
+was also not verified because no explicit credential was supplied; the fixture
+is deterministic transport evidence, not a GitHub API contract.
+
 The emulator container is intentionally retained after `stop`. Remove it
 manually when its state is no longer needed:
 

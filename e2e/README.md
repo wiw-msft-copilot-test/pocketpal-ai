@@ -80,6 +80,59 @@ The merger dedupes across multiple raw reports (latest run per `model_id × quan
 - Android SDK configured (for Android)
 - Build the app first (see below)
 
+### Remote protocol fixture suite
+
+The remote Responses acceptance suite is deterministic and requires no provider
+credential or network API. It covers Auto catalog routing, unversioned GitHub
+Copilot-style Responses and Chat Completions paths, streaming and final-only
+text, reasoning summaries, structured output at the fixture boundary, restart
+history replay, cancellation, usage, and incomplete/refusal/failure outcomes.
+It also verifies exact replay of the rejection outcome for an **unenabled**
+`calculate` function. It does not claim that the fixture executes the built-in
+calculate talent; local execution is covered by the unit agent/talent tests.
+
+Run the fixture checks from `e2e/`:
+
+```bash
+yarn test:remote-responses-fixture
+yarn typecheck:remote-responses
+yarn e2e:remote-responses:android --dry-run
+```
+
+Run the complete Android split-session suite against a built E2E APK:
+
+```bash
+E2E_DEVICE_NAME=emulator-5554 \
+E2E_PLATFORM_VERSION=15 \
+E2E_DEVICE_UDID=emulator-5554 \
+E2E_APP_PATH=../android/app/build/outputs/apk/e2e/releaseE2e/app-e2e-releaseE2e.apk \
+yarn e2e:remote-responses:android
+```
+
+`E2E_DEVICE_NAME`, `E2E_PLATFORM_VERSION`, `E2E_DEVICE_UDID`, and
+`E2E_APP_PATH` identify the Android target and APK. The runner starts one
+loopback fixture and runs the Responses and Chat Completions specs in separate
+WDIO sessions. It reserves device ports `18080` and `18081`, installs both
+`adb reverse` mappings, supplies `E2E_REMOTE_FIXTURE_URL` and
+`E2E_CHAT_FIXTURE_URL`, and removes the mappings afterward. Override the base
+host port with `E2E_REMOTE_FIXTURE_PORT`; use `E2E_REMOTE_GREP` only for a
+focused Responses diagnostic. No API-key environment variable is expected.
+
+Verified at source HEAD `f174a6c`:
+
+- build run `34751845630` produced an application APK whose application source
+  matched `f174a6c`, although its checkout included subsequent E2E-only commits;
+- APK SHA-256:
+  `26b53311d5906d5c35d77eaa8e9c8d5c673bee648c64132ca7bbfeb66a4c5f2f`;
+- artifact-only hosted run `34758311979` passed API 35 installation,
+  foreground checks, fixture tests, and Appium acceptance; and
+- the full split-session suite passed locally in the Docker API 30 emulator.
+
+iOS acceptance was not run because verification used Linux without Xcode.
+These fixtures verify PocketPal deterministically and are not a GitHub API
+contract; live Copilot inference was not tested without an explicitly supplied
+credential.
+
 ### Build
 
 ```bash
