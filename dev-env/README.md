@@ -1,8 +1,11 @@
 # Docker Android emulator
 
-`android_emulator.py` manages a hardware-accelerated Android emulator for
-installing and smoke-testing PocketPal APKs. It uses Google's experimental
-Android Emulator Container image and requires no Python packages.
+This directory contains two dependency-free Python tools:
+
+- `android_emulator.py` manages a hardware-accelerated Android emulator and
+  installs or launches local APKs.
+- `verify_android_artifact.py` runs the repeatable GitHub Actions artifact
+  acceptance workflow used for release-configuration changes.
 
 ## Requirements
 
@@ -10,11 +13,19 @@ Android Emulator Container image and requires no Python packages.
 - Docker Desktop or Docker Engine on x86-64 Linux
 - Hardware virtualization enabled
 - `/dev/kvm` available to Docker
+- GitHub CLI (`gh`) authenticated for the repository when using
+  `verify_android_artifact.py`
+- `unzip` is not required; APK inspection uses Python's standard library
 
 Docker Desktop on macOS and Windows does not support the KVM setup required by
 this image. A Linux host or Linux VM with nested virtualization is required.
 
 ## Usage
+
+### Fast local emulator operations
+
+Use `android_emulator.py` while developing or when an APK is already on disk.
+It does not dispatch GitHub Actions or inspect the app's feature policy.
 
 Run commands from the repository root:
 
@@ -74,12 +85,12 @@ python3 dev-env/android_emulator.py \
 
 The defaults are:
 
-| Setting | Value |
-| --- | --- |
-| Container | `pocketpal-android-emulator` |
-| Image | `us-docker.pkg.dev/android-emulator-268719/images/30-google-x64:30.1.2` |
-| Host ADB endpoint | `127.0.0.1:5555` |
-| Host WebRTC endpoint | `127.0.0.1:8554` |
+| Setting              | Value                                                                   |
+| -------------------- | ----------------------------------------------------------------------- |
+| Container            | `pocketpal-android-emulator`                                            |
+| Image                | `us-docker.pkg.dev/android-emulator-268719/images/30-google-x64:30.1.2` |
+| Host ADB endpoint    | `127.0.0.1:5555`                                                        |
+| Host WebRTC endpoint | `127.0.0.1:8554`                                                        |
 
 The emulator container is intentionally retained after `stop`. Remove it
 manually when its state is no longer needed:
@@ -87,3 +98,98 @@ manually when its state is no longer needed:
 ```bash
 docker rm pocketpal-android-emulator
 ```
+
+## Full GitHub artifact acceptance
+
+Use `verify_android_artifact.py` after changing native dependencies, feature
+flags, authentication boundaries, release bundling, or the E2E workflow. It is
+intentionally slower than a local smoke test: it binds evidence to an exact
+remote commit, performs a clean installation, and inspects rendered UI.
+
+### Dispatch and verify the current remote branch
+
+Push the branch first, then run:
+
+```bash
+python3 dev-env/verify_android_artifact.py --dispatch
+```
+
+The command:
+
+1. Reads the current SHA of
+   `origin/copilot/security-audit-credentials`.
+2. Dispatches `.github/workflows/e2e-tests.yml`.
+3. Refuses a workflow run for a different SHA.
+4. Watches the build for up to two hours and saves failed job logs.
+5. Downloads `e2e-android-apk` to `/tmp/pocketpal-apk-<run-id>/`.
+6. Records the APK SHA-256 and checks its native DEX boundary.
+7. Performs a 60-second upgrade launch and two cold relaunches.
+8. Verifies the disabled centralized-integration deep links and UI.
+9. Creates an isolated emulator for a clean 60-second launch, then removes it.
+10. Writes `acceptance.json`, screenshots, UI XML, app-process-scoped logcat,
+    and command output into the run-specific evidence directory.
+
+### Verify an existing successful run
+
+```bash
+python3 dev-env/verify_android_artifact.py \
+  --run-id 34725193906
+```
+
+By default, the run must target the current remote branch SHA. To verify an
+older run deliberately, supply its full commit SHA:
+
+```bash
+python3 dev-env/verify_android_artifact.py \
+  --run-id 34725193906 \
+  --expected-sha 4dd64383a7b2bcdd302999e5558863154971d785
+```
+
+### What the policy check asserts
+
+The acceptance script fails unless:
+
+- the app renders and remains foreground without fatal Java, native, or React
+  Native startup errors;
+- Firebase and Google Sign-In native classes are absent;
+- React Native Keychain remains for user-owned credentials;
+- Pals/PalsHub, centralized sign-in, and centralized feedback controls are
+  absent;
+- Hugging Face token, search-provider API key, and remote-server API key
+  controls remain visible; and
+- disabled hub and checkout deep links leave the app alive and foreground.
+
+It uses an unreachable emulator-local URL to reveal the remote-server API-key
+form. It never reads, prints, changes, or sends real provider credentials.
+
+### Useful options
+
+```bash
+python3 dev-env/verify_android_artifact.py --help
+
+# Use a different repository or branch.
+python3 dev-env/verify_android_artifact.py \
+  --dispatch \
+  --repo owner/repository \
+  --branch feature/my-branch
+
+# Put evidence somewhere other than /tmp.
+python3 dev-env/verify_android_artifact.py \
+  --run-id 123456789 \
+  --evidence-dir /path/to/evidence
+
+# Short diagnostic rerun after full acceptance has already passed.
+python3 dev-env/verify_android_artifact.py \
+  --run-id 123456789 \
+  --skip-clean-install \
+  --skip-ui-policy
+```
+
+The skip options are for diagnosis only and are recorded as `skipped` in
+`acceptance.json`; they do not constitute full acceptance. If ports `5557` or
+`8556` are occupied, override `--clean-adb-port` and
+`--clean-webrtc-port`. The persistent emulator is left running, while the
+run-specific clean-test emulator is always removed.
+
+Port `8554` exposes the emulator's gRPC/WebRTC service endpoint. It is not a
+standalone browser UI.

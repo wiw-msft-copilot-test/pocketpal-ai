@@ -186,6 +186,9 @@ PocketPal is a standard React Native app. If you can build a React Native projec
 
 See the [React Native environment setup](https://reactnative.dev/docs/set-up-your-environment) for platform details.
 
+For Docker-based Android APK installation and full GitHub artifact acceptance,
+see [`dev-env/README.md`](dev-env/README.md).
+
 ### Clone, install & run
 
 ```bash
