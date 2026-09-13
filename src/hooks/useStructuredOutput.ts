@@ -52,7 +52,7 @@ export const useStructuredOutput = () => {
 
         const resolvedSettings =
           await chatSessionStore.getCurrentCompletionSettings(
-            modelStore.activeModel?.completionSettings,
+            modelStore.activeModelCompletionSettings,
           );
         const result = await engine.completion({
           ...resolvedSettings,

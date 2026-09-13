@@ -119,6 +119,7 @@ function createRemoteModel(params: {
   serverName: string;
   remoteModelId: string;
   modelName: string;
+  completionSettings?: CompletionParams;
 }): Model {
   const emptyChatTemplate = {
     name: '',
@@ -146,8 +147,22 @@ function createRemoteModel(params: {
     chatTemplate: emptyChatTemplate,
     defaultStopWords: [],
     stopWords: [],
-    defaultCompletionSettings: {} as CompletionParams,
-    completionSettings: {} as CompletionParams,
+    defaultCompletionSettings: {},
+    completionSettings: params.completionSettings
+      ? {
+          ...params.completionSettings,
+          stop: params.completionSettings.stop
+            ? [...params.completionSettings.stop]
+            : params.completionSettings.stop,
+          reasoning: params.completionSettings.reasoning
+            ? {...params.completionSettings.reasoning}
+            : undefined,
+          generationParameterModes: params.completionSettings
+            .generationParameterModes
+            ? {...params.completionSettings.generationParameterModes}
+            : undefined,
+        }
+      : {},
     serverId: params.serverId,
     serverName: params.serverName,
     remoteModelId: params.remoteModelId,
@@ -2575,6 +2590,13 @@ class ModelStore {
     );
   }
 
+  get activeModelCompletionSettings(): CompletionParams | undefined {
+    if (this.activeRemoteBinding?.generationSettings) {
+      return this.activeRemoteBinding.generationSettings;
+    }
+    return this.activeModel?.completionSettings;
+  }
+
   private get capabilityEnv(): CapabilityEnv {
     return {
       remoteCaps: serverStore.remoteCaps,
@@ -2642,6 +2664,9 @@ class ModelStore {
           serverName: server.name,
           remoteModelId: selected.remoteModelId,
           modelName: selected.remoteModelId,
+          completionSettings: serverStore.getRemoteModelGenerationSettings(
+            `${selected.serverId}/${selected.remoteModelId}`,
+          ),
         }),
       );
     }
@@ -2682,6 +2707,9 @@ class ModelStore {
           ? server.credentialRevision!
           : 0,
       wireApi: protocol.wireApi,
+      generationSettings: serverStore.getRemoteModelGenerationSettings(
+        model.id,
+      ),
       protocolCapabilities: catalog
         ? {
             ...catalog.capabilities,
@@ -2721,6 +2749,7 @@ class ModelStore {
       wireApi: bindingSnapshot.wireApi,
       protocolCapabilities: bindingSnapshot.protocolCapabilities,
       credentialRevision: bindingSnapshot.credentialRevision,
+      generationSettings: bindingSnapshot.generationSettings,
     };
 
     runInAction(() => {

@@ -5,6 +5,7 @@ import {MD3Theme} from 'react-native-paper';
 import {TemplateConfig} from 'chat-formatter';
 import {ContextParams, TokenData} from 'llama.rn';
 import {CompletionParams} from './completionTypes';
+import type {RemoteGenerationSettings} from './completionTypes';
 import {PreviewData} from '@flyerhq/react-native-link-preview';
 import {MD3Colors, MD3Typescale} from 'react-native-paper/lib/typescript/types';
 import type {TokenRadius, TokenStroke, TokenTypography} from '../theme/tokens';
@@ -530,6 +531,7 @@ export interface RemoteSessionBinding {
   wireApi?: RemoteWireApi;
   protocolCapabilities?: RemoteProtocolCapabilities;
   credentialRevision?: number;
+  generationSettings?: RemoteGenerationSettings;
 }
 
 export type {RemoteModelPreference};

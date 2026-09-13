@@ -74,7 +74,7 @@ const prepareCompletion = async ({
 }) => {
   const sessionCompletionSettings =
     await chatSessionStore.getCurrentCompletionSettings(
-      modelStore.activeModel?.completionSettings,
+      modelStore.activeModelCompletionSettings,
     );
   const stopWords = toJS(modelStore.activeModel?.stopWords);
 

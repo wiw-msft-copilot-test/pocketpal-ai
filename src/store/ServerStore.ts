@@ -15,6 +15,12 @@ import {RemoteModelCaps, ServerConfig} from '../utils/types';
 import {ReasoningCapability} from '../utils/reasoningCapability';
 import {deriveListCapsMap} from '../utils/listCaps';
 import type {ListDerivedCaps} from '../utils/listCaps';
+import type {
+  GenerationParameterMode,
+  OptionalGenerationParameter,
+  RemoteGenerationSettings,
+} from '../utils/completionTypes';
+import {CURRENT_COMPLETION_SETTINGS_VERSION} from '../utils/completionSettingsVersions';
 import {normalizeRemoteCatalogModel} from '../utils/remoteCatalog';
 import {
   resolveRemoteProtocol as resolveProtocol,
@@ -68,6 +74,19 @@ function dropEntry<T>(map: Record<string, T>, key: string): Record<string, T> {
   return Object.fromEntries(
     Object.entries(map).filter(([entryKey]) => entryKey !== key),
   );
+}
+
+function cloneRemoteGenerationSettings(
+  settings: RemoteGenerationSettings,
+): RemoteGenerationSettings {
+  return {
+    ...settings,
+    stop: settings.stop ? [...settings.stop] : settings.stop,
+    reasoning: settings.reasoning ? {...settings.reasoning} : undefined,
+    generationParameterModes: settings.generationParameterModes
+      ? {...settings.generationParameterModes}
+      : undefined,
+  };
 }
 
 class ServerStore {
@@ -207,7 +226,20 @@ class ServerStore {
     modelId: string,
     preference: RemoteModelPreference,
   ): void {
-    this.remoteModelPreferences[modelId] = {...preference};
+    const existing = this.remoteModelPreferences[modelId];
+    this.remoteModelPreferences = {
+      ...this.remoteModelPreferences,
+      [modelId]: {
+        ...existing,
+        ...preference,
+        generationSettings: preference.generationSettings
+          ? cloneRemoteGenerationSettings({
+              ...preference.generationSettings,
+              version: CURRENT_COMPLETION_SETTINGS_VERSION,
+            })
+          : existing?.generationSettings,
+      },
+    };
   }
 
   clearRemoteModelPreference(modelId: string): void {
@@ -215,6 +247,65 @@ class ServerStore {
       this.remoteModelPreferences,
       modelId,
     );
+  }
+
+  getRemoteModelGenerationSettings(
+    modelId: string,
+  ): RemoteGenerationSettings | undefined {
+    const settings = this.remoteModelPreferences[modelId]?.generationSettings;
+    return settings ? cloneRemoteGenerationSettings(settings) : undefined;
+  }
+
+  setRemoteModelGenerationSettings(
+    modelId: string,
+    settings: RemoteGenerationSettings,
+  ): void {
+    const existing = this.remoteModelPreferences[modelId];
+    this.remoteModelPreferences = {
+      ...this.remoteModelPreferences,
+      [modelId]: {
+        ...existing,
+        generationSettings: cloneRemoteGenerationSettings({
+          ...settings,
+          version: CURRENT_COMPLETION_SETTINGS_VERSION,
+        }),
+      },
+    };
+  }
+
+  setRemoteModelGenerationMode(
+    modelId: string,
+    parameter: OptionalGenerationParameter,
+    mode: GenerationParameterMode,
+  ): void {
+    const settings = this.getRemoteModelGenerationSettings(modelId) ?? {};
+    this.setRemoteModelGenerationSettings(modelId, {
+      ...settings,
+      generationParameterModes: {
+        ...settings.generationParameterModes,
+        [parameter]: mode,
+      },
+    });
+  }
+
+  clearRemoteModelGenerationSettings(modelId: string): void {
+    const existing = this.remoteModelPreferences[modelId];
+    if (!existing?.generationSettings) {
+      return;
+    }
+    const remaining = {...existing};
+    delete remaining.generationSettings;
+    if (Object.keys(remaining).length === 0) {
+      this.remoteModelPreferences = dropEntry(
+        this.remoteModelPreferences,
+        modelId,
+      );
+      return;
+    }
+    this.remoteModelPreferences = {
+      ...this.remoteModelPreferences,
+      [modelId]: remaining,
+    };
   }
 
   getRemoteCatalogModel(

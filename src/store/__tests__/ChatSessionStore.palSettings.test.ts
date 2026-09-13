@@ -144,6 +144,65 @@ describe('ChatSessionStore - Pal Settings', () => {
       expect(result.top_k).toBe(40); // From session settings (default value)
       expect(result.n_predict).toBe(200); // From session settings
     });
+
+    it('places a remote model override between Pal and session layers', async () => {
+      chatSessionStore.newChatCompletionSettings = {
+        temperature: 0.8,
+        generationParameterModes: {temperature: 'send'},
+      };
+      palStore.pals.push({
+        type: 'local',
+        id: 'test-pal-id',
+        name: 'Test Pal',
+        description: 'Test pal for settings',
+        systemPrompt: 'Test prompt',
+        isSystemPromptChanged: false,
+        useAIPrompt: false,
+        parameters: {},
+        parameterSchema: [],
+        completionSettings: {
+          temperature: 0.6,
+          generationParameterModes: {temperature: 'send'},
+        },
+        source: 'local',
+      });
+      const remoteOverride: CompletionParams = {
+        temperature: 0.4,
+        generationParameterModes: {temperature: 'omit'},
+      };
+
+      const modelResult = await chatSessionStore.resolveCompletionSettings(
+        undefined,
+        'test-pal-id',
+        remoteOverride,
+      );
+
+      expect(modelResult.temperature).toBe(0.4);
+      expect(modelResult.generationParameterModes?.temperature).toBe('omit');
+
+      chatSessionStore.sessions = [
+        {
+          id: 'test-session',
+          title: 'Test Session',
+          date: '2024-01-01',
+          messages: [],
+          completionSettings: {
+            temperature: 0.2,
+            generationParameterModes: {temperature: 'send'},
+          },
+          activePalId: 'test-pal-id',
+          settingsSource: 'custom',
+        },
+      ];
+      const sessionResult = await chatSessionStore.resolveCompletionSettings(
+        'test-session',
+        'test-pal-id',
+        remoteOverride,
+      );
+
+      expect(sessionResult.temperature).toBe(0.2);
+      expect(sessionResult.generationParameterModes?.temperature).toBe('send');
+    });
   });
 
   describe('getCurrentCompletionSettings', () => {

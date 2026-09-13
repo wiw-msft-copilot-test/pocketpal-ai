@@ -76,6 +76,37 @@ const APP_ONLY_KEYS: (keyof AppOnlyCompletionParams)[] = [
 
 export type CompletionParams = ApiCompletionParams & AppOnlyCompletionParams;
 
+export type RemoteGenerationSettings = Partial<
+  Pick<
+    CompletionParams,
+    | 'version'
+    | 'n_predict'
+    | 'temperature'
+    | 'top_k'
+    | 'top_p'
+    | 'min_p'
+    | 'xtc_threshold'
+    | 'xtc_probability'
+    | 'typical_p'
+    | 'penalty_last_n'
+    | 'penalty_repeat'
+    | 'penalty_freq'
+    | 'penalty_present'
+    | 'mirostat'
+    | 'mirostat_tau'
+    | 'mirostat_eta'
+    | 'seed'
+    | 'n_probs'
+    | 'stop'
+    | 'jinja'
+    | 'enable_thinking'
+    | 'reasoning'
+    | 'reasoning_effort'
+    | 'include_thinking_in_context'
+    | 'generationParameterModes'
+  >
+>;
+
 export function toApiCompletionParams(
   params: CompletionParams,
 ): ApiCompletionParams {

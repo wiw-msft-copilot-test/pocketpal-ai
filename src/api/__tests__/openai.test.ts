@@ -13,6 +13,7 @@ import {
   directVisionModelsBody,
   routerModelsBody,
 } from '../../../jest/fixtures/remoteModelList';
+import {mergeCompletionParameterLayers} from '../../utils/generationParameterModes';
 
 /** Build a minimal Headers-like object for fetch mocks. */
 function mockHeaders(entries: Record<string, string> = {}) {
@@ -1073,6 +1074,38 @@ describe('streamChatCompletion', () => {
     expect(
       Object.prototype.hasOwnProperty.call(body, 'chat_template_kwargs'),
     ).toBe(false);
+    xhr.simulateHeaders(200);
+    xhr.simulateProgress(
+      'data: {"choices":[{"delta":{},"finish_reason":"stop"}]}\n\ndata: [DONE]\n\n',
+    );
+    xhr.simulateLoad();
+    await resultPromise;
+  });
+
+  it('applies a resolved remote model override to the final request', async () => {
+    const effective = mergeCompletionParameterLayers(
+      {temperature: 0.8},
+      {temperature: 0.6},
+      {
+        temperature: 0.37,
+        generationParameterModes: {temperature: 'omit'},
+      },
+    );
+    const resultPromise = streamChatCompletion(
+      {
+        messages: [{role: 'user', content: 'Hi'}],
+        model: 'test-model',
+        temperature: effective.temperature,
+        generationParameterModes: effective.generationParameterModes,
+      },
+      'http://localhost:1234',
+    );
+    const xhr = MockXHR.instances[0];
+    const body = JSON.parse(xhr.requestBody);
+
+    expect(Object.prototype.hasOwnProperty.call(body, 'temperature')).toBe(
+      false,
+    );
     xhr.simulateHeaders(200);
     xhr.simulateProgress(
       'data: {"choices":[{"delta":{},"finish_reason":"stop"}]}\n\ndata: [DONE]\n\n',

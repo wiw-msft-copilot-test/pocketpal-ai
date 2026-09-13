@@ -27,6 +27,7 @@ jest
 import {serverStore} from '../ServerStore';
 import {routerModelsBody} from '../../../jest/fixtures/remoteModelList';
 import type {RemoteModelInfo} from '../../api/openai';
+import {CURRENT_COMPLETION_SETTINGS_VERSION} from '../../utils/completionSettingsVersions';
 
 // Captured at import time: the constructor runs once, and `clearAllMocks`
 // between tests would otherwise erase the only call there ever is.
@@ -547,11 +548,86 @@ describe('ServerStore', () => {
       });
     });
 
+    it('retains remote custom values while toggling omit and Send modes', () => {
+      const id = addCatalogServer();
+      const modelId = `${id}/responses-model`;
+      serverStore.setRemoteModelGenerationSettings(modelId, {
+        temperature: 0.42,
+        generationParameterModes: {temperature: 'omit'},
+      });
+
+      serverStore.setRemoteModelGenerationMode(modelId, 'temperature', 'send');
+
+      expect(serverStore.getRemoteModelGenerationSettings(modelId)).toEqual({
+        version: CURRENT_COMPLETION_SETTINGS_VERSION,
+        temperature: 0.42,
+        generationParameterModes: {temperature: 'send'},
+      });
+    });
+
+    it('round-trips hydrated generation settings and clones nested values', () => {
+      const id = addCatalogServer();
+      const modelId = `${id}/responses-model`;
+      runInAction(() => {
+        serverStore.remoteModelPreferences = {
+          [modelId]: {
+            generationSettings: {
+              temperature: 0.25,
+              stop: ['END'],
+              reasoning: {enabled: true, effort: 'high'},
+              generationParameterModes: {
+                temperature: 'omit',
+                stop: 'send',
+              },
+            },
+          },
+        };
+      });
+
+      const hydrated = serverStore.getRemoteModelGenerationSettings(modelId);
+      hydrated!.stop!.push('MUTATED');
+      hydrated!.reasoning!.effort = 'low';
+      hydrated!.generationParameterModes!.temperature = 'send';
+
+      expect(serverStore.getRemoteModelGenerationSettings(modelId)).toEqual({
+        temperature: 0.25,
+        stop: ['END'],
+        reasoning: {enabled: true, effort: 'high'},
+        generationParameterModes: {
+          temperature: 'omit',
+          stop: 'send',
+        },
+      });
+    });
+
+    it('keeps generation overrides across discovery invalidation', () => {
+      const id = addCatalogServer();
+      const modelId = `${id}/responses-model`;
+      serverStore.setRemoteModelGenerationSettings(modelId, {
+        temperature: 0.2,
+        generationParameterModes: {temperature: 'omit'},
+      });
+
+      serverStore.updateServer(id, {url: 'https://other.example.com'});
+
+      expect(serverStore.getRemoteModelGenerationSettings(modelId)).toEqual({
+        version: CURRENT_COMPLETION_SETTINGS_VERSION,
+        temperature: 0.2,
+        generationParameterModes: {temperature: 'omit'},
+      });
+    });
+
     it('removes preferences and cached metadata with a selected model', () => {
       const id = addCatalogServer();
       const modelId = `${id}/responses-model`;
       serverStore.addUserSelectedModel(id, 'responses-model');
-      serverStore.setRemoteModelPreference(modelId, {wireApi: 'responses'});
+      serverStore.setRemoteModelPreference(modelId, {
+        wireApi: 'responses',
+        generationSettings: {
+          temperature: 0.2,
+          generationParameterModes: {temperature: 'omit'},
+        },
+      });
       runInAction(() => {
         serverStore.remoteCatalogMetadata[modelId] = {
           serverId: id,
@@ -568,6 +644,20 @@ describe('ServerStore', () => {
 
       expect(serverStore.getRemoteModelPreference(modelId)).toBeUndefined();
       expect(serverStore.remoteCatalogMetadata[modelId]).toBeUndefined();
+    });
+
+    it('removes generation settings with their server', () => {
+      const id = addCatalogServer();
+      const modelId = `${id}/responses-model`;
+      serverStore.setRemoteModelGenerationSettings(modelId, {
+        temperature: 0.2,
+      });
+
+      serverStore.removeServer(id);
+
+      expect(
+        serverStore.getRemoteModelGenerationSettings(modelId),
+      ).toBeUndefined();
     });
 
     it('resolves model override before server mode and catalog', () => {

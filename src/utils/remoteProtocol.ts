@@ -1,3 +1,5 @@
+import type {RemoteGenerationSettings} from './completionTypes';
+
 export const REMOTE_WIRE_APIS = ['chat-completions', 'responses'] as const;
 
 export type RemoteWireApi = (typeof REMOTE_WIRE_APIS)[number];
@@ -41,6 +43,7 @@ export interface RemoteProtocolCapabilities {
 export interface RemoteModelPreference {
   wireApi?: RemoteWireApi;
   vision?: 'auto' | 'on' | 'off';
+  generationSettings?: RemoteGenerationSettings;
 }
 
 export interface RemoteProtocolResolution {

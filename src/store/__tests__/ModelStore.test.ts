@@ -30,6 +30,7 @@ import {LOOKIE_DEFAULT_MODEL} from '../builtinPalModels';
 import {classify} from '../../services/deviceRules/classify';
 import {getVisionModelSizeBreakdown} from '../../utils/multimodalHelpers';
 import {MODEL_LIST_VERSION} from '../ModelStore';
+import {CURRENT_COMPLETION_SETTINGS_VERSION} from '../../utils/completionSettingsVersions';
 import {parseDeviceRules} from '../../services/deviceRules/parse';
 import {fetchRules} from '../../services/deviceRules/rules';
 import {readDeviceSignals} from '../../services/deviceRules/signals';
@@ -5061,6 +5062,43 @@ describe('ModelStore', () => {
       await modelStore.setRemoteModel(remoteModel);
 
       expect(modelStore.activeRemoteBinding?.wireApi).toBe('responses');
+    });
+
+    it('recreates and snapshots persisted remote generation overrides', async () => {
+      runInAction(() => {
+        serverStore.userSelectedModels = [
+          {serverId: 'srv-1', remoteModelId: 'protocol-model'},
+        ];
+      });
+      serverStore.setRemoteModelGenerationSettings(remoteModel.id, {
+        temperature: 0.37,
+        generationParameterModes: {temperature: 'omit'},
+      });
+      const recreated = modelStore.remoteModels[0];
+
+      expect(recreated.completionSettings).toEqual({
+        version: CURRENT_COMPLETION_SETTINGS_VERSION,
+        temperature: 0.37,
+        generationParameterModes: {temperature: 'omit'},
+      });
+
+      await modelStore.setRemoteModel(recreated);
+      serverStore.setRemoteModelGenerationMode(
+        remoteModel.id,
+        'temperature',
+        'send',
+      );
+
+      expect(modelStore.activeModelCompletionSettings).toEqual({
+        version: CURRENT_COMPLETION_SETTINGS_VERSION,
+        temperature: 0.37,
+        generationParameterModes: {temperature: 'omit'},
+      });
+      expect(modelStore.activeRemoteBinding?.generationSettings).toEqual({
+        version: CURRENT_COMPLETION_SETTINGS_VERSION,
+        temperature: 0.37,
+        generationParameterModes: {temperature: 'omit'},
+      });
     });
 
     it('fails explicitly for a catalog-only unsupported model', async () => {
