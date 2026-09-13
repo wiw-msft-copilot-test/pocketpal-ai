@@ -48,6 +48,7 @@ describe('ServerDetailsSheet', () => {
     id: 'srv-1',
     name: 'LM Studio',
     url: 'http://localhost:1234',
+    serverType: 'GitHub Copilot',
   };
 
   beforeEach(() => {
@@ -233,6 +234,53 @@ describe('ServerDetailsSheet', () => {
     );
   });
 
+  it('restores the saved type and reprobes when the dropdown changes it', async () => {
+    const view = render(
+      <ServerDetailsSheet
+        isVisible={true}
+        onDismiss={jest.fn()}
+        serverId="srv-1"
+      />,
+    );
+
+    await waitFor(() => {
+      expect(
+        view.getByTestId('server-type-dropdown').props.accessibilityLabel,
+      ).toBe('GitHub Copilot');
+    });
+
+    fireEvent.press(view.getByTestId('server-type-dropdown'));
+    fireEvent.press(view.getByTestId('server-type-option-Ollama'));
+
+    await waitFor(() => {
+      expect(mockedTestConnection).toHaveBeenCalled();
+    });
+    const probeCall = mockedTestConnection.mock.calls.at(-1)!;
+    expect(probeCall[0]).toBe('http://localhost:1234');
+    expect(probeCall[3]).toBe('Ollama');
+
+    view.rerender(
+      <ServerDetailsSheet
+        isVisible={false}
+        onDismiss={jest.fn()}
+        serverId="srv-1"
+      />,
+    );
+    view.rerender(
+      <ServerDetailsSheet
+        isVisible={true}
+        onDismiss={jest.fn()}
+        serverId="srv-1"
+      />,
+    );
+
+    await waitFor(() => {
+      expect(
+        view.getByTestId('server-type-dropdown').props.accessibilityLabel,
+      ).toBe('GitHub Copilot');
+    });
+  });
+
   // The debounced edit-time probe passes the in-edit timeout field
   // (seconds → ms) to testConnection, so a slow cold-start server does not
   // red-X at the 30s default while being edited.
@@ -260,6 +308,7 @@ describe('ServerDetailsSheet', () => {
     const call = mockedTestConnection.mock.calls.at(-1)!;
     expect(call[0]).toBe('http://localhost:1234');
     expect(call[2]).toBe(600000);
+    expect(call[3]).toBe('GitHub Copilot');
   });
 
   // When the in-edit field is empty, the probe falls back to the server's
@@ -288,6 +337,7 @@ describe('ServerDetailsSheet', () => {
     const call = mockedTestConnection.mock.calls.at(-1)!;
     expect(call[0]).toBe('http://localhost:1234');
     expect(call[2]).toBe(450000);
+    expect(call[3]).toBe('GitHub Copilot');
   });
 
   // An empty/invalid in-edit field on the probe falls through to undefined
@@ -313,6 +363,7 @@ describe('ServerDetailsSheet', () => {
     const call = mockedTestConnection.mock.calls.at(-1)!;
     expect(call[0]).toBe('http://localhost:1234');
     expect(call[2]).toBeUndefined();
+    expect(call[3]).toBe('GitHub Copilot');
   });
 
   // Save converts a positive seconds value to whole ms through the existing

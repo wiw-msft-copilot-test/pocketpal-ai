@@ -197,12 +197,28 @@ function isValidChatChunk(parsed: any): boolean {
 /**
  * Build headers for OpenAI-compatible API requests.
  */
-function buildHeaders(apiKey?: string): Record<string, string> {
+const GITHUB_COPILOT_SERVER_TYPE = 'GitHub Copilot';
+
+// Derived from the published Copilot CLI 1.0.83 Linux distribution, with the
+// deliberately requested "-test" suffix applied to each complete value.
+const GITHUB_COPILOT_HEADERS = {
+  'Copilot-Integration-Id': 'copilot-developer-cli-test',
+  'User-Agent': 'copilot/1.0.83 (linux v24.20.0) term/unknown-test',
+  'Editor-Version': 'copilot/1.0.83-test',
+} as const;
+
+function buildHeaders(
+  apiKey?: string,
+  serverType?: string,
+): Record<string, string> {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
   };
   if (apiKey) {
     headers.Authorization = `Bearer ${apiKey}`;
+  }
+  if (serverType === GITHUB_COPILOT_SERVER_TYPE) {
+    Object.assign(headers, GITHUB_COPILOT_HEADERS);
   }
   return headers;
 }
@@ -223,6 +239,15 @@ function normalizeUrl(serverUrl: string): string {
     throw new Error('Remote AI servers must use HTTPS.');
   }
   return serverUrl.replace(/\/+$/, '');
+}
+
+function buildOpenAIUrl(
+  serverUrl: string,
+  endpoint: 'models' | 'chat/completions',
+  serverType?: string,
+): string {
+  const prefix = serverType === GITHUB_COPILOT_SERVER_TYPE ? '' : '/v1';
+  return `${normalizeUrl(serverUrl)}${prefix}/${endpoint}`;
 }
 
 /** Result from fetchModelsWithHeaders: models + raw response headers. */
@@ -264,8 +289,9 @@ export async function fetchModelsWithHeaders(
   serverUrl: string,
   apiKey?: string,
   timeoutMs?: number,
+  serverType?: string,
 ): Promise<FetchModelsResult> {
-  const url = `${normalizeUrl(serverUrl)}/v1/models`;
+  const url = buildOpenAIUrl(serverUrl, 'models', serverType);
   const controller = new AbortController();
   const timeout = setTimeout(
     () => controller.abort(),
@@ -275,7 +301,7 @@ export async function fetchModelsWithHeaders(
   try {
     const response = await fetch(url, {
       method: 'GET',
-      headers: buildHeaders(apiKey),
+      headers: buildHeaders(apiKey, serverType),
       signal: controller.signal,
     });
 
@@ -319,8 +345,14 @@ export async function fetchModels(
   serverUrl: string,
   apiKey?: string,
   timeoutMs?: number,
+  serverType?: string,
 ): Promise<RemoteModelInfo[]> {
-  const {models} = await fetchModelsWithHeaders(serverUrl, apiKey, timeoutMs);
+  const {models} = await fetchModelsWithHeaders(
+    serverUrl,
+    apiKey,
+    timeoutMs,
+    serverType,
+  );
   return models;
 }
 
@@ -400,9 +432,10 @@ export async function testConnection(
   serverUrl: string,
   apiKey?: string,
   timeoutMs?: number,
+  serverType?: string,
 ): Promise<{ok: boolean; modelCount: number; error?: string}> {
   try {
-    const models = await fetchModels(serverUrl, apiKey, timeoutMs);
+    const models = await fetchModels(serverUrl, apiKey, timeoutMs, serverType);
     return {ok: true, modelCount: models.length};
   } catch (error: any) {
     return {ok: false, modelCount: 0, error: error.message || 'Unknown error'};
@@ -692,7 +725,7 @@ export async function streamChatCompletion(
   timeoutMs?: number,
   serverType?: string,
 ): Promise<CompletionResult> {
-  const url = `${normalizeUrl(serverUrl)}/v1/chat/completions`;
+  const url = buildOpenAIUrl(serverUrl, 'chat/completions', serverType);
   const connectionTimeoutMs = resolveTimeout(timeoutMs, CONNECTION_TIMEOUT_MS);
   const idleTimeoutMs = resolveTimeout(timeoutMs, IDLE_TIMEOUT_MS);
   // Only pay the async encode when a local image is actually attached; the
@@ -707,7 +740,7 @@ export async function streamChatCompletion(
     xhr.open('POST', url);
 
     // Set headers
-    const headers = buildHeaders(apiKey);
+    const headers = buildHeaders(apiKey, serverType);
     for (const [key, value] of Object.entries(headers)) {
       xhr.setRequestHeader(key, value);
     }

@@ -260,6 +260,7 @@ class ServerStore {
         server.url,
         apiKey,
         server.requestTimeoutMs,
+        server.serverType,
       );
 
       runInAction(() => {
@@ -411,7 +412,12 @@ class ServerStore {
     }
 
     const apiKey = await this.getApiKey(serverId);
-    return testConnection(server.url, apiKey, server.requestTimeoutMs);
+    return testConnection(
+      server.url,
+      apiKey,
+      server.requestTimeoutMs,
+      server.serverType,
+    );
   }
 
   acknowledgePrivacyNotice(): void {

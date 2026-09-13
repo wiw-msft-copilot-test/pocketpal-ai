@@ -365,13 +365,13 @@ describe('OpenAICompletionEngine', () => {
     );
   });
 
-  it('forwards params.reasoning and the constructed serverType', async () => {
+  it('forwards params.reasoning and the constructed GitHub Copilot serverType', async () => {
     const typedEngine = new OpenAICompletionEngine(
       'http://localhost:1234',
       'test-model',
       'sk-key',
       undefined,
-      'Ollama',
+      'GitHub Copilot',
     );
     mockedStreamChat.mockResolvedValueOnce({text: '', content: ''});
 
@@ -387,7 +387,7 @@ describe('OpenAICompletionEngine', () => {
       expect.any(Object),
       undefined,
       undefined,
-      'Ollama',
+      'GitHub Copilot',
     );
   });
 });

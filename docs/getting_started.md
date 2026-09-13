@@ -43,6 +43,34 @@ Modells need to be downloaded before use. You can download and use these models 
 ### Loading a Model
 After downloading, tap *Load* to bring the model into memory. Now you’re ready to chat!
 
+### Using a GitHub Copilot Remote Model
+
+PocketPal can connect to the GitHub Copilot API through its OpenAI-compatible
+Chat Completions endpoint:
+
+1. Open **Models**, tap **+**, then select **Add Remote Model**.
+2. Set **Server Type** to **GitHub Copilot** before connecting.
+3. Enter `https://api.githubcopilot.com` as the server URL. Do not append
+   `/v1`; PocketPal uses `/models` and `/chat/completions` for this server type.
+4. Enter a supported GitHub credential, select an available model, and add it.
+
+GitHub documents fine-grained personal access tokens with the **Copilot
+Requests** permission for Copilot CLI authentication. PocketPal stores the
+credential in the device keychain, but it does not sign you in or refresh the
+credential. Your account must have the required Copilot access and comply with
+any organization policy.
+
+This option sends a pinned, test-suffixed Copilot CLI-derived identification
+profile. GitHub may reject the custom `copilot-developer-cli-test` integration
+ID, and PocketPal will not retry with the original identity. A model appearing
+in `/models` also does not guarantee that it supports Chat Completions; models
+that require another API cannot be used through this integration.
+
+To change the URL, credential, or server type later, open **Models**, tap **+**,
+then **Manage Servers**. Re-select the remote model after editing its server so
+the active chat uses the new configuration. Messages sent to any remote server
+leave your device.
+
 ### Tips
 
 On iOS devices, Apple’s GPU API (Metal) is activated by default. If you experience any hiccups, try deactivating it.

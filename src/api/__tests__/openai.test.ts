@@ -122,6 +122,34 @@ describe('fetchModels', () => {
     );
   });
 
+  it('forwards GitHub Copilot server type to the models request', async () => {
+    global.fetch = jest.fn().mockResolvedValueOnce({
+      ok: true,
+      headers: mockHeaders(),
+      json: () => Promise.resolve({data: []}),
+    });
+
+    await fetchModels(
+      'https://copilot.example',
+      undefined,
+      undefined,
+      'GitHub Copilot',
+    );
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      'https://copilot.example/models',
+      expect.objectContaining({
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Copilot-Integration-Id': 'copilot-developer-cli-test',
+          'User-Agent': 'copilot/1.0.83 (linux v24.20.0) term/unknown-test',
+          'Editor-Version': 'copilot/1.0.83-test',
+        },
+      }),
+    );
+  });
+
   // fetchModels forwards a supplied timeoutMs down to the underlying request:
   // a slow server that never answers aborts at the configured deadline.
   it('forwards timeoutMs to the underlying request (aborts at configured value)', async () => {
@@ -162,6 +190,86 @@ describe('fetchModelsWithHeaders', () => {
 
     expect(result.models).toEqual(mockModels);
     expect(result.headers.server).toBe('llama.cpp');
+  });
+
+  it('keeps /v1 and omits Copilot identity headers for other server types', async () => {
+    global.fetch = jest.fn().mockResolvedValueOnce({
+      ok: true,
+      headers: mockHeaders(),
+      json: () => Promise.resolve({data: []}),
+    });
+
+    await fetchModelsWithHeaders(
+      'http://localhost:8080',
+      undefined,
+      undefined,
+      'Ollama',
+    );
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      'http://localhost:8080/v1/models',
+      expect.objectContaining({method: 'GET'}),
+    );
+    expect((global.fetch as jest.Mock).mock.calls[0][1].headers).toEqual({
+      'Content-Type': 'application/json',
+    });
+  });
+
+  it('uses the Copilot models endpoint and exact identity headers', async () => {
+    global.fetch = jest.fn().mockResolvedValueOnce({
+      ok: true,
+      headers: mockHeaders(),
+      json: () =>
+        Promise.resolve({
+          data: [{id: 'copilot-model', object: 'model', owned_by: 'github'}],
+        }),
+    });
+
+    const result = await fetchModelsWithHeaders(
+      'https://copilot.example///',
+      undefined,
+      undefined,
+      'GitHub Copilot',
+    );
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      'https://copilot.example/models',
+      expect.objectContaining({
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Copilot-Integration-Id': 'copilot-developer-cli-test',
+          'User-Agent': 'copilot/1.0.83 (linux v24.20.0) term/unknown-test',
+          'Editor-Version': 'copilot/1.0.83-test',
+        },
+      }),
+    );
+    expect(result.models).toEqual([
+      {id: 'copilot-model', object: 'model', owned_by: 'github'},
+    ]);
+  });
+
+  it('does not fall back to /v1 when the Copilot endpoint errors', async () => {
+    global.fetch = jest.fn().mockResolvedValueOnce({
+      ok: false,
+      status: 404,
+      statusText: 'Not Found',
+    });
+
+    await expect(
+      fetchModels(
+        'https://copilot.example',
+        undefined,
+        undefined,
+        'GitHub Copilot',
+      ),
+    ).rejects.toThrow('Server error: 404 Not Found');
+
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+    expect(global.fetch).toHaveBeenCalledWith(
+      'https://copilot.example/models',
+      expect.any(Object),
+    );
   });
 
   // An undefined timeoutMs (e.g. a persisted ServerConfig from a prior version
@@ -395,6 +503,36 @@ describe('testConnection', () => {
 
     const result = await testConnection('http://localhost:1234');
     expect(result).toEqual({ok: true, modelCount: 3});
+  });
+
+  it('forwards GitHub Copilot server type to the connection probe', async () => {
+    global.fetch = jest.fn().mockResolvedValueOnce({
+      ok: true,
+      headers: mockHeaders(),
+      json: () =>
+        Promise.resolve({
+          data: [{id: 'copilot-model', object: 'model', owned_by: 'github'}],
+        }),
+    });
+
+    const result = await testConnection(
+      'https://copilot.example',
+      undefined,
+      undefined,
+      'GitHub Copilot',
+    );
+
+    expect(result).toEqual({ok: true, modelCount: 1});
+    expect(global.fetch).toHaveBeenCalledWith(
+      'https://copilot.example/models',
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          'Copilot-Integration-Id': 'copilot-developer-cli-test',
+          'User-Agent': 'copilot/1.0.83 (linux v24.20.0) term/unknown-test',
+          'Editor-Version': 'copilot/1.0.83-test',
+        }),
+      }),
+    );
   });
 
   it('returns error on failure', async () => {
@@ -855,8 +993,10 @@ describe('streamChatCompletion', () => {
 
     expect(xhr.method).toBe('POST');
     expect(xhr.url).toBe('http://localhost:1234/v1/chat/completions');
-    expect(xhr.requestHeaders['Content-Type']).toBe('application/json');
-    expect(xhr.requestHeaders.Authorization).toBe('Bearer sk-key');
+    expect(xhr.requestHeaders).toEqual({
+      'Content-Type': 'application/json',
+      Authorization: 'Bearer sk-key',
+    });
 
     const body = JSON.parse(xhr.requestBody);
     expect(body.model).toBe('test-model');
@@ -873,6 +1013,35 @@ describe('streamChatCompletion', () => {
     );
     xhr.simulateLoad();
 
+    await resultPromise;
+  });
+
+  it('uses the Copilot chat endpoint and identity headers without /v1', async () => {
+    const resultPromise = streamChatCompletion(
+      {messages: [{role: 'user', content: 'Hi'}], model: 'test-model'},
+      'https://copilot.example',
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      'GitHub Copilot',
+    );
+
+    const xhr = MockXHR.instances[0];
+
+    expect(xhr.url).toBe('https://copilot.example/chat/completions');
+    expect(xhr.requestHeaders).toEqual({
+      'Content-Type': 'application/json',
+      'Copilot-Integration-Id': 'copilot-developer-cli-test',
+      'User-Agent': 'copilot/1.0.83 (linux v24.20.0) term/unknown-test',
+      'Editor-Version': 'copilot/1.0.83-test',
+    });
+
+    xhr.simulateHeaders(200);
+    xhr.simulateProgress(
+      'data: {"choices":[{"delta":{},"finish_reason":"stop"}]}\n\ndata: [DONE]\n\n',
+    );
+    xhr.simulateLoad();
     await resultPromise;
   });
 

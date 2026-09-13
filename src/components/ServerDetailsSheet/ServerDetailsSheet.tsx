@@ -65,6 +65,15 @@ export const ServerDetailsSheet: React.FC<ServerDetailsSheetProps> = observer(
       timeoutSecondsRef.current = timeoutSeconds;
     }, [timeoutSeconds]);
 
+    const serverTypeRef = useRef(serverType);
+    const probeGenerationRef = useRef(0);
+
+    const invalidateProbe = useCallback(() => {
+      probeGenerationRef.current += 1;
+      setProbeResult(null);
+      setIsProbing(false);
+    }, []);
+
     // Load server data when sheet opens
     useEffect(() => {
       if (isVisible && serverId) {
@@ -78,6 +87,7 @@ export const ServerDetailsSheet: React.FC<ServerDetailsSheetProps> = observer(
           setTimeoutSeconds(seconds);
           timeoutSecondsRef.current = seconds;
           setServerType(server.serverType || 'unknown');
+          serverTypeRef.current = server.serverType || 'unknown';
         }
         serverStore.getApiKey(serverId).then(key => {
           setApiKey(key || '');
@@ -86,6 +96,8 @@ export const ServerDetailsSheet: React.FC<ServerDetailsSheetProps> = observer(
         setProbeResult(null);
         setSecureTextEntry(true);
         setIsSaving(false);
+      } else {
+        probeGenerationRef.current += 1;
       }
     }, [isVisible, serverId]);
 
@@ -98,7 +110,7 @@ export const ServerDetailsSheet: React.FC<ServerDetailsSheetProps> = observer(
       : [];
 
     const probeServer = useCallback(
-      async (probeUrl: string) => {
+      async (probeUrl: string, probeServerType: string) => {
         const trimmedUrl = probeUrl.trim();
         if (!trimmedUrl) {
           return;
@@ -115,6 +127,7 @@ export const ServerDetailsSheet: React.FC<ServerDetailsSheetProps> = observer(
         } catch {
           return;
         }
+        const probeGeneration = ++probeGenerationRef.current;
         setIsProbing(true);
         setProbeResult(null);
         try {
@@ -125,12 +138,23 @@ export const ServerDetailsSheet: React.FC<ServerDetailsSheetProps> = observer(
           const timeoutMs =
             parseTimeoutMs(timeoutSecondsRef.current) ??
             savedServer?.requestTimeoutMs;
-          const result = await testConnection(trimmedUrl, key, timeoutMs);
-          setProbeResult({ok: result.ok, error: result.error});
+          const result = await testConnection(
+            trimmedUrl,
+            key,
+            timeoutMs,
+            probeServerType,
+          );
+          if (probeGeneration === probeGenerationRef.current) {
+            setProbeResult({ok: result.ok, error: result.error});
+          }
         } catch (error: any) {
-          setProbeResult({ok: false, error: error.message});
+          if (probeGeneration === probeGenerationRef.current) {
+            setProbeResult({ok: false, error: error.message});
+          }
         } finally {
-          setIsProbing(false);
+          if (probeGeneration === probeGenerationRef.current) {
+            setIsProbing(false);
+          }
         }
       },
       [serverId],
@@ -144,9 +168,22 @@ export const ServerDetailsSheet: React.FC<ServerDetailsSheetProps> = observer(
     // Re-probe on apiKey blur
     const handleApiKeyBlur = useCallback(() => {
       if (url.trim()) {
-        debouncedProbe(url);
+        debouncedProbe(url, serverTypeRef.current);
       }
     }, [url, debouncedProbe]);
+
+    const handleServerTypeChange = useCallback(
+      (value: string) => {
+        serverTypeRef.current = value;
+        setServerType(value);
+        debouncedProbe.cancel();
+        invalidateProbe();
+        if (url.trim()) {
+          debouncedProbe(url, value);
+        }
+      },
+      [url, debouncedProbe, invalidateProbe],
+    );
 
     const toggleSecureEntry = () => {
       setSecureTextEntry(!secureTextEntry);
@@ -223,8 +260,10 @@ export const ServerDetailsSheet: React.FC<ServerDetailsSheetProps> = observer(
               label={l10n.settings.serverUrl}
               defaultValue={url}
               onChangeText={text => {
+                debouncedProbe.cancel();
+                invalidateProbe();
                 setUrl(text);
-                debouncedProbe(text);
+                debouncedProbe(text, serverTypeRef.current);
               }}
               placeholder={l10n.settings.serverUrlPlaceholder}
               autoCapitalize="none"
@@ -255,7 +294,7 @@ export const ServerDetailsSheet: React.FC<ServerDetailsSheetProps> = observer(
               testID="server-type-dropdown"
               value={serverType}
               options={SERVER_TYPE_DROPDOWN_OPTIONS}
-              onChange={setServerType}
+              onChange={handleServerTypeChange}
             />
             <Text style={styles.apiKeyDescription}>
               {l10n.settings.serverTypeHelp}

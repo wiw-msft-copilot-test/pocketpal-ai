@@ -469,13 +469,14 @@ export interface ServerConfig {
   url: string; // Base URL e.g. "http://192.168.1.100:1234"
   lastConnected?: number; // Timestamp
   requestTimeoutMs?: number; // Per-server network timeout in ms; undefined = API default
-  // User-selectable server type; gates the per-server reasoning wire payload.
+  // User-selectable server type; gates provider-specific request behavior.
   // detectServerType seeds it best-effort; user selection wins. undefined = unknown.
   serverType?:
     | 'llama.cpp'
     | 'LM Studio'
     | 'Ollama'
     | 'OpenAI'
+    | 'GitHub Copilot'
     | 'vLLM'
     | string;
 }

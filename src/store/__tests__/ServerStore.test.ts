@@ -707,6 +707,7 @@ describe('ServerStore', () => {
         name: 'Slow Server',
         url: 'http://localhost:1234',
         requestTimeoutMs: 600000,
+        serverType: 'GitHub Copilot',
       });
       jest.clearAllMocks();
 
@@ -719,6 +720,7 @@ describe('ServerStore', () => {
         'http://localhost:1234',
         undefined,
         600000,
+        'GitHub Copilot',
       );
     });
 
@@ -738,6 +740,7 @@ describe('ServerStore', () => {
 
       expect(mockedFetchModels).toHaveBeenCalledWith(
         'http://localhost:1234',
+        undefined,
         undefined,
         undefined,
       );
@@ -834,6 +837,7 @@ describe('ServerStore', () => {
         'http://localhost:1234',
         undefined,
         undefined,
+        undefined,
       );
     });
 
@@ -852,6 +856,7 @@ describe('ServerStore', () => {
         name: 'Slow Server',
         url: 'http://localhost:1234',
         requestTimeoutMs: 600000,
+        serverType: 'GitHub Copilot',
       });
 
       (Keychain.getGenericPassword as jest.Mock).mockResolvedValueOnce(false);
@@ -863,6 +868,7 @@ describe('ServerStore', () => {
         'http://localhost:1234',
         undefined,
         600000,
+        'GitHub Copilot',
       );
     });
 
@@ -883,6 +889,7 @@ describe('ServerStore', () => {
       expect(mockedTestConnection).toHaveBeenCalledWith(
         'http://localhost:1234',
         'sk-key',
+        undefined,
         undefined,
       );
     });
