@@ -1,6 +1,7 @@
 import React from 'react';
 import {Platform, Keyboard} from 'react-native';
 import {runInAction} from 'mobx';
+import {makePersistable} from 'mobx-persist-store';
 
 import {
   fireEvent,
@@ -12,6 +13,10 @@ import {
 import {SettingsScreen} from '../SettingsScreen';
 
 import {modelStore, uiStore, ttsStore} from '../../../store';
+import {
+  UIStore as ActualUIStore,
+  type ResponsesDiagnosticsController,
+} from '../../../store/UIStore';
 import {l10n} from '../../../locales';
 
 jest.useFakeTimers();
@@ -22,6 +27,10 @@ const render = (ui: React.ReactElement, options: any = {}) =>
 describe('SettingsScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    Object.assign(uiStore, {
+      responsesProtocolLogging: false,
+      setResponsesProtocolLogging: jest.fn(),
+    });
     jest.spyOn(Keyboard, 'dismiss');
     // Ensure clean timer state for each test
     jest.clearAllTimers();
@@ -210,6 +219,72 @@ describe('SettingsScreen', () => {
     });
 
     expect(uiStore.setDisplayMemUsage).toHaveBeenCalledWith(true);
+  });
+
+  it('renders and toggles Responses protocol diagnostics in release UI', async () => {
+    const {getByTestId, getByText} = render(<SettingsScreen />, {
+      withSafeArea: true,
+      withNavigation: true,
+    });
+
+    expect(getByText('Diagnostics')).toBeTruthy();
+    expect(getByText('Responses protocol logging')).toBeTruthy();
+    expect(
+      getByText(l10n.en.settings.responsesProtocolLoggingDescription),
+    ).toBeTruthy();
+
+    const diagnosticsSwitch = getByTestId('responses-protocol-logging-switch');
+    expect(diagnosticsSwitch.props.value).toBe(false);
+
+    await act(async () => {
+      fireEvent(diagnosticsSwitch, 'valueChange', true);
+    });
+
+    expect(uiStore.setResponsesProtocolLogging).toHaveBeenCalledWith(true);
+  });
+
+  describe('Responses diagnostics store state', () => {
+    const makeController = (): jest.Mocked<ResponsesDiagnosticsController> => ({
+      setEnabled: jest.fn(),
+      clear: jest.fn(),
+    });
+
+    it('is memory-only and off for each cold store instance', () => {
+      const controller = makeController();
+      const firstStore = new ActualUIStore(controller);
+
+      firstStore.setResponsesProtocolLogging(true);
+      expect(firstStore.responsesProtocolLogging).toBe(true);
+      expect(makePersistable).toHaveBeenLastCalledWith(
+        firstStore,
+        expect.objectContaining({
+          properties: expect.not.arrayContaining(['responsesProtocolLogging']),
+        }),
+      );
+
+      const restartedStore = new ActualUIStore(controller);
+      expect(restartedStore.responsesProtocolLogging).toBe(false);
+      expect(controller.setEnabled).toHaveBeenLastCalledWith(false);
+      expect(controller.clear).toHaveBeenCalledTimes(2);
+    });
+
+    it('enables future tracing and disables then clears immediately', () => {
+      const controller = makeController();
+      const store = new ActualUIStore(controller);
+      controller.setEnabled.mockClear();
+      controller.clear.mockClear();
+
+      store.setResponsesProtocolLogging(true);
+      expect(controller.setEnabled).toHaveBeenLastCalledWith(true);
+
+      store.setResponsesProtocolLogging(false);
+      expect(controller.setEnabled).toHaveBeenLastCalledWith(false);
+      expect(controller.clear).toHaveBeenCalledTimes(1);
+      expect(store.responsesProtocolLogging).toBe(false);
+      expect(controller.setEnabled.mock.invocationCallOrder[1]).toBeLessThan(
+        controller.clear.mock.invocationCallOrder[0],
+      );
+    });
   });
 
   it('renders image max tokens slider in advanced settings', async () => {

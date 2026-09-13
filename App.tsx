@@ -15,6 +15,7 @@ import {
 } from 'react-native-gesture-handler';
 
 import {ttsStore, uiStore} from './src/store';
+import {responsesDiagnosticsController} from './src/api/responsesDiagnostics';
 import {useTheme} from './src/hooks';
 import {useDeepLinking} from './src/hooks/useDeepLinking';
 import {Theme} from './src/utils/types';
@@ -44,6 +45,8 @@ import {
   DevToolsScreen,
 } from './src/screens';
 import {OnboardingStack} from './src/screens/OnboardingScreens';
+
+uiStore.attachResponsesDiagnosticsController(responsesDiagnosticsController);
 
 const PalsScreen = __ENABLE_PALSHUB__
   ? require('./src/screens/PalsScreen').default

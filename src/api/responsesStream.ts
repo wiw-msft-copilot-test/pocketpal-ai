@@ -3,6 +3,7 @@ import type {
   CompletionStreamData,
   ToolCall,
 } from '../utils/completionTypes';
+import type {ResponsesDiagnostics} from './responsesDiagnostics';
 import type {
   ReplayableResponsesOutputItem,
   ResponsesFunctionCall,
@@ -217,7 +218,10 @@ export class ResponsesStreamReducer {
   private usage?: ResponsesUsage;
   private terminalError?: ResponsesStreamProtocolError;
 
+  constructor(private readonly diagnostics?: ResponsesDiagnostics) {}
+
   reduce(event: ResponsesStreamEvent): CompletionStreamData | undefined {
+    this.diagnostics?.event(event);
     if (!isRecord(event) || typeof event.type !== 'string' || !event.type) {
       throw new ResponsesStreamProtocolError(
         'malformed-event',
@@ -909,6 +913,8 @@ export class ResponsesStreamReducer {
   }
 }
 
-export function createResponsesStreamReducer(): ResponsesStreamReducer {
-  return new ResponsesStreamReducer();
+export function createResponsesStreamReducer(
+  diagnostics?: ResponsesDiagnostics,
+): ResponsesStreamReducer {
+  return new ResponsesStreamReducer(diagnostics);
 }

@@ -16,6 +16,11 @@ import {
   type TopicKey,
 } from './onboarding/types';
 
+export interface ResponsesDiagnosticsController {
+  setEnabled(enabled: boolean): void;
+  clear(): void;
+}
+
 export class UIStore {
   static readonly GROUP_KEYS = {
     READY_TO_USE: 'ready_to_use',
@@ -48,6 +53,8 @@ export class UIStore {
 
   displayMemUsage = false;
 
+  responsesProtocolLogging = false;
+
   iOSBackgroundDownloading = true;
 
   benchmarkShareDialog = {
@@ -79,6 +86,8 @@ export class UIStore {
   // state isn't pre-dismissed.
   dismissedDownloadIds: string[] = [];
 
+  private responsesDiagnosticsController?: ResponsesDiagnosticsController;
+
   hasWarnedToolCompat(modelId: string): boolean {
     return this.toolCompatWarnedModels.includes(modelId);
   }
@@ -108,8 +117,10 @@ export class UIStore {
     });
   }
 
-  constructor() {
-    makeAutoObservable(this);
+  constructor(responsesDiagnosticsController?: ResponsesDiagnosticsController) {
+    makeAutoObservable<this, 'responsesDiagnosticsController'>(this, {
+      responsesDiagnosticsController: false,
+    });
     makePersistable(this, {
       name: 'UIStore',
       properties: [
@@ -128,6 +139,10 @@ export class UIStore {
 
     // backwards compatibility. Removed this from the ui settings screen.
     this.iOSBackgroundDownloading = true;
+
+    if (responsesDiagnosticsController) {
+      this.attachResponsesDiagnosticsController(responsesDiagnosticsController);
+    }
   }
 
   setValue<T extends keyof typeof this.pageStates>(
@@ -174,6 +189,30 @@ export class UIStore {
   setDisplayMemUsage(value: boolean) {
     runInAction(() => {
       this.displayMemUsage = value;
+    });
+  }
+
+  setResponsesProtocolLogging(value: boolean) {
+    if (value) {
+      this.responsesDiagnosticsController?.setEnabled(true);
+    } else {
+      this.responsesDiagnosticsController?.setEnabled(false);
+      this.responsesDiagnosticsController?.clear();
+    }
+
+    runInAction(() => {
+      this.responsesProtocolLogging = value;
+    });
+  }
+
+  attachResponsesDiagnosticsController(
+    controller: ResponsesDiagnosticsController,
+  ) {
+    this.responsesDiagnosticsController = controller;
+    controller.setEnabled(false);
+    controller.clear();
+    runInAction(() => {
+      this.responsesProtocolLogging = false;
     });
   }
 

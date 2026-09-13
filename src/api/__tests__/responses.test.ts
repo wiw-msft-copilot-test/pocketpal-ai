@@ -1,6 +1,10 @@
 import * as RNFS from '@dr.pogodin/react-native-fs';
 
 import {streamResponses} from '../responses';
+import {
+  type ResponsesDiagnosticObserver,
+  ResponsesDiagnosticRecorder,
+} from '../responsesDiagnostics';
 import type {ResponsesRequestParams} from '../responsesRequest';
 import {ResponsesStreamProtocolError} from '../responsesStream';
 
@@ -95,6 +99,7 @@ const startResponses = (
     callback?: jest.Mock;
     timeoutMs?: number;
     serverType?: string;
+    diagnosticObserver?: ResponsesDiagnosticObserver;
   } = {},
 ) =>
   streamResponses(
@@ -106,6 +111,8 @@ const startResponses = (
     options.timeoutMs,
     options.serverType,
     binding,
+    {},
+    options.diagnosticObserver,
   );
 
 const message = (text: string) => ({
@@ -429,6 +436,57 @@ describe('streamResponses', () => {
     await expect(promise).rejects.toThrow('Server error: 429 — rate limited');
   });
 
+  it('diagnoses success and HTTP errors without recording response secrets', async () => {
+    const successRecorder = new ResponsesDiagnosticRecorder();
+    const success = startResponses(params(), {
+      diagnosticObserver: successRecorder.observer,
+    });
+    let xhr = MockXHR.instances[0];
+    xhr.headers();
+    xhr.progress(
+      frame({
+        type: 'response.completed',
+        response: {
+          id: 'response-SECRET_RESPONSE_ID',
+          status: 'completed',
+          output: [message('SECRET_RESPONSE_TEXT')],
+        },
+      }),
+    );
+    xhr.load();
+    await success;
+
+    expect(successRecorder.records).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({kind: 'http', httpStatus: 200}),
+        expect.objectContaining({
+          kind: 'event',
+          eventType: 'response.completed',
+          responseAlias: 'response-1',
+          status: 'completed',
+        }),
+        expect.objectContaining({kind: 'outcome', outcome: 'completed'}),
+      ]),
+    );
+    expect(JSON.stringify(successRecorder.records)).not.toContain('SECRET_');
+
+    const errorRecorder = new ResponsesDiagnosticRecorder();
+    const failure = startResponses(params(), {
+      diagnosticObserver: errorRecorder.observer,
+    });
+    xhr = MockXHR.instances[1];
+    xhr.httpError(429, {error: {message: 'SECRET_HTTP_BODY'}});
+    await expect(failure).rejects.toThrow('Server error: 429');
+    expect(errorRecorder.records).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({kind: 'http', httpStatus: 429}),
+        expect.objectContaining({kind: 'error', errorClass: 'http'}),
+        expect.objectContaining({kind: 'outcome', outcome: 'error'}),
+      ]),
+    );
+    expect(JSON.stringify(errorRecorder.records)).not.toContain('SECRET_');
+  });
+
   it('enforces connection and idle timeouts and resets idle on data', async () => {
     jest.useFakeTimers();
     let promise = startResponses(params(), {timeoutMs: 100});
@@ -539,6 +597,24 @@ describe('streamResponses', () => {
     expect(callback).toHaveBeenCalledTimes(callsBeforeAbort);
     expect(removeSpy).toHaveBeenCalledTimes(1);
     expect(xhr.abortCalls).toBe(1);
+  });
+
+  it('diagnoses external abort without changing transport cleanup', async () => {
+    const controller = new AbortController();
+    const recorder = new ResponsesDiagnosticRecorder();
+    const promise = startResponses(params(), {
+      signal: controller.signal,
+      diagnosticObserver: recorder.observer,
+    });
+    const xhr = MockXHR.instances[0];
+    xhr.headers();
+    controller.abort();
+
+    await expect(promise).resolves.toMatchObject({interrupted: true});
+    expect(xhr.abortCalls).toBe(1);
+    expect(recorder.records.at(-1)).toEqual(
+      expect.objectContaining({kind: 'outcome', outcome: 'aborted'}),
+    );
   });
 
   it('matches visible stop words across chunks, holds suffixes, and leaves reasoning/tool data intact', async () => {

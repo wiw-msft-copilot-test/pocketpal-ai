@@ -14,6 +14,11 @@ import {
   type ResponsesRequestParams,
 } from './responsesRequest';
 import {
+  createResponsesDiagnostics,
+  responsesDiagnosticsController,
+  type ResponsesDiagnosticObserver,
+} from './responsesDiagnostics';
+import {
   ResponsesStreamReducer,
   type ResponsesStreamEvent,
 } from './responsesStream';
@@ -57,23 +62,42 @@ export async function streamResponses(
   serverType: string | undefined,
   binding: ResponsesProviderBinding,
   requestOptions: ResponsesRequestOptions = {},
+  diagnosticObserver?: ResponsesDiagnosticObserver,
 ): Promise<CompletionResult> {
-  if (signal?.aborted) {
-    throw new Error('Completion aborted');
-  }
-
-  const url = buildOpenAIUrl(serverUrl, 'responses', serverType);
-  const encodedMessages = hasLocalImageAttachment(params.messages)
-    ? await encodeMessagesForRemote(params.messages, signal)
-    : params.messages;
-  if (signal?.aborted) {
-    throw new Error('Completion aborted');
-  }
-
-  const requestBody = encodeResponsesRequest(
-    {...params, messages: encodedMessages},
-    requestOptions,
+  const diagnostics = createResponsesDiagnostics(
+    diagnosticObserver ?? responsesDiagnosticsController.observer,
   );
+  diagnostics?.request(params, requestOptions);
+  if (signal?.aborted) {
+    diagnostics?.finish('aborted');
+    throw new Error('Completion aborted');
+  }
+
+  let url: string;
+  let encodedMessages: ResponsesRequestParams['messages'];
+  let requestBody: ReturnType<typeof encodeResponsesRequest>;
+  try {
+    url = buildOpenAIUrl(serverUrl, 'responses', serverType);
+    encodedMessages = hasLocalImageAttachment(params.messages)
+      ? await encodeMessagesForRemote(params.messages, signal)
+      : params.messages;
+    if (signal?.aborted) {
+      diagnostics?.finish('aborted');
+      throw new Error('Completion aborted');
+    }
+    requestBody = encodeResponsesRequest(
+      {...params, messages: encodedMessages},
+      requestOptions,
+    );
+  } catch (error) {
+    diagnostics?.error(error);
+    throw error;
+  }
+  if (signal?.aborted) {
+    diagnostics?.finish('aborted');
+    throw new Error('Completion aborted');
+  }
+
   const connectionTimeoutMs = resolveRequestTimeout(
     timeoutMs,
     CONNECTION_TIMEOUT_MS,
@@ -83,7 +107,7 @@ export async function streamResponses(
   return new Promise<CompletionResult>((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     const parser = new FramedSSEParser<ResponsesStreamEvent>();
-    const reducer = new ResponsesStreamReducer();
+    const reducer = new ResponsesStreamReducer(diagnostics);
     const stopMatcher = new StopSequenceMatcher(params.stop);
     let lastProcessedLength = 0;
     let latestSnapshot: CompletionStreamData = {
@@ -109,15 +133,17 @@ export async function streamResponses(
         return;
       }
       settled = true;
+      diagnostics?.finish(result.interrupted ? 'interrupted' : 'completed');
       cleanup();
       resolve(result);
     };
 
-    const settleReject = (error: unknown) => {
+    const settleReject = (error: unknown, errorClass?: 'http') => {
       if (settled) {
         return;
       }
       settled = true;
+      diagnostics?.error(error, errorClass);
       cleanup();
       reject(error instanceof Error ? error : new Error(String(error)));
     };
@@ -198,6 +224,7 @@ export async function streamResponses(
         return;
       }
       externallyAborted = true;
+      diagnostics?.finish('aborted');
       const content = latestSnapshot.accumulated_text ?? '';
       settleResolve(interruptedResult(latestSnapshot, content));
       abortAfterSettlement();
@@ -225,6 +252,7 @@ export async function streamResponses(
         }
         if (xhr.readyState === XMLHttpRequest.HEADERS_RECEIVED) {
           clearTimeout(connectionTimer);
+          diagnostics?.http(xhr.status);
           if (xhr.status === 200) {
             resetIdleTimer();
           }
@@ -234,7 +262,7 @@ export async function streamResponses(
           xhr.status !== 200 &&
           xhr.status !== 0
         ) {
-          settleReject(xhrHttpError(xhr.status, xhr.responseText));
+          settleReject(xhrHttpError(xhr.status, xhr.responseText), 'http');
           abortAfterSettlement();
         }
       };

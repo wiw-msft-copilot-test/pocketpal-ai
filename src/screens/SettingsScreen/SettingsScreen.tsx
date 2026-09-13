@@ -1164,6 +1164,36 @@ export const SettingsScreen: React.FC = observer(() => {
             </Card.Content>
           </Card>
 
+          {/* Diagnostics */}
+          <Card elevation={0} style={styles.card}>
+            <Card.Title title={l10n.settings.diagnostics} />
+            <Card.Content>
+              <View style={styles.settingItemContainer}>
+                <View style={styles.switchContainer}>
+                  <View style={styles.textContainer}>
+                    <Text variant="titleMedium" style={styles.textLabel}>
+                      {l10n.settings.responsesProtocolLogging}
+                    </Text>
+                    <Text variant="labelSmall" style={styles.textDescription}>
+                      {l10n.settings.responsesProtocolLoggingDescription}
+                    </Text>
+                  </View>
+                  <Switch
+                    testID="responses-protocol-logging-switch"
+                    value={uiStore.responsesProtocolLogging}
+                    accessibilityLabel={l10n.settings.responsesProtocolLogging}
+                    accessibilityHint={
+                      l10n.settings.responsesProtocolLoggingDescription
+                    }
+                    onValueChange={value =>
+                      uiStore.setResponsesProtocolLogging(value)
+                    }
+                  />
+                </View>
+              </View>
+            </Card.Content>
+          </Card>
+
           {/* Internet Search */}
           <Card elevation={0} style={styles.card} testID="internet-search-card">
             <Card.Title title={l10n.settings.internetSearch.title} />
