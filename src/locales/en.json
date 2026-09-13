@@ -644,6 +644,12 @@
         "thinkingEnabled": "Thinking mode enabled",
         "thinkingDisabled": "Thinking mode disabled",
         "thinkText": "Think",
+        "providerDefault": "Default",
+        "inherited": "Inherited",
+        "effortDefault": "Default effort",
+        "on": "On",
+        "off": "Off",
+        "useExplicitThinking": "Provider default thinking. Double tap to choose an explicit value",
         "cycleEffort": "Reasoning effort: {{level}}. Double tap to cycle effort level"
       }
     },
@@ -722,6 +728,22 @@
       },
       "palSettings": "Pal Settings",
       "settingsSource": "Settings Source"
+    },
+    "completionSettings": {
+      "useProviderDefault": "Use provider default",
+      "useCustomValue": "Use custom value",
+      "inherit": "Inherit",
+      "effectiveSource": "Effective source",
+      "sourceProviderDefault": "provider/native default (parameter is not sent)",
+      "sourceInherited": "inherited setting",
+      "sourceCustom": "custom value",
+      "customValue": "Custom value",
+      "unlimited": "Unlimited",
+      "custom": "Custom",
+      "on": "On",
+      "off": "Off",
+      "thinkingDescription": "Choose provider-native behavior, or explicitly send thinking On or Off.",
+      "reasoningEffortDescription": "Choose the provider's default effort, inherit it, or send an explicit level."
     },
     "palGenerationSettingsSheet": {
       "title": "Generation Settings - {{palName}}",
@@ -829,6 +851,8 @@
     "modelSettingsSheet": {
       "modelSettings": "Model Settings",
       "saveChanges": "Save Changes",
+      "generationOverrides": "Generation parameter overrides",
+      "generationOverridesHelp": "Inherit uses the lower-precedence effective setting. Provider default omits the parameter so the model backend chooses its native behavior.",
       "reasoningSection": "Reasoning",
       "remoteProtocolSection": "Remote API",
       "remoteProtocolHelp": "Inherit follows the server setting and model catalog.",

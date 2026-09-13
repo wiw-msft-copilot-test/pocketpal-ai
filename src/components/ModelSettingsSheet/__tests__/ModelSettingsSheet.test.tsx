@@ -1,5 +1,5 @@
 import React from 'react';
-import {fireEvent, render, act} from '../../../../jest/test-utils';
+import {fireEvent, render, act, waitFor} from '../../../../jest/test-utils';
 import {ModelSettingsSheet} from '../ModelSettingsSheet';
 import {modelStore, serverStore} from '../../../store';
 import {Model, ModelOrigin} from '../../../utils/types';
@@ -220,6 +220,49 @@ describe('ModelSettingsSheet', () => {
 
     // The state updates are handled by useEffect, which is tested implicitly
     // through the save/cancel/reset tests
+  });
+
+  it('isolates a model parameter override from other models', async () => {
+    const target = {
+      ...mockModel,
+      completionSettings: {
+        ...mockModel.completionSettings,
+        temperature: 0.25,
+      },
+    };
+    const other = {
+      ...mockModel,
+      id: 'other-model',
+      completionSettings: {
+        ...mockModel.completionSettings,
+        temperature: 0.9,
+      },
+    };
+    modelStore.models = [target, other];
+    const {getByTestId, getByText} = render(
+      <ModelSettingsSheet {...defaultProps} model={target} />,
+    );
+
+    await waitFor(() =>
+      expect(getByTestId('temperature-mode-omit')).toBeTruthy(),
+    );
+    await act(async () => {
+      fireEvent.press(getByTestId('temperature-mode-omit'));
+    });
+    await act(async () => {
+      fireEvent.press(getByText('Save Changes'));
+    });
+
+    expect(modelStore.models[0].completionSettings.temperature).toBe(0.25);
+    expect(
+      modelStore.models[0].completionSettings.generationParameterModes
+        ?.temperature,
+    ).toBe('omit');
+    expect(modelStore.models[1].completionSettings.temperature).toBe(0.9);
+    expect(
+      modelStore.models[1].completionSettings.generationParameterModes
+        ?.temperature,
+    ).toBeUndefined();
   });
 
   describe('reasoning override', () => {

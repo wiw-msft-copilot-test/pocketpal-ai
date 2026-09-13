@@ -189,7 +189,17 @@ export const ChatGenerationSettingsSheet = ({
     const processedSettings = Object.entries(settings).reduce(
       (acc, [key, value]) => {
         const metadata = COMPLETION_PARAMS_METADATA[key];
+        const mode =
+          settings.generationParameterModes?.[
+            key as keyof NonNullable<
+              CompletionParams['generationParameterModes']
+            >
+          ];
         if (metadata?.validation.type === 'numeric') {
+          if (mode === 'omit' || mode === 'inherit') {
+            acc.settings[key] = value;
+            return acc;
+          }
           // Handle numeric conversion
           let numValue: number;
           if (typeof value === 'string') {
@@ -351,6 +361,7 @@ export const ChatGenerationSettingsSheet = ({
           settings={settings}
           onChange={updateSettings}
           disabled={isUsingPalSettings}
+          allowInherit={!isEditingPresetSettings}
         />
       </Sheet.ScrollView>
       <Sheet.Actions>

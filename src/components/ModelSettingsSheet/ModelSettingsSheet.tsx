@@ -5,7 +5,12 @@ import {ModelSettings} from '../../screens/ModelsScreen/ModelSettings';
 import {Sheet} from '../Sheet';
 import {ProjectionModelSelector} from '../ProjectionModelSelector';
 import {Model, ModelOrigin} from '../../utils/types';
-import {modelStore, serverStore} from '../../store';
+import {
+  chatSessionStore,
+  defaultCompletionSettings,
+  modelStore,
+  serverStore,
+} from '../../store';
 import {chatTemplates} from '../../utils/chat';
 import {
   resolveReasoningCapability,
@@ -15,7 +20,7 @@ import {
 } from '../../utils/reasoningCapability';
 
 import {styles} from './styles';
-import {View} from 'react-native';
+import {Alert, View} from 'react-native';
 import {L10nContext} from '../../utils';
 import {Dropdown} from '../ui';
 import {
@@ -30,6 +35,15 @@ import {
   protocolSourceLabel,
   protocolWarningKey,
 } from '../RemoteModelSheet/protocolUi';
+import {CompletionSettings} from '../CompletionSettings';
+import {
+  CompletionParams,
+  OPTIONAL_GENERATION_PARAMETER_KEYS,
+} from '../../utils/completionTypes';
+import {
+  COMPLETION_PARAMS_METADATA,
+  validateCompletionSettings,
+} from '../../utils/modelSettings';
 
 interface ModelSettingsSheetProps {
   isVisible: boolean;
@@ -46,6 +60,10 @@ export const ModelSettingsSheet: React.FC<ModelSettingsSheetProps> = memo(
     const [tempStopWords, setTempStopWords] = useState<string[]>(
       model?.stopWords || [],
     );
+    const [tempCompletionSettings, setTempCompletionSettings] =
+      useState<CompletionParams>(
+        model?.completionSettings || defaultCompletionSettings,
+      );
     const l10n = useContext(L10nContext);
 
     // Remote models have no local-only settings (chat template, stop words,
@@ -138,6 +156,26 @@ export const ModelSettingsSheet: React.FC<ModelSettingsSheetProps> = memo(
         setSupportsEffort(cap.supportsEffort);
         setEffortSet(orderEffortValues(cap.effortValues));
         setReasoningDirty(false);
+        const loadCompletionSettings = async () => {
+          const inherited = await chatSessionStore.resolveCompletionSettings();
+          const raw = model.completionSettings || {};
+          setTempCompletionSettings({
+            ...inherited,
+            ...raw,
+            generationParameterModes: Object.fromEntries(
+              OPTIONAL_GENERATION_PARAMETER_KEYS.map(key => [
+                key,
+                raw.generationParameterModes?.[key] ??
+                  (Object.prototype.hasOwnProperty.call(raw, key) ||
+                  (key === 'reasoning_effort' &&
+                    raw.reasoning?.effort !== undefined)
+                    ? 'send'
+                    : 'inherit'),
+              ]),
+            ),
+          });
+        };
+        loadCompletionSettings();
       }
     }, [model, capabilitySnapshot]);
 
@@ -153,12 +191,81 @@ export const ModelSettingsSheet: React.FC<ModelSettingsSheetProps> = memo(
       setTempModelName(name);
     };
 
+    const handleCompletionSettingsUpdate = (name: string, value: any) => {
+      setTempCompletionSettings(previous => ({...previous, [name]: value}));
+    };
+
+    const processCompletionSettings = (): CompletionParams | undefined => {
+      const processed = Object.entries(tempCompletionSettings).reduce(
+        (acc, [key, value]) => {
+          const metadata = COMPLETION_PARAMS_METADATA[key];
+          const mode =
+            tempCompletionSettings.generationParameterModes?.[
+              key as keyof NonNullable<
+                CompletionParams['generationParameterModes']
+              >
+            ];
+          if (
+            metadata?.validation.type === 'numeric' &&
+            mode !== 'omit' &&
+            mode !== 'inherit'
+          ) {
+            const numericValue =
+              typeof value === 'string' ? Number(value) : value;
+            if (
+              typeof numericValue !== 'number' ||
+              Number.isNaN(numericValue)
+            ) {
+              acc.errors[key] =
+                l10n.components.chatGenerationSettingsSheet.invalidNumericValuesMessage;
+            } else {
+              acc.settings[key] = numericValue;
+            }
+          } else {
+            acc.settings[key] = value;
+          }
+          return acc;
+        },
+        {settings: {}, errors: {}} as {
+          settings: CompletionParams;
+          errors: Record<string, string>;
+        },
+      );
+      const validation = validateCompletionSettings(processed.settings);
+      const errors = {...processed.errors, ...validation.errors};
+      if (Object.keys(errors).length > 0) {
+        Alert.alert(
+          l10n.components.chatGenerationSettingsSheet.invalidValues,
+          l10n.components.chatGenerationSettingsSheet.pleaseCorrect +
+            '\n' +
+            Object.entries(errors)
+              .map(([key, message]) => `• ${key}: ${message}`)
+              .join('\n'),
+          [{text: l10n.common.ok}],
+        );
+        return undefined;
+      }
+      return processed.settings;
+    };
+
     const handleSaveSettings = () => {
       if (model) {
+        const processedCompletionSettings = processCompletionSettings();
+        if (!processedCompletionSettings) {
+          return;
+        }
         if (!isRemote) {
           modelStore.updateModelName(model.id, tempModelName);
           modelStore.updateModelChatTemplate(model.id, tempChatTemplate);
           modelStore.updateModelStopWords(model.id, tempStopWords);
+          const persistedModel = modelStore.models.find(
+            candidate => candidate.id === model.id,
+          );
+          if (persistedModel) {
+            persistedModel.completionSettings = processedCompletionSettings;
+          }
+        } else {
+          model.completionSettings = processedCompletionSettings;
         }
         // Persist a source:'user' reasoning override only when the user
         // actually touched a reasoning control. Otherwise leave the existing
@@ -280,6 +387,19 @@ export const ModelSettingsSheet: React.FC<ModelSettingsSheetProps> = memo(
               onModelNameChange={handleModelNameChange}
             />
           )}
+
+          <Divider style={styles.multimodalDivider} />
+          <Text style={styles.multimodalSectionTitle}>
+            {l10n.components.modelSettingsSheet.generationOverrides}
+          </Text>
+          <Text variant="bodySmall" style={styles.reasoningHelp}>
+            {l10n.components.modelSettingsSheet.generationOverridesHelp}
+          </Text>
+          <CompletionSettings
+            settings={tempCompletionSettings}
+            onChange={handleCompletionSettingsUpdate}
+            allowInherit
+          />
 
           {isRemote && protocol && (
             <>

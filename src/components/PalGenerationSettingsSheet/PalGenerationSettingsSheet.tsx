@@ -1,7 +1,10 @@
 import React, {useContext, useEffect, useState} from 'react';
 import {Sheet} from '../Sheet/Sheet';
 import {CompletionSettings} from '../CompletionSettings';
-import {CompletionParams} from '../../utils/completionTypes';
+import {
+  CompletionParams,
+  OPTIONAL_GENERATION_PARAMETER_KEYS,
+} from '../../utils/completionTypes';
 import {chatSessionStore, defaultCompletionSettings} from '../../store';
 import {
   COMPLETION_PARAMS_METADATA,
@@ -123,15 +126,22 @@ export const PalGenerationSettingsSheet = ({
   const theme = useTheme();
   const styles = createStyles(theme);
 
+  const inheritedSettings = (): CompletionParams => ({
+    ...defaultCompletionSettings,
+    generationParameterModes: Object.fromEntries(
+      OPTIONAL_GENERATION_PARAMETER_KEYS.map(key => [key, 'inherit']),
+    ),
+  });
+
   const [settings, setSettings] = useState<CompletionParams>(
-    (completionSettings as CompletionParams) || defaultCompletionSettings,
+    (completionSettings as CompletionParams) || inheritedSettings(),
   );
   const [resetMenuVisible, setResetMenuVisible] = useState(false);
 
   // Update settings when completionSettings changes
   useEffect(() => {
     setSettings(
-      (completionSettings as CompletionParams) || defaultCompletionSettings,
+      (completionSettings as CompletionParams) || inheritedSettings(),
     );
   }, [completionSettings]);
 
@@ -142,7 +152,7 @@ export const PalGenerationSettingsSheet = ({
   const onCloseSheet = () => {
     // Reset to original settings
     setSettings(
-      (completionSettings as CompletionParams) || defaultCompletionSettings,
+      (completionSettings as CompletionParams) || inheritedSettings(),
     );
     onClose();
   };
@@ -152,7 +162,17 @@ export const PalGenerationSettingsSheet = ({
     const processedSettings = Object.entries(settings).reduce(
       (acc, [key, value]) => {
         const metadata = COMPLETION_PARAMS_METADATA[key];
+        const mode =
+          settings.generationParameterModes?.[
+            key as keyof NonNullable<
+              CompletionParams['generationParameterModes']
+            >
+          ];
         if (metadata?.validation.type === 'numeric') {
+          if (mode === 'omit' || mode === 'inherit') {
+            acc.settings[key] = value;
+            return acc;
+          }
           let numValue: number;
           if (typeof value === 'string') {
             numValue = Number(value);
@@ -240,7 +260,11 @@ export const PalGenerationSettingsSheet = ({
           palName={palName}
           hasCustomSettings={hasCustomSettings}
         />
-        <CompletionSettings settings={settings} onChange={updateSettings} />
+        <CompletionSettings
+          settings={settings}
+          onChange={updateSettings}
+          allowInherit
+        />
       </Sheet.ScrollView>
       <Sheet.Actions>
         <View style={styles.actionsContainer}>
