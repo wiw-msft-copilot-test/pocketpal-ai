@@ -115,6 +115,10 @@ describe('Remote Responses protocol', () => {
     expect(responseProtocol).toContain('Responses');
     expect(responseProtocol).toContain('catalog');
 
+    await Gestures.scrollInSheetToElementExists(
+      Selectors.remoteModel.protocolRow(UNSUPPORTED_MODEL_ID),
+      10,
+    );
     const unsupportedProtocol = await browser
       .$(Selectors.remoteModel.protocolRow(UNSUPPORTED_MODEL_ID))
       .getText();

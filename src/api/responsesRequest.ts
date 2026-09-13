@@ -357,8 +357,12 @@ export function encodeResponsesRequest(
 
   return {
     model: assertNonEmptyString(params.model, 'Model'),
+    // Replay items are validated plain JSON. JSON cloning keeps the encoder
+    // immutable without relying on structuredClone, which Hermes lacks.
     input: options.input
-      ? structuredClone(options.input)
+      ? (JSON.parse(
+          JSON.stringify(options.input),
+        ) as ResponsesHistoryInputItem[])
       : encodeInput(params.messages),
     stream: true,
     store: false,

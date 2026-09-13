@@ -40,20 +40,20 @@ async function main(): Promise<void> {
     if (reverseCode !== 0) {
       throw new Error(`adb reverse failed for ${serial}`);
     }
-    const code = await run(
-      'npx',
-      [
-        'wdio',
-        'wdio.android.local.conf.ts',
-        '--spec',
-        'specs/features/remote-responses.spec.ts',
-      ],
-      {
-        ...process.env,
-        E2E_REMOTE_FIXTURE_URL: fixture.url,
-        E2E_REMOTE_FIXTURE_PORT: String(port),
-      },
-    );
+    const args = [
+      'wdio',
+      'wdio.android.local.conf.ts',
+      '--spec',
+      'specs/features/remote-responses.spec.ts',
+    ];
+    if (process.env.E2E_REMOTE_GREP) {
+      args.push('--mochaOpts.grep', process.env.E2E_REMOTE_GREP);
+    }
+    const code = await run('npx', args, {
+      ...process.env,
+      E2E_REMOTE_FIXTURE_URL: fixture.url,
+      E2E_REMOTE_FIXTURE_PORT: String(port),
+    });
     if (code !== 0) {
       process.exitCode = code;
     }

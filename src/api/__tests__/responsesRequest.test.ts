@@ -9,6 +9,14 @@ const baseParams = (): ResponsesRequestParams => ({
 });
 
 describe('encodeResponsesRequest', () => {
+  it('clones replay input without requiring structuredClone', () => {
+    const input = [{role: 'user' as const, content: 'hello'}];
+    const body = encodeResponsesRequest(baseParams(), {input});
+
+    expect(body.input).toEqual(input);
+    expect(body.input).not.toBe(input);
+  });
+
   it('creates the minimal streaming, stateless Responses request', () => {
     expect(encodeResponsesRequest(baseParams())).toEqual({
       model: 'model-test',
