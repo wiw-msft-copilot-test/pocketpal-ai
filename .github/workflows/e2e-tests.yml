@@ -243,7 +243,7 @@ jobs:
             -no-window -gpu swiftshader_indirect -no-snapshot
             -noaudio -no-boot-anim -camera-back none -partition-size 4096
           script: |
-            set -euo pipefail
+            set -eu
 
             APK="$GITHUB_WORKSPACE/apk/app-e2e-releaseE2e.apk"
             PKG="com.pocketpalai.e2e"
@@ -256,7 +256,10 @@ jobs:
             timeout 300 adb install -t "$APK"
 
             PACKAGE_PATH="$(adb shell pm path "$PKG" | tr -d '\r')"
-            [[ "$PACKAGE_PATH" == package:* ]]
+            case "$PACKAGE_PATH" in
+              package:*) ;;
+              *) echo "Package was not installed: $PACKAGE_PATH"; exit 1 ;;
+            esac
 
             adb logcat -c
             adb shell am force-stop "$PKG"
@@ -267,7 +270,7 @@ jobs:
                 -n "$COMP" | tr -d '\r'
             )"
             printf '%s\n' "$START"
-            grep -q '^Status: ok$' <<<"$START"
+            printf '%s\n' "$START" | grep -q '^Status: ok$'
 
             sleep 10
             PID="$(adb shell pidof "$PKG" 2>/dev/null | tr -d '\r' || true)"
@@ -280,7 +283,7 @@ jobs:
             printf 'PACKAGE_PATH=%s\nPID=%s\nRESUMED=%s\n' \
               "$PACKAGE_PATH" "$PID" "$RESUMED"
 
-            if [[ -z "$PID" ]] || ! grep -Fq "$COMP" <<<"$RESUMED"; then
+            if [ -z "$PID" ] || ! printf '%s\n' "$RESUMED" | grep -Fq "$COMP"; then
               adb shell dumpsys activity top || true
               adb logcat -d -t 300 '*:E' || true
               exit 1
