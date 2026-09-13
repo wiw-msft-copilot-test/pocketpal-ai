@@ -45,3 +45,14 @@ if [[ -z "$PID" ]] || ! grep -Fq "$COMP" <<<"$RESUMED"; then
   adb logcat -d -t 300 '*:E' || true
   exit 1
 fi
+
+export E2E_DEVICE_NAME="github-actions-api-35"
+export E2E_PLATFORM_VERSION="15"
+export E2E_DEVICE_UDID="emulator-5554"
+export E2E_APP_PATH="$APK"
+export E2E_NO_RESET="false"
+export E2E_FULL_RESET="true"
+
+yarn --cwd "$GITHUB_WORKSPACE/e2e" test:remote-responses-fixture
+yarn --cwd "$GITHUB_WORKSPACE/e2e" typecheck:remote-responses
+yarn --cwd "$GITHUB_WORKSPACE/e2e" e2e:remote-responses:android

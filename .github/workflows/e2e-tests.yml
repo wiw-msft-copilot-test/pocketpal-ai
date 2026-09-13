@@ -219,13 +219,15 @@ jobs:
           retention-days: 30
 
   smoke-android:
-    name: install-and-launch
+    name: install-launch-and-protocol
     needs: build-android
     if: >-
       always() &&
       (needs.build-android.result == 'success' || inputs.artifact_run_id != '')
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+    env:
+      APPIUM_HOME: ${{ github.workspace }}/e2e/.appium
 
     steps:
       - name: Checkout smoke script
@@ -239,6 +241,21 @@ jobs:
           run-id: ${{ inputs.artifact_run_id || github.run_id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'yarn'
+          cache-dependency-path: e2e/yarn.lock
+
+      - name: Install E2E dependencies and Android driver
+        run: |
+          set -euo pipefail
+          yarn --cwd e2e install --frozen-lockfile
+          cd e2e
+          npx appium driver install \
+            --source=npm appium-uiautomator2-driver@3.8.1
+
       - name: Enable KVM
         run: |
           set -euo pipefail
@@ -247,7 +264,7 @@ jobs:
           test -r /dev/kvm
           test -w /dev/kvm
 
-      - name: Install and prove foreground launch
+      - name: Install, prove foreground launch, and exercise Responses
         uses: ReactiveCircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
         with:
           api-level: 35
