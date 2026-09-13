@@ -40,6 +40,7 @@ import {
   getCpuCoreCount,
   getRecommendedThreadCount,
 } from '../../utils/deviceCapabilities';
+import {chatSessionRepository} from '../../repositories/ChatSessionRepository';
 
 // Mock deviceCapabilities
 jest.mock('../../utils/deviceCapabilities', () => ({
@@ -3764,6 +3765,45 @@ describe('ModelStore', () => {
 
       expect(mockContext.completion).toHaveBeenCalled();
       expect(onComplete).toHaveBeenCalledWith('Response text');
+    });
+
+    it('applies model omission policy at the direct native boundary', async () => {
+      const mockContext = new LlamaContext({
+        contextId: 1,
+      } as ConstructorParameters<typeof LlamaContext>[0]);
+      (mockContext.isMultimodalEnabled as jest.Mock).mockResolvedValue(true);
+      (mockContext.completion as jest.Mock).mockResolvedValue({
+        text: 'Response text',
+      });
+      modelStore.context = mockContext;
+      modelStore.models = [
+        {
+          ...basicModel,
+          id: 'active-model',
+          completionSettings: {
+            temperature: 0.8,
+            generationParameterModes: {temperature: 'omit'},
+          },
+          stopWords: [],
+        },
+      ];
+      modelStore.activeModelId = 'active-model';
+      const settingsSpy = jest
+        .spyOn(chatSessionRepository, 'getGlobalCompletionSettings')
+        .mockResolvedValue({temperature: 0.7});
+
+      await modelStore.startImageCompletion({
+        prompt: 'Test prompt',
+        image_path: '/path/to/image.jpg',
+      });
+
+      const nativeParams = (mockContext.completion as jest.Mock).mock
+        .calls[0][0];
+      expect(
+        Object.prototype.hasOwnProperty.call(nativeParams, 'temperature'),
+      ).toBe(false);
+      expect(nativeParams).not.toHaveProperty('generationParameterModes');
+      settingsSpy.mockRestore();
     });
 
     it('should handle completion error', async () => {
