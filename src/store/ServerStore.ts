@@ -15,11 +15,33 @@ import {RemoteModelCaps, ServerConfig} from '../utils/types';
 import {ReasoningCapability} from '../utils/reasoningCapability';
 import {deriveListCapsMap} from '../utils/listCaps';
 import type {ListDerivedCaps} from '../utils/listCaps';
+import {normalizeRemoteCatalogModel} from '../utils/remoteCatalog';
+import {
+  resolveRemoteProtocol as resolveProtocol,
+  type NormalizedRemoteCatalogModel,
+  type RemoteModelPreference,
+  type RemoteProtocolResolution,
+} from '../utils/remoteProtocol';
 
 const KEYCHAIN_SERVICE_PREFIX = 'pocketpal-server-';
 
 /** Minimum interval between auto-fetch cycles (ms) */
 const FETCH_THROTTLE_MS = 60000;
+
+interface CachedRemoteCatalogModel extends NormalizedRemoteCatalogModel {
+  serverId: string;
+  normalizedUrl: string;
+  serverType?: string;
+  credentialRevision: number;
+}
+
+const normalizeServerUrl = (url: string): string => url.replace(/\/+$/, '');
+
+const credentialRevisionOf = (server: ServerConfig): number =>
+  Number.isSafeInteger(server.credentialRevision) &&
+  (server.credentialRevision ?? -1) >= 0
+    ? server.credentialRevision!
+    : 0;
 
 /**
  * The capability fields of a `RemoteModelCaps` entry — everything except the
@@ -42,6 +64,12 @@ function dropServerEntries<T>(
   );
 }
 
+function dropEntry<T>(map: Record<string, T>, key: string): Record<string, T> {
+  return Object.fromEntries(
+    Object.entries(map).filter(([entryKey]) => entryKey !== key),
+  );
+}
+
 class ServerStore {
   servers: ServerConfig[] = [];
   // Remote reasoning capability keyed by full model id (`${serverId}/${remoteModelId}`).
@@ -51,6 +79,8 @@ class ServerStore {
   // Server-reported capabilities keyed by the same full model id. /props
   // answers per model on a multi-model server, so caps cannot live per server.
   remoteCaps: Record<string, RemoteModelCaps> = {};
+  remoteModelPreferences: Record<string, RemoteModelPreference> = {};
+  remoteCatalogMetadata: Record<string, CachedRemoteCatalogModel> = {};
   serverModels: Map<string, RemoteModelInfo[]> = observable.map();
   userSelectedModels: Array<{serverId: string; remoteModelId: string}> = [];
   isLoading = false;
@@ -59,6 +89,7 @@ class ServerStore {
 
   private lastFetchTime = 0;
   private appStateSubscription: any = null;
+  private fetchGenerations: Record<string, number> = {};
 
   constructor() {
     makeAutoObservable(this, {
@@ -73,6 +104,8 @@ class ServerStore {
         'userSelectedModels',
         'remoteReasoning',
         'remoteCaps',
+        'remoteModelPreferences',
+        'remoteCatalogMetadata',
       ],
       storage: AsyncStorage,
     }).then(() => {
@@ -89,6 +122,7 @@ class ServerStore {
     const newServer: ServerConfig = {
       ...config,
       id,
+      credentialRevision: credentialRevisionOf(config as ServerConfig),
     };
     this.servers.push(newServer);
     return id;
@@ -107,15 +141,17 @@ class ServerStore {
     // Reasoning state survives: it carries user declarations, and it is not
     // server-reported.
     const invalidatesDiscovery =
-      (updates.url !== undefined && updates.url !== server.url) ||
+      (updates.url !== undefined &&
+        normalizeServerUrl(updates.url) !== normalizeServerUrl(server.url)) ||
       (updates.serverType !== undefined &&
-        updates.serverType !== server.serverType);
+        updates.serverType !== server.serverType) ||
+      (updates.credentialRevision !== undefined &&
+        updates.credentialRevision !== server.credentialRevision);
 
     Object.assign(server, updates);
 
     if (invalidatesDiscovery) {
-      this.remoteCaps = dropServerEntries(this.remoteCaps, id);
-      this.serverModels.delete(id);
+      this.invalidateServerDiscovery(id);
     }
   }
 
@@ -128,6 +164,16 @@ class ServerStore {
     );
     this.remoteReasoning = dropServerEntries(this.remoteReasoning, id);
     this.remoteCaps = dropServerEntries(this.remoteCaps, id);
+    this.remoteModelPreferences = dropServerEntries(
+      this.remoteModelPreferences,
+      id,
+    );
+    this.remoteCatalogMetadata = dropServerEntries(
+      this.remoteCatalogMetadata,
+      id,
+    );
+    this.bumpFetchGeneration(id);
+    this.isLoading = false;
     // Clean up API key from keychain
     this.removeApiKey(id);
   }
@@ -145,6 +191,78 @@ class ServerStore {
     this.userSelectedModels = this.userSelectedModels.filter(
       m => !(m.serverId === serverId && m.remoteModelId === remoteModelId),
     );
+    const modelId = `${serverId}/${remoteModelId}`;
+    this.remoteModelPreferences = dropEntry(
+      this.remoteModelPreferences,
+      modelId,
+    );
+    this.remoteCatalogMetadata = dropEntry(this.remoteCatalogMetadata, modelId);
+  }
+
+  getRemoteModelPreference(modelId: string): RemoteModelPreference | undefined {
+    return this.remoteModelPreferences[modelId];
+  }
+
+  setRemoteModelPreference(
+    modelId: string,
+    preference: RemoteModelPreference,
+  ): void {
+    this.remoteModelPreferences[modelId] = {...preference};
+  }
+
+  clearRemoteModelPreference(modelId: string): void {
+    this.remoteModelPreferences = dropEntry(
+      this.remoteModelPreferences,
+      modelId,
+    );
+  }
+
+  getRemoteCatalogModel(
+    modelId: string,
+  ): NormalizedRemoteCatalogModel | undefined {
+    const slash = modelId.indexOf('/');
+    if (slash <= 0) {
+      return undefined;
+    }
+    const serverId = modelId.slice(0, slash);
+    const remoteModelId = modelId.slice(slash + 1);
+    const server = this.servers.find(candidate => candidate.id === serverId);
+    if (!server) {
+      return undefined;
+    }
+
+    const liveRow = this.serverModels
+      .get(serverId)
+      ?.find(row => row.id === remoteModelId);
+    if (liveRow) {
+      return normalizeRemoteCatalogModel(liveRow, 'live');
+    }
+
+    const cached = this.remoteCatalogMetadata[modelId];
+    if (
+      !cached ||
+      cached.serverId !== serverId ||
+      cached.normalizedUrl !== normalizeServerUrl(server.url) ||
+      cached.serverType !== server.serverType ||
+      cached.credentialRevision !== credentialRevisionOf(server)
+    ) {
+      return undefined;
+    }
+    return {
+      capabilities: cached.capabilities,
+      endpointSupport: cached.endpointSupport,
+      provenance: 'cached',
+    };
+  }
+
+  resolveRemoteModelProtocol(modelId: string): RemoteProtocolResolution {
+    const serverId = modelId.slice(0, modelId.indexOf('/'));
+    const server = this.servers.find(candidate => candidate.id === serverId);
+    return resolveProtocol({
+      modelPreference: this.getRemoteModelPreference(modelId),
+      apiMode: server?.apiMode,
+      catalog: this.getRemoteCatalogModel(modelId),
+    });
   }
 
   /**
@@ -212,6 +330,9 @@ class ServerStore {
       await Keychain.setGenericPassword('apiKey', apiKey, {
         service: `${KEYCHAIN_SERVICE_PREFIX}${serverId}`,
       });
+      runInAction(() => {
+        this.advanceCredentialRevision(serverId);
+      });
     } catch (error) {
       console.error('Failed to save API key:', error);
     }
@@ -237,6 +358,9 @@ class ServerStore {
       await Keychain.resetGenericPassword({
         service: `${KEYCHAIN_SERVICE_PREFIX}${serverId}`,
       });
+      runInAction(() => {
+        this.advanceCredentialRevision(serverId);
+      });
     } catch (error) {
       console.error('Failed to remove API key:', error);
     }
@@ -248,6 +372,13 @@ class ServerStore {
     if (!server) {
       return;
     }
+
+    const generation = this.bumpFetchGeneration(serverId);
+    const snapshot = {
+      normalizedUrl: normalizeServerUrl(server.url),
+      serverType: server.serverType,
+      credentialRevision: credentialRevisionOf(server),
+    };
 
     runInAction(() => {
       this.isLoading = true;
@@ -264,7 +395,26 @@ class ServerStore {
       );
 
       runInAction(() => {
+        if (!this.isCurrentFetch(serverId, generation, snapshot)) {
+          return;
+        }
         this.serverModels.set(serverId, models);
+        this.remoteCatalogMetadata = {
+          ...dropServerEntries(this.remoteCatalogMetadata, serverId),
+          ...Object.fromEntries(
+            models.map(row => {
+              const modelId = `${serverId}/${row.id}`;
+              return [
+                modelId,
+                {
+                  ...normalizeRemoteCatalogModel(row, 'cached'),
+                  serverId,
+                  ...snapshot,
+                },
+              ];
+            }),
+          ),
+        };
         this.isLoading = false;
 
         // Update lastConnected timestamp
@@ -275,10 +425,58 @@ class ServerStore {
       });
     } catch (error: any) {
       runInAction(() => {
+        if (!this.isCurrentFetch(serverId, generation, snapshot)) {
+          return;
+        }
         this.error = error.message || 'Failed to fetch models';
         this.isLoading = false;
       });
     }
+  }
+
+  private bumpFetchGeneration(serverId: string): number {
+    const next = (this.fetchGenerations[serverId] ?? 0) + 1;
+    this.fetchGenerations[serverId] = next;
+    return next;
+  }
+
+  private invalidateServerDiscovery(serverId: string): void {
+    this.remoteCaps = dropServerEntries(this.remoteCaps, serverId);
+    this.remoteCatalogMetadata = dropServerEntries(
+      this.remoteCatalogMetadata,
+      serverId,
+    );
+    this.serverModels.delete(serverId);
+    this.bumpFetchGeneration(serverId);
+    this.isLoading = false;
+  }
+
+  private advanceCredentialRevision(serverId: string): void {
+    const server = this.servers.find(candidate => candidate.id === serverId);
+    if (!server) {
+      return;
+    }
+    server.credentialRevision = credentialRevisionOf(server) + 1;
+    this.invalidateServerDiscovery(serverId);
+  }
+
+  private isCurrentFetch(
+    serverId: string,
+    generation: number,
+    snapshot: {
+      normalizedUrl: string;
+      serverType?: string;
+      credentialRevision: number;
+    },
+  ): boolean {
+    const current = this.servers.find(server => server.id === serverId);
+    return (
+      this.fetchGenerations[serverId] === generation &&
+      !!current &&
+      normalizeServerUrl(current.url) === snapshot.normalizedUrl &&
+      current.serverType === snapshot.serverType &&
+      credentialRevisionOf(current) === snapshot.credentialRevision
+    );
   }
 
   /**
@@ -324,6 +522,7 @@ class ServerStore {
     // in place while the probe is in flight.
     const probedUrl = server.url;
     const probedType = server.serverType;
+    const probedCredentialRevision = credentialRevisionOf(server);
 
     const timeoutMs = Math.min(
       server.requestTimeoutMs ?? PROPS_TIMEOUT_MS,
@@ -355,7 +554,8 @@ class ServerStore {
       if (
         !current ||
         current.url !== probedUrl ||
-        current.serverType !== probedType
+        current.serverType !== probedType ||
+        credentialRevisionOf(current) !== probedCredentialRevision
       ) {
         return;
       }

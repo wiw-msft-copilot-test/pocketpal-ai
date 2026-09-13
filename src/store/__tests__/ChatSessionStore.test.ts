@@ -692,6 +692,58 @@ describe('chatSessionStore', () => {
         0.7,
       );
     });
+
+    it('passes nested Responses state through the clone create path', async () => {
+      const responsesState = {
+        version: 1 as const,
+        binding: {
+          wireApi: 'responses' as const,
+          serverUrl: 'https://foreign.example.com',
+          modelId: 'responses-model',
+        },
+        output: [],
+        terminalStatus: 'completed' as const,
+      };
+      const assistantTurn: MessageType.AssistantTurn = {
+        id: 'assistant-1',
+        type: 'assistant_turn',
+        author: {id: 'assistant'},
+        createdAt: 1,
+        metadata: {},
+        steps: [{content: 'answer', responsesState}],
+      };
+      chatSessionStore.sessions = [
+        {
+          id: 'session1',
+          title: 'Responses Session',
+          date: new Date().toISOString(),
+          messages: [assistantTurn],
+          completionSettings: defaultCompletionSettings,
+          settingsSource: 'pal',
+        },
+      ];
+      (chatSessionRepository.createSession as jest.Mock).mockResolvedValue({
+        id: 'new-session',
+        date: new Date().toISOString(),
+      });
+      (chatSessionRepository.getSessionById as jest.Mock).mockResolvedValue({
+        messages: [{toMessageObject: () => assistantTurn}],
+        completionSettings: null,
+      });
+
+      await chatSessionStore.duplicateSession('session1');
+
+      expect(chatSessionRepository.createSession).toHaveBeenCalledWith(
+        'Responses Session - Copy',
+        [assistantTurn],
+        defaultCompletionSettings,
+        undefined,
+        'pal',
+      );
+      const clonedTurn = chatSessionStore.sessions[1]
+        .messages[0] as MessageType.AssistantTurn;
+      expect(clonedTurn.steps[0].responsesState).toEqual(responsesState);
+    });
   });
 
   // Tests from ChatSessionStoreExtended.test.ts

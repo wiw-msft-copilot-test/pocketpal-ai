@@ -2657,29 +2657,74 @@ class ModelStore {
       throw new Error('Model is missing remote configuration');
     }
 
-    // Release any existing context (local or remote)
-    await this.releaseContext();
-
-    const apiKey = await serverStore.getApiKey(model.serverId);
     const server = serverStore.servers.find(s => s.id === model.serverId);
     if (!server) {
       throw new Error('Server not found');
     }
+    const catalog = serverStore.getRemoteCatalogModel(model.id);
+    const protocol = serverStore.resolveRemoteModelProtocol(model.id);
+    if (!protocol.supported || !protocol.wireApi) {
+      throw new Error(
+        `Model "${model.remoteModelId}" does not advertise a supported API endpoint. Set a manual model or server API override to continue.`,
+      );
+    }
+    const bindingSnapshot = {
+      url: server.url,
+      serverType: server.serverType,
+      requestTimeoutMs: server.requestTimeoutMs,
+      credentialRevision:
+        Number.isSafeInteger(server.credentialRevision) &&
+        (server.credentialRevision ?? -1) >= 0
+          ? server.credentialRevision!
+          : 0,
+      wireApi: protocol.wireApi,
+      protocolCapabilities: catalog
+        ? {
+            ...catalog.capabilities,
+            advertisedEndpoints: catalog.capabilities.advertisedEndpoints
+              ? [...catalog.capabilities.advertisedEndpoints]
+              : undefined,
+            reasoningEffortValues: catalog.capabilities.reasoningEffortValues
+              ? [...catalog.capabilities.reasoningEffortValues]
+              : undefined,
+          }
+        : undefined,
+    };
+    const apiKey = await serverStore.getApiKey(model.serverId);
+    const currentServer = serverStore.servers.find(
+      candidate => candidate.id === model.serverId,
+    );
+    if (
+      !currentServer ||
+      currentServer.url !== bindingSnapshot.url ||
+      currentServer.serverType !== bindingSnapshot.serverType ||
+      (currentServer.credentialRevision ?? 0) !==
+        bindingSnapshot.credentialRevision
+    ) {
+      throw new Error('Server configuration changed while selecting model');
+    }
+
+    // Release only after validation, so a rejected catalog-only model does not
+    // tear down the currently active session.
+    await this.releaseContext();
 
     runInAction(() => {
       this.engine = new OpenAICompletionEngine(
-        server.url,
+        bindingSnapshot.url,
         model.remoteModelId!,
         apiKey,
-        server.requestTimeoutMs,
-        server.serverType,
+        bindingSnapshot.requestTimeoutMs,
+        bindingSnapshot.serverType,
       );
       this.activeRemoteBinding = {
         modelId: model.id,
         serverId: model.serverId!,
         remoteModelId: model.remoteModelId!,
-        url: server.url,
-        serverType: server.serverType,
+        url: bindingSnapshot.url,
+        serverType: bindingSnapshot.serverType,
+        wireApi: bindingSnapshot.wireApi,
+        protocolCapabilities: bindingSnapshot.protocolCapabilities,
+        credentialRevision: bindingSnapshot.credentialRevision,
       };
       this.setActiveModel(model.id);
       // Do NOT set lastUsedModelId for remote models -- server may be offline on next launch

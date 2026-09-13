@@ -19,6 +19,7 @@ import {derivedText} from '../utils/chat';
 import {palStore} from './PalStore';
 import {deriveToolSchemas} from '../services/talents';
 import {AgentUiState, initialAgentUiState} from '../services/agent';
+import {isResponsesReplayState} from '../api/responsesTypes';
 
 /**
  * Update payload accepted by `updateMessage` / `updateMessageStreaming`.
@@ -29,6 +30,11 @@ import {AgentUiState, initialAgentUiState} from '../services/agent';
 type MessageUpdate =
   | Partial<MessageType.Text>
   | Partial<Omit<MessageType.AssistantTurn, 'type' | 'id' | 'author'>>;
+
+type FinalAgentStep = Pick<
+  AgentStep,
+  'content' | 'reasoningContent' | 'toolCalls' | 'responsesState'
+>;
 
 const NEW_SESSION_TITLE = 'New Session';
 const TITLE_LIMIT = 40;
@@ -1003,50 +1009,94 @@ class ChatSessionStore {
     }
   }
 
-  /**
-   * Mark the active (last) step as no longer streaming. Writes the
-   * whole `steps` array wholesale.
-   */
-  async finalizeActiveStep(id: string, sessionId: string): Promise<void> {
-    // Drain any pending throttled update first so the final partial
-    // content for this step lands BEFORE we mark it `partial: false`
-    // and replace the array. Otherwise a late-firing timer could
-    // either (a) write to a stale array reference or (b) write to
-    // whatever step happens to be lastIdx after this finalize completes.
-    this.flushStreamingUpdate();
+  async persistFinalActiveStep(
+    id: string,
+    sessionId: string,
+    finalStep: FinalAgentStep,
+  ): Promise<void> {
+    if (
+      finalStep.responsesState !== undefined &&
+      !isResponsesReplayState(finalStep.responsesState)
+    ) {
+      throw new Error(
+        `Cannot persist invalid Responses state for message ${id}`,
+      );
+    }
     const targetSessionId = sessionId || this.activeSessionId;
     if (!targetSessionId) {
-      return;
+      throw new Error('Cannot finalize step without a target session');
     }
     const session = this.sessions.find(s => s.id === targetSessionId);
     if (!session) {
-      return;
+      throw new Error(`Session ${targetSessionId} not found`);
     }
     const index = session.messages.findIndex(msg => msg.id === id);
     if (index < 0) {
-      return;
+      throw new Error(`Message ${id} not found in session ${targetSessionId}`);
     }
     const message = session.messages[index];
     if (message.type !== 'assistant_turn') {
-      return;
+      throw new Error(`Message ${id} is not an assistant turn`);
     }
     const turn = message as MessageType.AssistantTurn;
     if (!turn.steps || turn.steps.length === 0) {
-      return;
+      throw new Error(`Assistant turn ${id} has no active step`);
     }
-    let nextSteps: AgentStep[] = [];
+
+    let pendingPartial: Partial<AgentStep> | undefined;
+    const pending = this.pendingStreamingUpdate;
+    if (this.streamingThrottleTimer) {
+      clearTimeout(this.streamingThrottleTimer);
+      this.streamingThrottleTimer = null;
+    }
+    if (
+      pending?.kind === 'step' &&
+      pending.id === id &&
+      (pending.sessionId || this.activeSessionId) === targetSessionId
+    ) {
+      pendingPartial = pending.partial;
+      this.pendingStreamingUpdate = null;
+      this.lastStreamingUpdateTime = Date.now();
+    } else if (pending) {
+      this.applyStreamingUpdate();
+    }
+
+    const lastIdx = turn.steps.length - 1;
+    const nextLast: AgentStep = {
+      ...turn.steps[lastIdx],
+      ...pendingPartial,
+      content: finalStep.content,
+      reasoningContent: finalStep.reasoningContent,
+      toolCalls: finalStep.toolCalls,
+      responsesState: finalStep.responsesState,
+      partial: false,
+    };
+    const nextSteps = [...turn.steps.slice(0, lastIdx), nextLast];
+
+    await chatSessionRepository.persistFinalAssistantSteps(id, nextSteps);
     runInAction(() => {
-      const lastIdx = turn.steps.length - 1;
-      const last = turn.steps[lastIdx];
-      const nextLast: AgentStep = {...last, partial: false};
-      nextSteps = [...turn.steps.slice(0, lastIdx), nextLast];
       turn.steps = nextSteps;
     });
-    try {
-      await chatSessionRepository.updateMessage(id, {steps: nextSteps});
-    } catch (error) {
-      console.error('Failed to persist finalizeActiveStep:', error);
+  }
+
+  /**
+   * Legacy finalizer retained until the runner is wired to provide the
+   * authoritative final payload to `persistFinalActiveStep`.
+   */
+  async finalizeActiveStep(id: string, sessionId: string): Promise<void> {
+    const targetSessionId = sessionId || this.activeSessionId;
+    const session = this.sessions.find(s => s.id === targetSessionId);
+    const message = session?.messages.find(msg => msg.id === id);
+    if (message?.type !== 'assistant_turn' || message.steps.length === 0) {
+      return;
     }
+    const activeStep = message.steps[message.steps.length - 1];
+    await this.persistFinalActiveStep(id, sessionId, {
+      content: activeStep.content,
+      reasoningContent: activeStep.reasoningContent,
+      toolCalls: activeStep.toolCalls,
+      responsesState: activeStep.responsesState,
+    });
   }
 
   async updateSessionCompletionSettings(settings: CompletionParams) {

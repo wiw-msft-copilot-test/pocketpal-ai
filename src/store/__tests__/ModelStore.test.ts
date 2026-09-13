@@ -4919,6 +4919,173 @@ describe('ModelStore', () => {
     });
   });
 
+  describe('setRemoteModel protocol binding', () => {
+    let getApiKeySpy: jest.SpyInstance;
+    let probeSpy: jest.SpyInstance;
+    const remoteModel = {
+      id: 'srv-1/protocol-model',
+      name: 'protocol-model',
+      origin: ModelOrigin.REMOTE,
+      serverId: 'srv-1',
+      remoteModelId: 'protocol-model',
+    } as any;
+
+    beforeEach(() => {
+      runInAction(() => {
+        modelStore.context = undefined;
+        modelStore.engine = undefined;
+        modelStore.activeRemoteBinding = undefined;
+        modelStore.activeModelId = undefined;
+        serverStore.servers = [
+          {
+            id: 'srv-1',
+            name: 'Remote',
+            url: 'https://api.example.com',
+            serverType: 'OpenAI',
+            apiMode: 'auto',
+            credentialRevision: 4,
+          },
+        ];
+        serverStore.serverModels.clear();
+        serverStore.remoteModelPreferences = {};
+        serverStore.remoteCatalogMetadata = {};
+      });
+      getApiKeySpy = jest
+        .spyOn(serverStore, 'getApiKey')
+        .mockResolvedValue('sk-test');
+      probeSpy = jest
+        .spyOn(serverStore, 'fetchRemoteModelCaps')
+        .mockResolvedValue(undefined);
+    });
+
+    afterEach(() => {
+      probeSpy.mockRestore();
+      getApiKeySpy.mockRestore();
+    });
+
+    it('snapshots catalog protocol, capabilities, and credential revision', async () => {
+      runInAction(() => {
+        serverStore.serverModels.set('srv-1', [
+          {
+            id: 'protocol-model',
+            object: 'model',
+            owned_by: 'system',
+            supported_endpoints: ['/responses'],
+            capabilities: {
+              supports: {vision: true, reasoning_effort: ['low', 'high']},
+              limits: {max_context_window_tokens: 128000},
+            },
+          },
+        ]);
+      });
+
+      await modelStore.setRemoteModel(remoteModel);
+
+      expect(modelStore.activeRemoteBinding).toMatchObject({
+        wireApi: 'responses',
+        credentialRevision: 4,
+        protocolCapabilities: {
+          advertisedEndpoints: ['responses'],
+          supportsVision: true,
+          contextLength: 128000,
+          reasoningEffortValues: ['low', 'high'],
+        },
+      });
+    });
+
+    it('uses a model override before server mode and catalog', async () => {
+      runInAction(() => {
+        serverStore.servers[0].apiMode = 'chat-completions';
+        serverStore.serverModels.set('srv-1', [
+          {
+            id: 'protocol-model',
+            object: 'model',
+            owned_by: 'system',
+            supported_endpoints: ['/v1/chat/completions'],
+          },
+        ]);
+        serverStore.remoteModelPreferences[remoteModel.id] = {
+          wireApi: 'responses',
+        };
+      });
+
+      await modelStore.setRemoteModel(remoteModel);
+
+      expect(modelStore.activeRemoteBinding?.wireApi).toBe('responses');
+    });
+
+    it('fails explicitly for a catalog-only unsupported model', async () => {
+      runInAction(() => {
+        modelStore.activeModelId = 'existing/model';
+        serverStore.serverModels.set('srv-1', [
+          {
+            id: 'protocol-model',
+            object: 'model',
+            owned_by: 'system',
+            supported_endpoints: ['/embeddings'],
+          },
+        ]);
+      });
+
+      await expect(modelStore.setRemoteModel(remoteModel)).rejects.toThrow(
+        'does not advertise a supported API endpoint',
+      );
+      expect(modelStore.activeModelId).toBe('existing/model');
+    });
+
+    it('allows an unsupported catalog model when manually overridden', async () => {
+      runInAction(() => {
+        serverStore.serverModels.set('srv-1', [
+          {
+            id: 'protocol-model',
+            object: 'model',
+            owned_by: 'system',
+            supported_endpoints: ['/embeddings'],
+          },
+        ]);
+        serverStore.remoteModelPreferences[remoteModel.id] = {
+          wireApi: 'chat-completions',
+        };
+      });
+
+      await modelStore.setRemoteModel(remoteModel);
+
+      expect(modelStore.activeRemoteBinding?.wireApi).toBe('chat-completions');
+    });
+
+    it('keeps the active binding snapshot unchanged after server edits', async () => {
+      await modelStore.setRemoteModel(remoteModel);
+      const binding = modelStore.activeRemoteBinding;
+
+      serverStore.updateServer('srv-1', {
+        url: 'https://new.example.com',
+        serverType: 'GitHub Copilot',
+      });
+
+      expect(modelStore.activeRemoteBinding).toBe(binding);
+      expect(modelStore.activeRemoteBinding).toMatchObject({
+        url: 'https://api.example.com',
+        serverType: 'OpenAI',
+        credentialRevision: 4,
+        wireApi: 'chat-completions',
+      });
+    });
+
+    it('uses compatibility defaults for legacy missing protocol settings', async () => {
+      runInAction(() => {
+        serverStore.servers[0].apiMode = undefined;
+        serverStore.servers[0].credentialRevision = undefined;
+      });
+
+      await modelStore.setRemoteModel(remoteModel);
+
+      expect(modelStore.activeRemoteBinding).toMatchObject({
+        wireApi: 'chat-completions',
+        credentialRevision: 0,
+      });
+    });
+  });
+
   describe('foreground capability re-probe', () => {
     let probe: jest.SpyInstance;
 

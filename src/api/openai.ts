@@ -18,10 +18,11 @@ export interface RemoteModelInfo {
   id: string;
   object: string;
   owned_by: string;
+  supported_endpoints?: string[];
   status?: {value?: string; args?: string[]};
   architecture?: {input_modalities?: string[]; output_modalities?: string[]};
   meta?: {n_ctx?: number; n_ctx_train?: number; [key: string]: unknown};
-  capabilities?: string[];
+  capabilities?: string[] | Record<string, unknown>;
 }
 
 /** Chat message type compatible with OpenAI API format */
