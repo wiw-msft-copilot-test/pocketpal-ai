@@ -11,6 +11,13 @@ import type {TokenRadius, TokenStroke, TokenTypography} from '../theme/tokens';
 import {SkillKey} from '.';
 import type {TalentResult} from '../services/talents/types';
 import type {ReasoningCapability} from './reasoningCapability';
+import type {ResponsesReplayState} from '../api/responsesTypes';
+import type {
+  RemoteApiMode,
+  RemoteModelPreference,
+  RemoteProtocolCapabilities,
+  RemoteWireApi,
+} from './remoteProtocol';
 
 /**
  * One model-emitted tool call within an `AgentStep`. The `arguments` field
@@ -69,6 +76,8 @@ export interface AgentStep {
   toolOutcomes?: AgentToolOutcome[];
   /** True while this step is still streaming. Cleared on step_finished. */
   partial?: boolean;
+  /** Validated provider state needed to continue a Responses conversation. */
+  responsesState?: ResponsesReplayState;
 }
 
 export namespace MessageType {
@@ -479,6 +488,9 @@ export interface ServerConfig {
     | 'GitHub Copilot'
     | 'vLLM'
     | string;
+  /** Missing is the legacy-compatible Auto mode. */
+  apiMode?: RemoteApiMode;
+  credentialRevision?: number;
 }
 
 /**
@@ -513,7 +525,12 @@ export interface RemoteSessionBinding {
   remoteModelId: string;
   url: string;
   serverType?: string;
+  wireApi?: RemoteWireApi;
+  protocolCapabilities?: RemoteProtocolCapabilities;
+  credentialRevision?: number;
 }
+
+export type {RemoteModelPreference};
 
 export enum ModelType {
   PROJECTION = 'projection',

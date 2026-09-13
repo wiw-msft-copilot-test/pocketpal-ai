@@ -2,6 +2,12 @@ import {CompletionParams as LlamaRNCompletionParams} from 'llama.rn';
 
 export type {ToolCall} from 'llama.rn';
 import type {ToolCall} from 'llama.rn';
+import type {
+  CompletionProviderState,
+  ResponsesIncompleteReason,
+  ResponsesTerminalStatus,
+  ResponsesUsage,
+} from '../api/responsesTypes';
 
 // `enabled: false` is a best-effort hint — reasoning the model still returns is
 // never stripped from what is displayed.
@@ -75,6 +81,11 @@ export interface CompletionResult {
   stopping_word?: string;
   context_full?: boolean;
   interrupted?: boolean;
+  terminal_status?: ResponsesTerminalStatus;
+  incomplete_reason?: ResponsesIncompleteReason;
+  refusal?: string;
+  usage?: ResponsesUsage;
+  provider_state?: CompletionProviderState;
 }
 
 // `used` is tokens_evaluated + tokens_predicted; tokens_cached is not exposed at
