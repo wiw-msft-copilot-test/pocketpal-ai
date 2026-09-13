@@ -13,10 +13,7 @@ import {
 import {SettingsScreen} from '../SettingsScreen';
 
 import {modelStore, uiStore, ttsStore} from '../../../store';
-import {
-  UIStore as ActualUIStore,
-  type ResponsesDiagnosticsController,
-} from '../../../store/UIStore';
+import {UIStore as ActualUIStore} from '../../../store/UIStore';
 import {l10n} from '../../../locales';
 
 jest.useFakeTimers();
@@ -244,9 +241,9 @@ describe('SettingsScreen', () => {
   });
 
   describe('Responses diagnostics store state', () => {
-    const makeController = (): jest.Mocked<ResponsesDiagnosticsController> => ({
-      setEnabled: jest.fn(),
-      clear: jest.fn(),
+    const makeController = () => ({
+      enable: jest.fn(),
+      disableAndClear: jest.fn(),
     });
 
     it('is memory-only and off for each cold store instance', () => {
@@ -264,25 +261,23 @@ describe('SettingsScreen', () => {
 
       const restartedStore = new ActualUIStore(controller);
       expect(restartedStore.responsesProtocolLogging).toBe(false);
-      expect(controller.setEnabled).toHaveBeenLastCalledWith(false);
-      expect(controller.clear).toHaveBeenCalledTimes(2);
+      expect(controller.disableAndClear).toHaveBeenCalledTimes(2);
     });
 
     it('enables future tracing and disables then clears immediately', () => {
       const controller = makeController();
       const store = new ActualUIStore(controller);
-      controller.setEnabled.mockClear();
-      controller.clear.mockClear();
+      controller.enable.mockClear();
+      controller.disableAndClear.mockClear();
 
       store.setResponsesProtocolLogging(true);
-      expect(controller.setEnabled).toHaveBeenLastCalledWith(true);
+      expect(controller.enable).toHaveBeenCalledTimes(1);
 
       store.setResponsesProtocolLogging(false);
-      expect(controller.setEnabled).toHaveBeenLastCalledWith(false);
-      expect(controller.clear).toHaveBeenCalledTimes(1);
+      expect(controller.disableAndClear).toHaveBeenCalledTimes(1);
       expect(store.responsesProtocolLogging).toBe(false);
-      expect(controller.setEnabled.mock.invocationCallOrder[1]).toBeLessThan(
-        controller.clear.mock.invocationCallOrder[0],
+      expect(controller.enable.mock.invocationCallOrder[0]).toBeLessThan(
+        controller.disableAndClear.mock.invocationCallOrder[0],
       );
     });
   });

@@ -4,6 +4,10 @@ import {makePersistable} from 'mobx-persist-store';
 import {makeAutoObservable, runInAction} from 'mobx';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
+  responsesDiagnosticsController,
+  type ResponsesDiagnosticsController,
+} from '../api/responsesDiagnostics';
+import {
   l10n,
   supportedLanguages as localesSupportedLanguages,
   type AvailableLanguage,
@@ -16,10 +20,10 @@ import {
   type TopicKey,
 } from './onboarding/types';
 
-export interface ResponsesDiagnosticsController {
-  setEnabled(enabled: boolean): void;
-  clear(): void;
-}
+type ResponsesDiagnosticsControl = Pick<
+  ResponsesDiagnosticsController,
+  'enable' | 'disableAndClear'
+>;
 
 export class UIStore {
   static readonly GROUP_KEYS = {
@@ -86,7 +90,7 @@ export class UIStore {
   // state isn't pre-dismissed.
   dismissedDownloadIds: string[] = [];
 
-  private responsesDiagnosticsController?: ResponsesDiagnosticsController;
+  private responsesDiagnosticsController: ResponsesDiagnosticsControl;
 
   hasWarnedToolCompat(modelId: string): boolean {
     return this.toolCompatWarnedModels.includes(modelId);
@@ -117,7 +121,10 @@ export class UIStore {
     });
   }
 
-  constructor(responsesDiagnosticsController?: ResponsesDiagnosticsController) {
+  constructor(
+    responsesDiagnosticsControl: ResponsesDiagnosticsControl = responsesDiagnosticsController,
+  ) {
+    this.responsesDiagnosticsController = responsesDiagnosticsControl;
     makeAutoObservable<this, 'responsesDiagnosticsController'>(this, {
       responsesDiagnosticsController: false,
     });
@@ -140,9 +147,7 @@ export class UIStore {
     // backwards compatibility. Removed this from the ui settings screen.
     this.iOSBackgroundDownloading = true;
 
-    if (responsesDiagnosticsController) {
-      this.attachResponsesDiagnosticsController(responsesDiagnosticsController);
-    }
+    this.responsesDiagnosticsController.disableAndClear();
   }
 
   setValue<T extends keyof typeof this.pageStates>(
@@ -194,10 +199,9 @@ export class UIStore {
 
   setResponsesProtocolLogging(value: boolean) {
     if (value) {
-      this.responsesDiagnosticsController?.setEnabled(true);
+      this.responsesDiagnosticsController.enable();
     } else {
-      this.responsesDiagnosticsController?.setEnabled(false);
-      this.responsesDiagnosticsController?.clear();
+      this.responsesDiagnosticsController.disableAndClear();
     }
 
     runInAction(() => {
@@ -206,11 +210,10 @@ export class UIStore {
   }
 
   attachResponsesDiagnosticsController(
-    controller: ResponsesDiagnosticsController,
+    controller: ResponsesDiagnosticsControl,
   ) {
     this.responsesDiagnosticsController = controller;
-    controller.setEnabled(false);
-    controller.clear();
+    controller.disableAndClear();
     runInAction(() => {
       this.responsesProtocolLogging = false;
     });
