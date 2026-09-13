@@ -7,6 +7,7 @@ const MAX_RECORD_BYTES = 2 * 1024;
 const MAX_RECORDS = 128;
 const MAX_TRACE_BYTES = 64 * 1024;
 const MAX_ALIASES = 256;
+const LOG_TAG = '[PP_RESPONSES_DIAG]';
 
 const EVENT_TYPE_VALUES = [
   'response.created',
@@ -113,6 +114,10 @@ export interface ResponsesDiagnosticRecord {
 export type ResponsesDiagnosticObserver = (
   record: Readonly<ResponsesDiagnosticRecord>,
 ) => void;
+
+const logResponsesDiagnosticRecord: ResponsesDiagnosticObserver = record => {
+  console.info(`${LOG_TAG} ${JSON.stringify(record)}`);
+};
 
 type RecordValue = Record<string, unknown>;
 
@@ -274,7 +279,9 @@ export class ResponsesDiagnosticsController {
     return this.recorder?.records ?? [];
   }
 
-  enable(observer?: ResponsesDiagnosticObserver): void {
+  enable(
+    observer: ResponsesDiagnosticObserver = logResponsesDiagnosticRecord,
+  ): void {
     this.recorder ??= new ResponsesDiagnosticRecorder();
     this.downstreamObserver = observer;
     this.active = true;

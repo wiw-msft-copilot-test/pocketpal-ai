@@ -219,7 +219,7 @@ describe('Responses diagnostics', () => {
     expect(responsesDiagnosticsController.enabled).toBe(false);
     expect(responsesDiagnosticsController.observer).toBeUndefined();
 
-    responsesDiagnosticsController.enable();
+    responsesDiagnosticsController.enable(() => {});
     expect(responsesDiagnosticsController.enabled).toBe(true);
     const observer = responsesDiagnosticsController.observer!;
     observer({kind: 'outcome', sequence: 0, outcome: 'completed'});
@@ -246,5 +246,41 @@ describe('Responses diagnostics', () => {
     expect(responsesDiagnosticsController.records).toHaveLength(0);
     observer({kind: 'outcome', sequence: 3, outcome: 'completed'});
     expect(responsesDiagnosticsController.records).toHaveLength(0);
+  });
+
+  it('logs sanitized bounded records with the diagnostic tag by default', () => {
+    const info = jest.spyOn(console, 'info').mockImplementation(() => {});
+    responsesDiagnosticsController.enable();
+    const diagnostics = createResponsesDiagnostics(
+      responsesDiagnosticsController.observer,
+    )!;
+
+    diagnostics.request(request, {});
+    diagnostics.event({
+      type: 'response.output_item.added',
+      output_index: 0,
+      item: {
+        type: 'function_call',
+        id: `item-${secret}`,
+        call_id: `call-${secret}`,
+        name: `tool-${secret}`,
+        arguments: `args-${secret}`,
+        status: 'in_progress',
+      },
+    });
+    diagnostics.finish('completed');
+
+    expect(info).toHaveBeenCalled();
+    for (const [message] of info.mock.calls) {
+      expect(message).toEqual(expect.stringMatching(/^\[PP_RESPONSES_DIAG\] /));
+      expect(message).not.toContain(secret);
+    }
+
+    const callsBeforeDisable = info.mock.calls.length;
+    const staleObserver = responsesDiagnosticsController.observer!;
+    responsesDiagnosticsController.disableAndClear();
+    staleObserver({kind: 'outcome', sequence: 100, outcome: 'completed'});
+    expect(info).toHaveBeenCalledTimes(callsBeforeDisable);
+    info.mockRestore();
   });
 });
