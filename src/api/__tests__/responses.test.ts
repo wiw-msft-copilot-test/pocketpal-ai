@@ -253,6 +253,71 @@ describe('streamResponses', () => {
     });
   });
 
+  it('applies Copilot item-scoped identity rotation from the binding', async () => {
+    const promise = startResponses(params(), {
+      serverType: 'GitHub Copilot',
+      binding: {...binding, serverType: 'GitHub Copilot'},
+    });
+    const xhr = MockXHR.instances[0];
+    xhr.headers();
+    xhr.progress(
+      [
+        {
+          type: 'response.output_item.added',
+          output_index: 0,
+          item: {...message(''), id: 'message-added', status: 'in_progress'},
+        },
+        {
+          type: 'response.content_part.added',
+          output_index: 0,
+          item_id: 'message-content',
+          content_index: 0,
+          part: {type: 'output_text', text: ''},
+        },
+        {
+          type: 'response.output_text.delta',
+          output_index: 0,
+          item_id: 'message-delta',
+          content_index: 0,
+          delta: 'live content',
+        },
+        {
+          type: 'response.output_item.done',
+          output_index: 0,
+          item: {
+            ...message('live content'),
+            id: 'message-done',
+          },
+        },
+        {
+          type: 'response.completed',
+          response: {
+            status: 'completed',
+            output: [{...message('live content'), id: 'message-done'}],
+          },
+        },
+      ]
+        .map(frame)
+        .join(''),
+    );
+    xhr.load();
+
+    await expect(promise).resolves.toMatchObject({
+      content: 'live content',
+      provider_state: {
+        responses: {
+          output: [
+            {
+              type: 'message',
+              id: 'message-done',
+              content: [{type: 'output_text', text: 'live content'}],
+            },
+          ],
+        },
+      },
+    });
+  });
+
   it('rejects insecure non-local URLs before constructing XHR', async () => {
     await expect(
       startResponses(params(), {url: 'http://example.test'}),

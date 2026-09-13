@@ -470,7 +470,7 @@ describe('ResponsesStreamReducer', () => {
     ).toThrow('output item id moved to another index');
   });
 
-  it('keeps content-part item ids strict after a Copilot replacement', () => {
+  it('accepts Copilot item-scoped id rotation and reconciles the final identity', () => {
     const reducer = createResponsesStreamReducer(undefined, {
       providerProfile: 'github-copilot',
     });
@@ -480,16 +480,156 @@ describe('ResponsesStreamReducer', () => {
       item: message('message-added'),
     });
     reducer.reduce({
+      type: 'response.content_part.added',
+      output_index: 0,
+      item_id: 'message-content',
+      content_index: 0,
+      part: {type: 'output_text', text: ''},
+    });
+    reducer.reduce({
+      type: 'response.output_text.delta',
+      output_index: 0,
+      item_id: 'message-delta',
+      content_index: 0,
+      delta: 'rotated',
+    });
+    reducer.reduce({
+      type: 'response.content_part.done',
+      output_index: 0,
+      item_id: 'message-part-done',
+      content_index: 0,
+      part: {type: 'output_text', text: 'rotated identity'},
+    });
+    reducer.reduce({
       type: 'response.output_item.done',
       output_index: 0,
-      item: {...message('message-done', 'completed'), content: []},
+      item: {
+        ...message('message-item-done', 'completed'),
+        content: [],
+      },
+    });
+    reducer.reduce({
+      type: 'response.completed',
+      response: {
+        status: 'completed',
+        output: [
+          {
+            ...message('message-item-done', 'completed'),
+            content: [],
+          },
+        ],
+      },
+    });
+
+    const finalized = reducer.finish(binding);
+    expect(finalized.result.content).toBe('rotated identity');
+    expect(finalized.replay?.output[0]).toMatchObject({
+      id: 'message-item-done',
+      content: [{type: 'output_text', text: 'rotated identity'}],
+    });
+  });
+
+  it('rejects item-scoped id rotation without the Copilot profile', () => {
+    const reducer = createResponsesStreamReducer();
+    reducer.reduce({
+      type: 'response.output_item.added',
+      output_index: 0,
+      item: message('message-added'),
     });
 
     expect(() =>
       reducer.reduce({
         type: 'response.content_part.added',
         output_index: 0,
+        item_id: 'message-content',
+        content_index: 0,
+        part: {type: 'output_text', text: ''},
+      }),
+    ).toThrow('event does not match a message item');
+  });
+
+  it('rejects replay of an earlier Copilot item alias', () => {
+    const reducer = createResponsesStreamReducer(undefined, {
+      providerProfile: 'github-copilot',
+    });
+    reducer.reduce({
+      type: 'response.output_item.added',
+      output_index: 0,
+      item: message('message-added'),
+    });
+    reducer.reduce({
+      type: 'response.content_part.added',
+      output_index: 0,
+      item_id: 'message-content',
+      content_index: 0,
+      part: {type: 'output_text', text: ''},
+    });
+
+    expect(() =>
+      reducer.reduce({
+        type: 'response.output_text.delta',
+        output_index: 0,
         item_id: 'message-added',
+        content_index: 0,
+        delta: 'replayed',
+      }),
+    ).toThrow('event does not match a message item');
+  });
+
+  it.each([
+    [
+      'wrong item type',
+      {
+        type: 'response.content_part.added',
+        output_index: 0,
+        item_id: 'message-content',
+        content_index: 0,
+        part: {type: 'output_text', text: ''},
+      },
+    ],
+    [
+      'wrong output index',
+      {
+        type: 'response.reasoning_summary_text.delta',
+        output_index: 1,
+        item_id: 'reasoning-delta',
+        summary_index: 0,
+        delta: 'no',
+      },
+    ],
+  ])('rejects Copilot item-scoped rotation with %s', (_label, event) => {
+    const reducer = createResponsesStreamReducer(undefined, {
+      providerProfile: 'github-copilot',
+    });
+    reducer.reduce({
+      type: 'response.output_item.added',
+      output_index: 0,
+      item: {type: 'reasoning', id: 'reasoning-added', summary: []},
+    });
+
+    expect(() => reducer.reduce(event)).toThrow(ResponsesStreamProtocolError);
+  });
+
+  it('rejects a Copilot item-scoped id registered at another index', () => {
+    const reducer = createResponsesStreamReducer(undefined, {
+      providerProfile: 'github-copilot',
+    });
+    reducer.reduce({
+      type: 'response.output_item.added',
+      output_index: 0,
+      item: message('message-zero'),
+    });
+    reducer.reduce({
+      type: 'response.output_item.added',
+      output_index: 1,
+      item: message('message-one'),
+    });
+
+    expect(() =>
+      reducer.reduce({
+        type: 'response.content_part.added',
+        output_index: 0,
+        item_id: 'message-one',
         content_index: 0,
         part: {type: 'output_text', text: ''},
       }),

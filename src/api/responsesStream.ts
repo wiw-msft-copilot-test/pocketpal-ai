@@ -217,7 +217,8 @@ function terminalErrorCode(
 export class ResponsesStreamReducer {
   private readonly items = new Map<number, InternalItem>();
   private readonly itemIndices = new Map<string, number>();
-  private readonly replacedItemIndices = new Set<number>();
+  private readonly doneReplacedItemIndices = new Set<number>();
+  private readonly compatibilityRemappedItemIndices = new Set<number>();
   private terminalStatus?: ResponsesTerminalStatus;
   private incompleteReason?: CompletionResult['incomplete_reason'];
   private usage?: ResponsesUsage;
@@ -564,7 +565,8 @@ export class ResponsesStreamReducer {
       replacesId &&
       (eventType !== 'response.output_item.done' ||
         this.compatibility.providerProfile !== 'github-copilot' ||
-        this.replacedItemIndices.has(outputIndex))
+        priorIndex !== undefined ||
+        this.doneReplacedItemIndices.has(outputIndex))
     ) {
       throw malformed(eventType, 'output item identity changed');
     }
@@ -579,7 +581,7 @@ export class ResponsesStreamReducer {
       }
     }
     const preserveAccumulated =
-      replacesId || this.replacedItemIndices.has(outputIndex);
+      replacesId || this.compatibilityRemappedItemIndices.has(outputIndex);
 
     let item: InternalItem;
     if (type === 'message') {
@@ -701,7 +703,8 @@ export class ResponsesStreamReducer {
     this.items.set(outputIndex, item);
     this.itemIndices.set(id, outputIndex);
     if (replacesId) {
-      this.replacedItemIndices.add(outputIndex);
+      this.doneReplacedItemIndices.add(outputIndex);
+      this.compatibilityRemappedItemIndices.add(outputIndex);
     }
   }
 
@@ -754,8 +757,20 @@ export class ResponsesStreamReducer {
     const outputIndex = requiredIndex(event, 'output_index', eventType);
     const itemId = requiredString(event, 'item_id', eventType);
     const item = this.items.get(outputIndex);
-    if (!item || item.id !== itemId || item.type !== expected) {
+    if (!item || item.type !== expected) {
       throw malformed(eventType, `event does not match a ${expected} item`);
+    }
+    if (item.id !== itemId) {
+      const priorIndex = this.itemIndices.get(itemId);
+      if (
+        this.compatibility.providerProfile !== 'github-copilot' ||
+        priorIndex !== undefined
+      ) {
+        throw malformed(eventType, `event does not match a ${expected} item`);
+      }
+      item.id = itemId;
+      this.itemIndices.set(itemId, outputIndex);
+      this.compatibilityRemappedItemIndices.add(outputIndex);
     }
     return item;
   }
