@@ -75,9 +75,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "CPU"
-        ],
+        "devices": ["CPU"],
         "n_gpu_layers": 0
       },
       "settings_overrides": {
@@ -148,9 +146,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "GPUOpenCL"
-        ],
+        "devices": ["GPUOpenCL"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -237,9 +233,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "HTP*"
-        ],
+        "devices": ["HTP*"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -309,9 +303,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "CPU"
-        ],
+        "devices": ["CPU"],
         "n_gpu_layers": 0
       },
       "settings_overrides": {
@@ -382,9 +374,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "GPUOpenCL"
-        ],
+        "devices": ["GPUOpenCL"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -471,9 +461,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "HTP*"
-        ],
+        "devices": ["HTP*"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -543,9 +531,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "CPU"
-        ],
+        "devices": ["CPU"],
         "n_gpu_layers": 0
       },
       "settings_overrides": {
@@ -616,9 +602,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "GPUOpenCL"
-        ],
+        "devices": ["GPUOpenCL"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -705,9 +689,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "HTP*"
-        ],
+        "devices": ["HTP*"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -777,9 +759,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "CPU"
-        ],
+        "devices": ["CPU"],
         "n_gpu_layers": 0
       },
       "settings_overrides": {
@@ -850,9 +830,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "GPUOpenCL"
-        ],
+        "devices": ["GPUOpenCL"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -945,9 +923,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "HTP*"
-        ],
+        "devices": ["HTP*"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -1017,9 +993,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "CPU"
-        ],
+        "devices": ["CPU"],
         "n_gpu_layers": 0
       },
       "settings_overrides": {
@@ -1090,9 +1064,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "GPUOpenCL"
-        ],
+        "devices": ["GPUOpenCL"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -1179,9 +1151,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "HTP*"
-        ],
+        "devices": ["HTP*"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -1251,9 +1221,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "CPU"
-        ],
+        "devices": ["CPU"],
         "n_gpu_layers": 0
       },
       "settings_overrides": {
@@ -1324,9 +1292,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "GPUOpenCL"
-        ],
+        "devices": ["GPUOpenCL"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -1413,9 +1379,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "HTP*"
-        ],
+        "devices": ["HTP*"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -1485,9 +1449,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "CPU"
-        ],
+        "devices": ["CPU"],
         "n_gpu_layers": 0
       },
       "settings_overrides": {
@@ -1558,9 +1520,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "GPUOpenCL"
-        ],
+        "devices": ["GPUOpenCL"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -1647,9 +1607,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "HTP*"
-        ],
+        "devices": ["HTP*"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -1719,9 +1677,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "CPU"
-        ],
+        "devices": ["CPU"],
         "n_gpu_layers": 0
       },
       "settings_overrides": {
@@ -1792,9 +1748,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "GPUOpenCL"
-        ],
+        "devices": ["GPUOpenCL"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -1887,9 +1841,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "HTP*"
-        ],
+        "devices": ["HTP*"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -1959,9 +1911,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "CPU"
-        ],
+        "devices": ["CPU"],
         "n_gpu_layers": 0
       },
       "settings_overrides": {
@@ -2033,9 +1983,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "GPUOpenCL"
-        ],
+        "devices": ["GPUOpenCL"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -2128,9 +2076,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "HTP*"
-        ],
+        "devices": ["HTP*"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -2200,9 +2146,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "CPU"
-        ],
+        "devices": ["CPU"],
         "n_gpu_layers": 0
       },
       "settings_overrides": {
@@ -2274,9 +2218,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "GPUOpenCL"
-        ],
+        "devices": ["GPUOpenCL"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -2369,9 +2311,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "HTP*"
-        ],
+        "devices": ["HTP*"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -2441,9 +2381,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "CPU"
-        ],
+        "devices": ["CPU"],
         "n_gpu_layers": 0
       },
       "settings_overrides": {
@@ -2515,9 +2453,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "GPUOpenCL"
-        ],
+        "devices": ["GPUOpenCL"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -2610,9 +2546,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "HTP*"
-        ],
+        "devices": ["HTP*"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -2682,9 +2616,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "CPU"
-        ],
+        "devices": ["CPU"],
         "n_gpu_layers": 0
       },
       "settings_overrides": {
@@ -2755,9 +2687,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "GPUOpenCL"
-        ],
+        "devices": ["GPUOpenCL"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -2850,9 +2780,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "HTP*"
-        ],
+        "devices": ["HTP*"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -2922,9 +2850,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "CPU"
-        ],
+        "devices": ["CPU"],
         "n_gpu_layers": 0
       },
       "settings_overrides": {
@@ -2995,9 +2921,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "GPUOpenCL"
-        ],
+        "devices": ["GPUOpenCL"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -3090,9 +3014,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "HTP*"
-        ],
+        "devices": ["HTP*"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -3162,9 +3084,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "CPU"
-        ],
+        "devices": ["CPU"],
         "n_gpu_layers": 0
       },
       "settings_overrides": {
@@ -3235,9 +3155,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "GPUOpenCL"
-        ],
+        "devices": ["GPUOpenCL"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -3330,9 +3248,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "HTP*"
-        ],
+        "devices": ["HTP*"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -3402,9 +3318,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "CPU"
-        ],
+        "devices": ["CPU"],
         "n_gpu_layers": 0
       },
       "settings_overrides": {
@@ -3475,9 +3389,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "GPUOpenCL"
-        ],
+        "devices": ["GPUOpenCL"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -3570,9 +3482,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "HTP*"
-        ],
+        "devices": ["HTP*"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -3642,9 +3552,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "CPU"
-        ],
+        "devices": ["CPU"],
         "n_gpu_layers": 0
       },
       "settings_overrides": {
@@ -3715,9 +3623,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "GPUOpenCL"
-        ],
+        "devices": ["GPUOpenCL"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -3810,9 +3716,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "HTP*"
-        ],
+        "devices": ["HTP*"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -3882,9 +3786,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "CPU"
-        ],
+        "devices": ["CPU"],
         "n_gpu_layers": 0
       },
       "settings_overrides": {
@@ -3955,9 +3857,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "GPUOpenCL"
-        ],
+        "devices": ["GPUOpenCL"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -4041,9 +3941,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "HTP*"
-        ],
+        "devices": ["HTP*"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -4113,9 +4011,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "CPU"
-        ],
+        "devices": ["CPU"],
         "n_gpu_layers": 0
       },
       "settings_overrides": {
@@ -4186,9 +4082,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "GPUOpenCL"
-        ],
+        "devices": ["GPUOpenCL"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -4272,9 +4166,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "HTP*"
-        ],
+        "devices": ["HTP*"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -4344,9 +4236,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "CPU"
-        ],
+        "devices": ["CPU"],
         "n_gpu_layers": 0
       },
       "settings_overrides": {
@@ -4417,9 +4307,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "GPUOpenCL"
-        ],
+        "devices": ["GPUOpenCL"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -4503,9 +4391,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "HTP*"
-        ],
+        "devices": ["HTP*"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -4575,9 +4461,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "CPU"
-        ],
+        "devices": ["CPU"],
         "n_gpu_layers": 0
       },
       "settings_overrides": {
@@ -4648,9 +4532,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "GPUOpenCL"
-        ],
+        "devices": ["GPUOpenCL"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -4740,9 +4622,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "HTP*"
-        ],
+        "devices": ["HTP*"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -4812,9 +4692,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "CPU"
-        ],
+        "devices": ["CPU"],
         "n_gpu_layers": 0
       },
       "settings_overrides": {
@@ -4885,9 +4763,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "GPUOpenCL"
-        ],
+        "devices": ["GPUOpenCL"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -4971,9 +4847,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "HTP*"
-        ],
+        "devices": ["HTP*"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -5043,9 +4917,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "CPU"
-        ],
+        "devices": ["CPU"],
         "n_gpu_layers": 0
       },
       "settings_overrides": {
@@ -5116,9 +4988,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "GPUOpenCL"
-        ],
+        "devices": ["GPUOpenCL"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -5202,9 +5072,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "HTP*"
-        ],
+        "devices": ["HTP*"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -5274,9 +5142,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "CPU"
-        ],
+        "devices": ["CPU"],
         "n_gpu_layers": 0
       },
       "settings_overrides": {
@@ -5347,9 +5213,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "GPUOpenCL"
-        ],
+        "devices": ["GPUOpenCL"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -5439,9 +5303,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "HTP*"
-        ],
+        "devices": ["HTP*"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -5511,9 +5373,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "CPU"
-        ],
+        "devices": ["CPU"],
         "n_gpu_layers": 0
       },
       "settings_overrides": {
@@ -5584,9 +5444,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "GPUOpenCL"
-        ],
+        "devices": ["GPUOpenCL"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -5676,9 +5534,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "HTP*"
-        ],
+        "devices": ["HTP*"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -5748,9 +5604,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "CPU"
-        ],
+        "devices": ["CPU"],
         "n_gpu_layers": 0
       },
       "settings_overrides": {
@@ -5821,9 +5675,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "GPUOpenCL"
-        ],
+        "devices": ["GPUOpenCL"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -5915,9 +5767,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "HTP*"
-        ],
+        "devices": ["HTP*"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -5987,9 +5837,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "CPU"
-        ],
+        "devices": ["CPU"],
         "n_gpu_layers": 0
       },
       "settings_overrides": {
@@ -6060,9 +5908,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "GPUOpenCL"
-        ],
+        "devices": ["GPUOpenCL"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -6148,9 +5994,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "HTP*"
-        ],
+        "devices": ["HTP*"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -6220,9 +6064,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "CPU"
-        ],
+        "devices": ["CPU"],
         "n_gpu_layers": 0
       },
       "settings_overrides": {
@@ -6293,9 +6135,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "GPUOpenCL"
-        ],
+        "devices": ["GPUOpenCL"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -6381,9 +6221,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "HTP*"
-        ],
+        "devices": ["HTP*"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -6453,9 +6291,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "CPU"
-        ],
+        "devices": ["CPU"],
         "n_gpu_layers": 0
       },
       "settings_overrides": {
@@ -6526,9 +6362,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "GPUOpenCL"
-        ],
+        "devices": ["GPUOpenCL"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -6614,9 +6448,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "HTP*"
-        ],
+        "devices": ["HTP*"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -6686,9 +6518,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "CPU"
-        ],
+        "devices": ["CPU"],
         "n_gpu_layers": 0
       },
       "settings_overrides": {
@@ -6759,9 +6589,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "GPUOpenCL"
-        ],
+        "devices": ["GPUOpenCL"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -6853,9 +6681,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "HTP*"
-        ],
+        "devices": ["HTP*"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -6925,9 +6751,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "CPU"
-        ],
+        "devices": ["CPU"],
         "n_gpu_layers": 0
       },
       "settings_overrides": {
@@ -6998,9 +6822,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "GPUOpenCL"
-        ],
+        "devices": ["GPUOpenCL"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -7087,9 +6909,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "HTP*"
-        ],
+        "devices": ["HTP*"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -7159,9 +6979,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "CPU"
-        ],
+        "devices": ["CPU"],
         "n_gpu_layers": 0
       },
       "settings_overrides": {
@@ -7232,9 +7050,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "GPUOpenCL"
-        ],
+        "devices": ["GPUOpenCL"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -7321,9 +7137,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "HTP*"
-        ],
+        "devices": ["HTP*"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -7393,9 +7207,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "CPU"
-        ],
+        "devices": ["CPU"],
         "n_gpu_layers": 0
       },
       "settings_overrides": {
@@ -7466,9 +7278,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "GPUOpenCL"
-        ],
+        "devices": ["GPUOpenCL"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -7555,9 +7365,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "HTP*"
-        ],
+        "devices": ["HTP*"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -7627,9 +7435,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "CPU"
-        ],
+        "devices": ["CPU"],
         "n_gpu_layers": 0
       },
       "settings_overrides": {
@@ -7700,9 +7506,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "GPUOpenCL"
-        ],
+        "devices": ["GPUOpenCL"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -7795,9 +7599,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "HTP*"
-        ],
+        "devices": ["HTP*"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -7867,9 +7669,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "CPU"
-        ],
+        "devices": ["CPU"],
         "n_gpu_layers": 0
       },
       "settings_overrides": {
@@ -7940,9 +7740,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "GPUOpenCL"
-        ],
+        "devices": ["GPUOpenCL"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -8029,9 +7827,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "HTP*"
-        ],
+        "devices": ["HTP*"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -8101,9 +7897,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "CPU"
-        ],
+        "devices": ["CPU"],
         "n_gpu_layers": 0
       },
       "settings_overrides": {
@@ -8174,9 +7968,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "GPUOpenCL"
-        ],
+        "devices": ["GPUOpenCL"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -8263,9 +8055,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "HTP*"
-        ],
+        "devices": ["HTP*"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -8335,9 +8125,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "CPU"
-        ],
+        "devices": ["CPU"],
         "n_gpu_layers": 0
       },
       "settings_overrides": {
@@ -8408,9 +8196,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "GPUOpenCL"
-        ],
+        "devices": ["GPUOpenCL"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -8497,9 +8283,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "HTP*"
-        ],
+        "devices": ["HTP*"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -8569,9 +8353,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "CPU"
-        ],
+        "devices": ["CPU"],
         "n_gpu_layers": 0
       },
       "settings_overrides": {
@@ -8642,9 +8424,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "GPUOpenCL"
-        ],
+        "devices": ["GPUOpenCL"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -8737,9 +8517,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "HTP*"
-        ],
+        "devices": ["HTP*"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -8809,9 +8587,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "CPU"
-        ],
+        "devices": ["CPU"],
         "n_gpu_layers": 0
       },
       "settings_overrides": {
@@ -8882,9 +8658,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "GPUOpenCL"
-        ],
+        "devices": ["GPUOpenCL"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -8971,9 +8745,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "HTP*"
-        ],
+        "devices": ["HTP*"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -9043,9 +8815,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "CPU"
-        ],
+        "devices": ["CPU"],
         "n_gpu_layers": 0
       },
       "settings_overrides": {
@@ -9116,9 +8886,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "GPUOpenCL"
-        ],
+        "devices": ["GPUOpenCL"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -9205,9 +8973,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "HTP*"
-        ],
+        "devices": ["HTP*"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -9277,9 +9043,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "CPU"
-        ],
+        "devices": ["CPU"],
         "n_gpu_layers": 0
       },
       "settings_overrides": {
@@ -9350,9 +9114,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "GPUOpenCL"
-        ],
+        "devices": ["GPUOpenCL"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -9439,9 +9201,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "HTP*"
-        ],
+        "devices": ["HTP*"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -9511,9 +9271,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "CPU"
-        ],
+        "devices": ["CPU"],
         "n_gpu_layers": 0
       },
       "settings_overrides": {
@@ -9584,9 +9342,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "GPUOpenCL"
-        ],
+        "devices": ["GPUOpenCL"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -9679,9 +9435,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "HTP*"
-        ],
+        "devices": ["HTP*"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -9751,9 +9505,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "CPU"
-        ],
+        "devices": ["CPU"],
         "n_gpu_layers": 0
       },
       "settings_overrides": {
@@ -9824,9 +9576,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "GPUOpenCL"
-        ],
+        "devices": ["GPUOpenCL"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -9913,9 +9663,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "HTP*"
-        ],
+        "devices": ["HTP*"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -9985,9 +9733,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "CPU"
-        ],
+        "devices": ["CPU"],
         "n_gpu_layers": 0
       },
       "settings_overrides": {
@@ -10058,9 +9804,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "GPUOpenCL"
-        ],
+        "devices": ["GPUOpenCL"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -10147,9 +9891,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "HTP*"
-        ],
+        "devices": ["HTP*"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -10219,9 +9961,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "CPU"
-        ],
+        "devices": ["CPU"],
         "n_gpu_layers": 0
       },
       "settings_overrides": {
@@ -10292,9 +10032,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "GPUOpenCL"
-        ],
+        "devices": ["GPUOpenCL"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -10381,9 +10119,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "HTP*"
-        ],
+        "devices": ["HTP*"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -10453,9 +10189,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "CPU"
-        ],
+        "devices": ["CPU"],
         "n_gpu_layers": 0
       },
       "settings_overrides": {
@@ -10526,9 +10260,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "GPUOpenCL"
-        ],
+        "devices": ["GPUOpenCL"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -10621,9 +10353,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "HTP*"
-        ],
+        "devices": ["HTP*"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -10693,9 +10423,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "CPU"
-        ],
+        "devices": ["CPU"],
         "n_gpu_layers": 0
       },
       "settings_overrides": {
@@ -10766,9 +10494,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "GPUOpenCL"
-        ],
+        "devices": ["GPUOpenCL"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -10855,9 +10581,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "HTP*"
-        ],
+        "devices": ["HTP*"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -10927,9 +10651,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "CPU"
-        ],
+        "devices": ["CPU"],
         "n_gpu_layers": 0
       },
       "settings_overrides": {
@@ -11000,9 +10722,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "GPUOpenCL"
-        ],
+        "devices": ["GPUOpenCL"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -11089,9 +10809,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "HTP*"
-        ],
+        "devices": ["HTP*"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -11161,9 +10879,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "CPU"
-        ],
+        "devices": ["CPU"],
         "n_gpu_layers": 0
       },
       "settings_overrides": {
@@ -11234,9 +10950,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "GPUOpenCL"
-        ],
+        "devices": ["GPUOpenCL"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -11323,9 +11037,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "HTP*"
-        ],
+        "devices": ["HTP*"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -11395,9 +11107,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "CPU"
-        ],
+        "devices": ["CPU"],
         "n_gpu_layers": 0
       },
       "settings_overrides": {
@@ -11468,9 +11178,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "GPUOpenCL"
-        ],
+        "devices": ["GPUOpenCL"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -11563,9 +11271,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "HTP*"
-        ],
+        "devices": ["HTP*"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -11635,9 +11341,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "CPU"
-        ],
+        "devices": ["CPU"],
         "n_gpu_layers": 0
       },
       "settings_overrides": {
@@ -11708,9 +11412,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "GPUOpenCL"
-        ],
+        "devices": ["GPUOpenCL"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -11797,9 +11499,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "HTP*"
-        ],
+        "devices": ["HTP*"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -11869,9 +11569,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "CPU"
-        ],
+        "devices": ["CPU"],
         "n_gpu_layers": 0
       },
       "settings_overrides": {
@@ -11942,9 +11640,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "GPUOpenCL"
-        ],
+        "devices": ["GPUOpenCL"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -12031,9 +11727,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "HTP*"
-        ],
+        "devices": ["HTP*"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -12103,9 +11797,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "CPU"
-        ],
+        "devices": ["CPU"],
         "n_gpu_layers": 0
       },
       "settings_overrides": {
@@ -12176,9 +11868,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "GPUOpenCL"
-        ],
+        "devices": ["GPUOpenCL"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -12265,9 +11955,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "HTP*"
-        ],
+        "devices": ["HTP*"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -12337,9 +12025,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "CPU"
-        ],
+        "devices": ["CPU"],
         "n_gpu_layers": 0
       },
       "settings_overrides": {
@@ -12410,9 +12096,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "GPUOpenCL"
-        ],
+        "devices": ["GPUOpenCL"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -12505,9 +12189,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "HTP*"
-        ],
+        "devices": ["HTP*"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -12577,9 +12259,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "CPU"
-        ],
+        "devices": ["CPU"],
         "n_gpu_layers": 0
       },
       "settings_overrides": {
@@ -12650,9 +12330,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "GPUOpenCL"
-        ],
+        "devices": ["GPUOpenCL"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -12739,9 +12417,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "HTP*"
-        ],
+        "devices": ["HTP*"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -12811,9 +12487,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "CPU"
-        ],
+        "devices": ["CPU"],
         "n_gpu_layers": 0
       },
       "settings_overrides": {
@@ -12884,9 +12558,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "GPUOpenCL"
-        ],
+        "devices": ["GPUOpenCL"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -12973,9 +12645,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "HTP*"
-        ],
+        "devices": ["HTP*"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -13045,9 +12715,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "CPU"
-        ],
+        "devices": ["CPU"],
         "n_gpu_layers": 0
       },
       "settings_overrides": {
@@ -13118,9 +12786,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "GPUOpenCL"
-        ],
+        "devices": ["GPUOpenCL"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -13207,9 +12873,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "HTP*"
-        ],
+        "devices": ["HTP*"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -13279,9 +12943,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "CPU"
-        ],
+        "devices": ["CPU"],
         "n_gpu_layers": 0
       },
       "settings_overrides": {
@@ -13352,9 +13014,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "GPUOpenCL"
-        ],
+        "devices": ["GPUOpenCL"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -13447,9 +13107,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "HTP*"
-        ],
+        "devices": ["HTP*"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -13519,9 +13177,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "CPU"
-        ],
+        "devices": ["CPU"],
         "n_gpu_layers": 0
       },
       "settings_overrides": {
@@ -13592,9 +13248,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "GPUOpenCL"
-        ],
+        "devices": ["GPUOpenCL"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -13681,9 +13335,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "HTP*"
-        ],
+        "devices": ["HTP*"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -13753,9 +13405,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "CPU"
-        ],
+        "devices": ["CPU"],
         "n_gpu_layers": 0
       },
       "settings_overrides": {
@@ -13826,9 +13476,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "GPUOpenCL"
-        ],
+        "devices": ["GPUOpenCL"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -13915,9 +13563,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "HTP*"
-        ],
+        "devices": ["HTP*"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -13987,9 +13633,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "CPU"
-        ],
+        "devices": ["CPU"],
         "n_gpu_layers": 0
       },
       "settings_overrides": {
@@ -14060,9 +13704,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "GPUOpenCL"
-        ],
+        "devices": ["GPUOpenCL"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -14149,9 +13791,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "HTP*"
-        ],
+        "devices": ["HTP*"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -14221,9 +13861,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "CPU"
-        ],
+        "devices": ["CPU"],
         "n_gpu_layers": 0
       },
       "settings_overrides": {
@@ -14294,9 +13932,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "GPUOpenCL"
-        ],
+        "devices": ["GPUOpenCL"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -14389,9 +14025,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "HTP*"
-        ],
+        "devices": ["HTP*"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -14461,9 +14095,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "CPU"
-        ],
+        "devices": ["CPU"],
         "n_gpu_layers": 0
       },
       "settings_overrides": {
@@ -14534,9 +14166,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "GPUOpenCL"
-        ],
+        "devices": ["GPUOpenCL"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -14623,9 +14253,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "HTP*"
-        ],
+        "devices": ["HTP*"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -14695,9 +14323,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "CPU"
-        ],
+        "devices": ["CPU"],
         "n_gpu_layers": 0
       },
       "settings_overrides": {
@@ -14768,9 +14394,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "GPUOpenCL"
-        ],
+        "devices": ["GPUOpenCL"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -14863,9 +14487,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "HTP*"
-        ],
+        "devices": ["HTP*"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -14935,9 +14557,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "CPU"
-        ],
+        "devices": ["CPU"],
         "n_gpu_layers": 0
       },
       "settings_overrides": {
@@ -15008,9 +14628,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "GPUOpenCL"
-        ],
+        "devices": ["GPUOpenCL"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -15103,9 +14721,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "HTP*"
-        ],
+        "devices": ["HTP*"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -15175,9 +14791,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "CPU"
-        ],
+        "devices": ["CPU"],
         "n_gpu_layers": 0
       },
       "settings_overrides": {
@@ -15248,9 +14862,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "GPUOpenCL"
-        ],
+        "devices": ["GPUOpenCL"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -15343,9 +14955,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "HTP*"
-        ],
+        "devices": ["HTP*"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -15415,9 +15025,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "CPU"
-        ],
+        "devices": ["CPU"],
         "n_gpu_layers": 0
       },
       "settings_overrides": {
@@ -15488,9 +15096,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "GPUOpenCL"
-        ],
+        "devices": ["GPUOpenCL"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -15583,9 +15189,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "HTP*"
-        ],
+        "devices": ["HTP*"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -15655,9 +15259,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "CPU"
-        ],
+        "devices": ["CPU"],
         "n_gpu_layers": 0
       },
       "settings_overrides": {
@@ -15728,9 +15330,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "GPUOpenCL"
-        ],
+        "devices": ["GPUOpenCL"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -15823,9 +15423,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "HTP*"
-        ],
+        "devices": ["HTP*"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -15895,9 +15493,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "CPU"
-        ],
+        "devices": ["CPU"],
         "n_gpu_layers": 0
       },
       "settings_overrides": {
@@ -15968,9 +15564,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "GPUOpenCL"
-        ],
+        "devices": ["GPUOpenCL"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -16063,9 +15657,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "HTP*"
-        ],
+        "devices": ["HTP*"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -16135,9 +15727,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "CPU"
-        ],
+        "devices": ["CPU"],
         "n_gpu_layers": 0
       },
       "settings_overrides": {
@@ -16208,9 +15798,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "GPUOpenCL"
-        ],
+        "devices": ["GPUOpenCL"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -16303,9 +15891,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "HTP*"
-        ],
+        "devices": ["HTP*"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -16375,9 +15961,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "CPU"
-        ],
+        "devices": ["CPU"],
         "n_gpu_layers": 0
       },
       "settings_overrides": {
@@ -16448,9 +16032,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "GPUOpenCL"
-        ],
+        "devices": ["GPUOpenCL"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -16537,9 +16119,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "HTP*"
-        ],
+        "devices": ["HTP*"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -16609,9 +16189,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "CPU"
-        ],
+        "devices": ["CPU"],
         "n_gpu_layers": 0
       },
       "settings_overrides": {
@@ -16682,9 +16260,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "GPUOpenCL"
-        ],
+        "devices": ["GPUOpenCL"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -16777,9 +16353,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "HTP*"
-        ],
+        "devices": ["HTP*"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -16849,9 +16423,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "CPU"
-        ],
+        "devices": ["CPU"],
         "n_gpu_layers": 0
       },
       "settings_overrides": {
@@ -16922,9 +16494,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "GPUOpenCL"
-        ],
+        "devices": ["GPUOpenCL"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -17017,9 +16587,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "HTP*"
-        ],
+        "devices": ["HTP*"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -17089,9 +16657,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "CPU"
-        ],
+        "devices": ["CPU"],
         "n_gpu_layers": 0
       },
       "settings_overrides": {
@@ -17162,9 +16728,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "GPUOpenCL"
-        ],
+        "devices": ["GPUOpenCL"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -17257,9 +16821,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "HTP*"
-        ],
+        "devices": ["HTP*"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -17329,9 +16891,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "CPU"
-        ],
+        "devices": ["CPU"],
         "n_gpu_layers": 0
       },
       "settings_overrides": {
@@ -17402,9 +16962,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "GPUOpenCL"
-        ],
+        "devices": ["GPUOpenCL"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -17497,9 +17055,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "HTP*"
-        ],
+        "devices": ["HTP*"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -17569,9 +17125,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "CPU"
-        ],
+        "devices": ["CPU"],
         "n_gpu_layers": 0
       },
       "settings_overrides": {
@@ -17642,9 +17196,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "GPUOpenCL"
-        ],
+        "devices": ["GPUOpenCL"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -17737,9 +17289,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "HTP*"
-        ],
+        "devices": ["HTP*"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -17809,9 +17359,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "CPU"
-        ],
+        "devices": ["CPU"],
         "n_gpu_layers": 0
       },
       "settings_overrides": {
@@ -17882,9 +17430,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "GPUOpenCL"
-        ],
+        "devices": ["GPUOpenCL"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -17977,9 +17523,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "HTP*"
-        ],
+        "devices": ["HTP*"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -18049,9 +17593,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "CPU"
-        ],
+        "devices": ["CPU"],
         "n_gpu_layers": 0
       },
       "settings_overrides": {
@@ -18122,9 +17664,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "GPUOpenCL"
-        ],
+        "devices": ["GPUOpenCL"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -18217,9 +17757,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "HTP*"
-        ],
+        "devices": ["HTP*"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -18289,9 +17827,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "CPU"
-        ],
+        "devices": ["CPU"],
         "n_gpu_layers": 0
       },
       "settings_overrides": {
@@ -18362,9 +17898,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "GPUOpenCL"
-        ],
+        "devices": ["GPUOpenCL"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -18451,9 +17985,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "HTP*"
-        ],
+        "devices": ["HTP*"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -18523,9 +18055,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "CPU"
-        ],
+        "devices": ["CPU"],
         "n_gpu_layers": 0
       },
       "settings_overrides": {
@@ -18596,9 +18126,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "GPUOpenCL"
-        ],
+        "devices": ["GPUOpenCL"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -18685,9 +18213,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "HTP*"
-        ],
+        "devices": ["HTP*"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -18757,9 +18283,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "CPU"
-        ],
+        "devices": ["CPU"],
         "n_gpu_layers": 0
       },
       "settings_overrides": {
@@ -18830,9 +18354,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "GPUOpenCL"
-        ],
+        "devices": ["GPUOpenCL"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -18925,9 +18447,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "HTP*"
-        ],
+        "devices": ["HTP*"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -18997,9 +18517,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "CPU"
-        ],
+        "devices": ["CPU"],
         "n_gpu_layers": 0
       },
       "settings_overrides": {
@@ -19070,9 +18588,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "GPUOpenCL"
-        ],
+        "devices": ["GPUOpenCL"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -19159,9 +18675,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "HTP*"
-        ],
+        "devices": ["HTP*"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -19231,9 +18745,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "CPU"
-        ],
+        "devices": ["CPU"],
         "n_gpu_layers": 0
       },
       "settings_overrides": {
@@ -19304,9 +18816,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "GPUOpenCL"
-        ],
+        "devices": ["GPUOpenCL"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -19393,9 +18903,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "HTP*"
-        ],
+        "devices": ["HTP*"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -19465,9 +18973,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "CPU"
-        ],
+        "devices": ["CPU"],
         "n_gpu_layers": 0
       },
       "settings_overrides": {
@@ -19538,9 +19044,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "GPUOpenCL"
-        ],
+        "devices": ["GPUOpenCL"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -19627,9 +19131,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "HTP*"
-        ],
+        "devices": ["HTP*"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -19699,9 +19201,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "CPU"
-        ],
+        "devices": ["CPU"],
         "n_gpu_layers": 0
       },
       "settings_overrides": {
@@ -19772,9 +19272,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "GPUOpenCL"
-        ],
+        "devices": ["GPUOpenCL"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {
@@ -19867,9 +19365,7 @@
         "kv_unified": true,
         "n_parallel": 1,
         "no_extra_bufts": false,
-        "devices": [
-          "HTP*"
-        ],
+        "devices": ["HTP*"],
         "n_gpu_layers": 99
       },
       "settings_overrides": {

@@ -99,7 +99,10 @@ describe('Benchmark Matrix', () => {
       if (typeof s === 'string') {
         lastObserved = s;
       }
-      if (s === 'complete' || (typeof s === 'string' && s.startsWith('error:'))) {
+      if (
+        s === 'complete' ||
+        (typeof s === 'string' && s.startsWith('error:'))
+      ) {
         terminal = s;
         break;
       }
@@ -118,7 +121,8 @@ describe('Benchmark Matrix', () => {
     // spec fills the top-level device/soc/commit/llama_rn/os fields the
     // screen has no clean way to know.
     const caps = (driver.capabilities || {}) as Record<string, any>;
-    report.device = caps.deviceModel || process.env.E2E_DEVICE_NAME || 'unknown';
+    report.device =
+      caps.deviceModel || process.env.E2E_DEVICE_NAME || 'unknown';
     report.soc = process.env.E2E_DEVICE_SOC || null;
     report.os_version =
       caps.platformVersion || process.env.E2E_PLATFORM_VERSION || 'unknown';

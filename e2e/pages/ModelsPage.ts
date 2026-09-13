@@ -147,7 +147,9 @@ export class ModelsPage extends BasePage {
    * the right card's button is tapped when several cards are present.
    */
   async openModelSettings(downloadFile: string): Promise<void> {
-    const container = browser.$(Selectors.modelCard.cardContainer(downloadFile));
+    const container = browser.$(
+      Selectors.modelCard.cardContainer(downloadFile),
+    );
     await container.waitForDisplayed({timeout: 30000});
     const settingsBtn = container.$(Selectors.modelCard.settingsButton);
     await settingsBtn.waitForDisplayed({timeout: 10000});

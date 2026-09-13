@@ -38,7 +38,12 @@ import {getBenchmarkMatrix} from '../fixtures/benchmark-models';
 const REMOTE_PACKAGE = 'com.pocketpalai.e2e';
 const REMOTE_DIR = `/sdcard/Android/data/${REMOTE_PACKAGE}/files`;
 const REMOTE_PATH = `${REMOTE_DIR}/bench-config.json`;
-const DEFAULT_OUT = path.join(__dirname, '..', 'debug-output', 'bench-config.json');
+const DEFAULT_OUT = path.join(
+  __dirname,
+  '..',
+  'debug-output',
+  'bench-config.json',
+);
 
 interface Args {
   out: string;
@@ -167,7 +172,9 @@ function main() {
     execFileSync('adb', [...adbPrefix, 'push', args.out, REMOTE_PATH], {
       stdio: 'inherit',
     });
-    console.error(`pushed to ${REMOTE_PATH}${args.udid ? ` on ${args.udid}` : ''}`);
+    console.error(
+      `pushed to ${REMOTE_PATH}${args.udid ? ` on ${args.udid}` : ''}`,
+    );
   }
 }
 

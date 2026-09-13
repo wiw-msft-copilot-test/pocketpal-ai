@@ -8,12 +8,7 @@
 import {BasePage} from './BasePage';
 import {ChatPage} from './ChatPage';
 import {DrawerPage} from './DrawerPage';
-import {
-  Selectors,
-  byTestId,
-  byText,
-  byPartialText,
-} from '../helpers/selectors';
+import {Selectors, byTestId, byText, byPartialText} from '../helpers/selectors';
 import {Gestures} from '../helpers/gestures';
 
 declare const browser: WebdriverIO.Browser;
@@ -118,10 +113,7 @@ export class SettingsPage extends BasePage {
    * The Remote Servers card is below API Settings, needs several swipes.
    */
   async scrollToRemoteServers(): Promise<boolean> {
-    return Gestures.scrollToElement(
-      Selectors.serverConfig.addServerButton,
-      8,
-    );
+    return Gestures.scrollToElement(Selectors.serverConfig.addServerButton, 8);
   }
 
   /**

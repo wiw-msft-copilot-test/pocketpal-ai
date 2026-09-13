@@ -87,7 +87,12 @@ export function pullLatestReport(outDir: string, udid?: string): string {
   // the device-side shell expands the glob). Each token is its own argv
   // slot so neither REMOTE_DIR nor the udid can carry shell metacharacters
   // into the host shell.
-  const remote = adb(udid, 'shell', 'ls', `${REMOTE_DIR}/benchmark-report-*.json`)
+  const remote = adb(
+    udid,
+    'shell',
+    'ls',
+    `${REMOTE_DIR}/benchmark-report-*.json`,
+  )
     .split('\n')
     .filter(Boolean)
     .sort()

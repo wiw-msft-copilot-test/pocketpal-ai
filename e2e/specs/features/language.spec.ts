@@ -90,7 +90,22 @@ const LANGUAGE_ASSERTIONS: Record<
 };
 
 // Order: start with non-English, end with English to restore default state
-const LANGUAGE_ORDER = ['fa', 'he', 'id', 'ja', 'ko', 'ms', 'pl', 'pt', 'pt_BR', 'ru', 'uk', 'zh', 'zh_Hant', 'en'];
+const LANGUAGE_ORDER = [
+  'fa',
+  'he',
+  'id',
+  'ja',
+  'ko',
+  'ms',
+  'pl',
+  'pt',
+  'pt_BR',
+  'ru',
+  'uk',
+  'zh',
+  'zh_Hant',
+  'en',
+];
 
 describe('Language Switching', () => {
   let chatPage: ChatPage;

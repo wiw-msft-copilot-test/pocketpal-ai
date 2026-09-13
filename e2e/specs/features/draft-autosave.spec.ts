@@ -22,7 +22,11 @@ import {
   downloadAndLoadModel,
   waitForInferenceComplete,
 } from '../../helpers/model-actions';
-import {QUICK_TEST_MODEL, TIMEOUTS, getModelsToTest} from '../../fixtures/models';
+import {
+  QUICK_TEST_MODEL,
+  TIMEOUTS,
+  getModelsToTest,
+} from '../../fixtures/models';
 import {SCREENSHOT_DIR} from '../../wdio.shared.conf';
 
 declare const driver: WebdriverIO.Browser;

@@ -60,9 +60,7 @@ interface VisualCapturePal {
 }
 
 const capturesJson = process.env.VISUAL_CAPTURES;
-const captures: VisualCapture[] = capturesJson
-  ? JSON.parse(capturesJson)
-  : [];
+const captures: VisualCapture[] = capturesJson ? JSON.parse(capturesJson) : [];
 
 const palJson = process.env.VISUAL_CAPTURE_PAL;
 const palConfig: VisualCapturePal | null = palJson ? JSON.parse(palJson) : null;
@@ -97,8 +95,10 @@ describe('Visual Capture', () => {
     // Optional: create a Pal with talents enabled, then re-load the model
     // and select the Pal so the captures below exercise tool calls.
     if (palConfig) {
-      console.log(`Creating Pal "${palConfig.name}" with talents:`,
-        palConfig.talents);
+      console.log(
+        `Creating Pal "${palConfig.name}" with talents:`,
+        palConfig.talents,
+      );
       const drawerPage = new DrawerPage();
       const palSheetPage = new PalSheetPage();
 
@@ -138,7 +138,9 @@ describe('Visual Capture', () => {
 
       const modelsPage = new ModelsPage();
       await modelsPage.waitForReady();
-      const cardSelector = Selectors.modelCard.cardContainer(model.downloadFile);
+      const cardSelector = Selectors.modelCard.cardContainer(
+        model.downloadFile,
+      );
       const modelCard = browser.$(cardSelector);
       await modelCard.waitForDisplayed({timeout: 30000});
       const loadBtn = modelCard.$(Selectors.modelCard.loadButtonElement);
@@ -173,7 +175,10 @@ describe('Visual Capture', () => {
           path.join(VISUAL_DIR, `failure-${testName}-${timestamp}.png`),
         );
       } catch (e) {
-        console.error('Failed to capture failure screenshot:', (e as Error).message);
+        console.error(
+          'Failed to capture failure screenshot:',
+          (e as Error).message,
+        );
       }
     }
   });

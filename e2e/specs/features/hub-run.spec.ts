@@ -121,7 +121,9 @@ describe('Hub Run Deep Link', () => {
 
     // The full quant list is shown: the target file row exists.
     await hubSheet.scrollToFile(model.downloadFile);
-    const fileCard = browser.$(Selectors.modelDetails.fileCard(model.downloadFile));
+    const fileCard = browser.$(
+      Selectors.modelDetails.fileCard(model.downloadFile),
+    );
     await fileCard.waitForExist({timeout: TIMEOUTS.element});
 
     // Start the download for the small Q2_K file.
@@ -137,7 +139,9 @@ describe('Hub Run Deep Link', () => {
     await drawerPage.navigateToModels();
     await modelsPage.waitForReady();
 
-    const containerSelector = Selectors.modelCard.cardContainer(model.downloadFile);
+    const containerSelector = Selectors.modelCard.cardContainer(
+      model.downloadFile,
+    );
     const modelCardContainer = browser.$(containerSelector);
     await modelCardContainer.waitForDisplayed({timeout: TIMEOUTS.download});
 
@@ -179,10 +183,10 @@ describe('Hub Run Deep Link', () => {
 
     const aiMessage = browser.$(Selectors.chat.aiMessage);
     const textView = aiMessage.$(nativeTextElement());
-    const responseText = await textView
-      .getText()
-      .catch(() => '');
-    console.log(`\nHub Run Results:\n  Model: ${model.id}\n  Prompt: ${prompt}\n  Response: ${responseText}`);
+    const responseText = await textView.getText().catch(() => '');
+    console.log(
+      `\nHub Run Results:\n  Model: ${model.id}\n  Prompt: ${prompt}\n  Response: ${responseText}`,
+    );
     expect(responseText.length).toBeGreaterThan(0);
 
     // No error snackbar.

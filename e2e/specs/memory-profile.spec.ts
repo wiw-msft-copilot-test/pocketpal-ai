@@ -59,20 +59,34 @@ function getModelForTest(): ModelTestConfig {
 /**
  * Get device info from Appium capabilities (works with multiple devices).
  */
-function getDeviceInfo(): {device: string; os_version: string; platform: string} {
+function getDeviceInfo(): {
+  device: string;
+  os_version: string;
+  platform: string;
+} {
   const caps = (driver.capabilities || {}) as Record<string, any>;
   const isAndroid = (driver as any).isAndroid;
 
   if (isAndroid) {
     return {
-      device: caps['deviceModel'] || caps['deviceName'] || process.env.E2E_DEVICE_NAME || 'unknown',
-      os_version: caps['platformVersion'] || process.env.E2E_PLATFORM_VERSION || 'unknown',
+      device:
+        caps['deviceModel'] ||
+        caps['deviceName'] ||
+        process.env.E2E_DEVICE_NAME ||
+        'unknown',
+      os_version:
+        caps['platformVersion'] ||
+        process.env.E2E_PLATFORM_VERSION ||
+        'unknown',
       platform: 'android',
     };
   } else {
     return {
       device: caps['deviceName'] || process.env.E2E_DEVICE_NAME || 'unknown',
-      os_version: caps['platformVersion'] || process.env.E2E_PLATFORM_VERSION || 'unknown',
+      os_version:
+        caps['platformVersion'] ||
+        process.env.E2E_PLATFORM_VERSION ||
+        'unknown',
       platform: 'ios',
     };
   }
@@ -105,9 +119,10 @@ function buildReport(
   // Calculate peak memory (iOS: phys + metal, Android: pss)
   let peakBytes = 0;
   for (const snap of snapshots) {
-    const memBytes = snap.native.phys_footprint !== undefined
-      ? snap.native.phys_footprint + (snap.native.metal_allocated ?? 0)
-      : snap.native.pss_total ?? 0;
+    const memBytes =
+      snap.native.phys_footprint !== undefined
+        ? snap.native.phys_footprint + (snap.native.metal_allocated ?? 0)
+        : (snap.native.pss_total ?? 0);
     if (memBytes > peakBytes) {
       peakBytes = memBytes;
     }

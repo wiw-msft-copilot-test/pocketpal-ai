@@ -118,6 +118,9 @@ export const Selectors = {
     get modelsTab(): string {
       return byText('Models');
     },
+    get palsTab(): string {
+      return byText('Pals');
+    },
     get openIndicator(): string {
       return byTestId('drawer-item-chat');
     },
@@ -678,6 +681,15 @@ export const Selectors = {
     get addModelButton(): string {
       return byTestId('add-model-button');
     },
+    get protocolDropdown(): string {
+      return byTestId('api-protocol-dropdown');
+    },
+    protocolOption: (value: string): string =>
+      byTestId(`api-protocol-option-${value}`),
+    protocolRow: (modelId: string): string =>
+      byTestId(`remote-model-row-protocol-${modelId}`),
+    protocolWarning: (modelId: string): string =>
+      byTestId(`remote-model-row-warning-${modelId}`),
   },
 
   // Server details sheet (edit/delete server)

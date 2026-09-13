@@ -255,7 +255,8 @@ export function computeStats(wav: WavData, silenceFloor: number): AudioStats {
 
   const rms = Math.sqrt(sumSquares / n);
   const silenceRatio = silentFrames / n;
-  const leadingSilenceSec = firstLoud < 0 ? n / sampleRate : firstLoud / sampleRate;
+  const leadingSilenceSec =
+    firstLoud < 0 ? n / sampleRate : firstLoud / sampleRate;
   const trailingSilenceSec =
     lastLoud < 0 ? n / sampleRate : (n - 1 - lastLoud) / sampleRate;
 
@@ -314,12 +315,19 @@ export function runAsr(
   let raw: string;
   try {
     // -np prints only the transcript segments to stdout; stderr carries logs.
-    raw = execFileSync('whisper-cli', ['-m', model, '-l', lang, '-np', '-nf', file], {
-      encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'ignore'],
-    });
+    raw = execFileSync(
+      'whisper-cli',
+      ['-m', model, '-l', lang, '-np', '-nf', file],
+      {
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'ignore'],
+      },
+    );
   } catch (e) {
-    return {available: false, note: `whisper-cli failed: ${(e as Error).message}`};
+    return {
+      available: false,
+      note: `whisper-cli failed: ${(e as Error).message}`,
+    };
   }
 
   // whisper-cli emits "[start --> end]  text" lines; keep just the text.
@@ -377,8 +385,11 @@ export function analyzeFile(file: string, opts: AnalyzeOptions = {}): Verdict {
     );
   }
   if (stats.rmsDbfs < thresholds.minRmsDbfs) {
-    const shown = stats.rmsDbfs === NEG_INFINITY_DBFS ? '-inf' : stats.rmsDbfs.toFixed(1);
-    reasons.push(`RMS ${shown} dBFS below minimum ${thresholds.minRmsDbfs} dBFS`);
+    const shown =
+      stats.rmsDbfs === NEG_INFINITY_DBFS ? '-inf' : stats.rmsDbfs.toFixed(1);
+    reasons.push(
+      `RMS ${shown} dBFS below minimum ${thresholds.minRmsDbfs} dBFS`,
+    );
   }
 
   const hasSpeechLikeEnergy =
@@ -405,7 +416,10 @@ export function analyzeFile(file: string, opts: AnalyzeOptions = {}): Verdict {
     channels: wav.channels,
     bitDepth: wav.bitDepth,
     rms: round(stats.rms, 6),
-    rmsDbfs: stats.rmsDbfs === NEG_INFINITY_DBFS ? NEG_INFINITY_DBFS : round(stats.rmsDbfs, 2),
+    rmsDbfs:
+      stats.rmsDbfs === NEG_INFINITY_DBFS
+        ? NEG_INFINITY_DBFS
+        : round(stats.rmsDbfs, 2),
     peak: round(stats.peak, 6),
     silenceRatio: round(stats.silenceRatio, 4),
     leadingSilenceSec: round(stats.leadingSilenceSec, 3),
@@ -440,7 +454,9 @@ export function resolveInputs(input: string): string[] {
       return [];
     }
     const regex = new RegExp(
-      '^' + pattern.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*') + '$',
+      '^' +
+        pattern.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*') +
+        '$',
     );
     return fs
       .readdirSync(dir)
@@ -452,7 +468,10 @@ export function resolveInputs(input: string): string[] {
   return [input];
 }
 
-export function analyzeAll(files: string[], opts: AnalyzeOptions = {}): Summary {
+export function analyzeAll(
+  files: string[],
+  opts: AnalyzeOptions = {},
+): Summary {
   const verdicts = files.map(f => analyzeFile(f, opts));
   const passed = verdicts.filter(v => v.pass).length;
   return {
@@ -594,7 +613,8 @@ function main(): void {
   // Human-readable lines to stderr so JSON on stdout stays machine-clean.
   for (const v of summary.verdicts) {
     const flag = v.pass ? 'PASS' : 'FAIL';
-    const dbfs = v.rmsDbfs === NEG_INFINITY_DBFS ? '-inf' : v.rmsDbfs.toFixed(1);
+    const dbfs =
+      v.rmsDbfs === NEG_INFINITY_DBFS ? '-inf' : v.rmsDbfs.toFixed(1);
     console.error(
       `${flag}  ${path.basename(v.file)}  ${v.durationSec.toFixed(2)}s  ` +
         `${dbfs} dBFS  silence=${(v.silenceRatio * 100).toFixed(1)}%` +
