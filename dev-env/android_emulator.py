@@ -10,6 +10,8 @@ import sys
 import time
 import uuid
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from docker_cli import docker_command, resolve_docker
 
 DEFAULT_IMAGE = (
     "us-docker.pkg.dev/android-emulator-268719/images/"
@@ -47,19 +49,20 @@ def run(
 
 def docker_available() -> None:
     try:
-        run(["docker", "info"], capture=True, timeout=15)
-    except (
-        FileNotFoundError,
-        subprocess.CalledProcessError,
-        subprocess.TimeoutExpired,
-    ):
-        raise SystemExit("Docker is unavailable. Start Docker Desktop and try again.")
+        executable, is_windows = resolve_docker()
+        if is_windows:
+            print(
+                f"Using Windows Docker CLI fallback: {executable}",
+                file=sys.stderr,
+            )
+    except RuntimeError as error:
+        raise SystemExit(str(error)) from error
 
 
 def inspect_container(name: str) -> dict | None:
     try:
         result = subprocess.run(
-            ["docker", "inspect", name],
+            docker_command("inspect", name),
             text=True,
             capture_output=True,
             timeout=SUBPROCESS_TIMEOUT,
@@ -86,12 +89,12 @@ def inspect_container(name: str) -> dict | None:
 
 def pull_image(image: str) -> None:
     docker_available()
-    run(["docker", "pull", image])
+    run(docker_command("pull", image))
 
 
 def ensure_image(image: str) -> None:
     result = subprocess.run(
-        ["docker", "image", "inspect", image],
+        docker_command("image", "inspect", image),
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
     )
@@ -113,8 +116,7 @@ def ensure_adb_key(image: str) -> Path:
 
     android_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
     run(
-        [
-            "docker",
+        docker_command(
             "run",
             "--rm",
             "--user",
@@ -126,7 +128,7 @@ def ensure_adb_key(image: str) -> Path:
             image,
             "keygen",
             "/keys/adbkey",
-        ],
+        ),
         timeout=SUBPROCESS_TIMEOUT,
     )
     private_key.chmod(0o600)
@@ -139,15 +141,14 @@ def wait_for_boot(name: str, timeout: int) -> None:
     while time.monotonic() < deadline:
         try:
             result = subprocess.run(
-                [
-                    "docker",
+                docker_command(
                     "exec",
                     name,
                     ADB,
                     "shell",
                     "getprop",
                     "sys.boot_completed",
-                ],
+                ),
                 text=True,
                 capture_output=True,
                 timeout=SUBPROCESS_TIMEOUT,
@@ -156,28 +157,26 @@ def wait_for_boot(name: str, timeout: int) -> None:
             result = None
         if result and result.returncode == 0 and result.stdout.strip() == "1":
             version = run(
-                [
-                    "docker",
+                docker_command(
                     "exec",
                     name,
                     ADB,
                     "shell",
                     "getprop",
                     "ro.build.version.release",
-                ],
+                ),
                 capture=True,
                 timeout=SUBPROCESS_TIMEOUT,
             ).stdout.strip()
             api = run(
-                [
-                    "docker",
+                docker_command(
                     "exec",
                     name,
                     ADB,
                     "shell",
                     "getprop",
                     "ro.build.version.sdk",
-                ],
+                ),
                 capture=True,
                 timeout=SUBPROCESS_TIMEOUT,
             ).stdout.strip()
@@ -202,7 +201,7 @@ def start_container(args: argparse.Namespace) -> None:
                 f"{args.image!r}. Remove or rename it before continuing."
             )
         if not existing["State"]["Running"]:
-            run(["docker", "start", args.name])
+            run(docker_command("start", args.name))
         else:
             print(f"Container {args.name!r} is already running.")
         wait_for_boot(args.name, args.timeout)
@@ -216,8 +215,7 @@ def start_container(args: argparse.Namespace) -> None:
 
     adb_key = ensure_adb_key(args.image)
     run(
-        [
-            "docker",
+        docker_command(
             "run",
             "--detach",
             "--name",
@@ -231,7 +229,7 @@ def start_container(args: argparse.Namespace) -> None:
             "--publish",
             f"127.0.0.1:{args.webrtc_port}:8554",
             args.image,
-        ]
+        )
     )
     wait_for_boot(args.name, args.timeout)
 
@@ -242,7 +240,7 @@ def stop_container(args: argparse.Namespace) -> None:
     if not existing:
         raise SystemExit(f"Container {args.name!r} does not exist.")
     if existing["State"]["Running"]:
-        run(["docker", "stop", args.name])
+        run(docker_command("stop", args.name))
     else:
         print(f"Container {args.name!r} is already stopped.")
 
@@ -261,14 +259,14 @@ def show_status(args: argparse.Namespace) -> None:
     print(f"health: {health}")
     if state["Running"]:
         run(
-            ["docker", "exec", args.name, ADB, "devices", "-l"],
+            docker_command("exec", args.name, ADB, "devices", "-l"),
             timeout=SUBPROCESS_TIMEOUT,
         )
 
 
 def show_logs(args: argparse.Namespace) -> None:
     docker_available()
-    command = ["docker", "logs", "--tail", str(args.tail)]
+    command = docker_command("logs", "--tail", str(args.tail))
     if args.follow:
         command.append("--follow")
     command.append(args.name)
@@ -284,7 +282,7 @@ def adb_shell(
     capture: bool = True,
 ) -> subprocess.CompletedProcess[str]:
     return run(
-        ["docker", "exec", name, ADB, "shell", *arguments],
+        docker_command("exec", name, ADB, "shell", *arguments),
         capture=capture,
         timeout=SUBPROCESS_TIMEOUT,
     )
@@ -419,15 +417,14 @@ def install_apk(args: argparse.Namespace) -> None:
     copied = False
     primary_error: BaseException | None = None
     try:
-        run(["docker", "cp", str(apk), f"{args.name}:{destination}"])
+        run(docker_command("cp", str(apk), f"{args.name}:{destination}"))
         copied = True
-        install_command = [
-            "docker",
+        install_command = docker_command(
             "exec",
             args.name,
             ADB,
             "install",
-        ]
+        )
         if args.replace:
             install_command.append("-r")
         if args.grant_permissions:
@@ -443,7 +440,7 @@ def install_apk(args: argparse.Namespace) -> None:
         if copied:
             try:
                 run(
-                    ["docker", "exec", args.name, "rm", "-f", destination],
+                    docker_command("exec", args.name, "rm", "-f", destination),
                     capture=True,
                     timeout=SUBPROCESS_TIMEOUT,
                 )

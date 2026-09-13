@@ -19,6 +19,10 @@ This directory contains two dependency-free Python tools:
 
 Docker Desktop on macOS and Windows does not support the KVM setup required by
 this image. A Linux host or Linux VM with nested virtualization is required.
+When running inside WSL 2, the scripts normally use Docker Desktop's Linux
+socket. If that socket integration is missing but the Windows Docker engine is
+healthy, they automatically fall back to Docker Desktop's `docker.exe` and
+translate WSL file paths for APK copies and key mounts.
 
 ## Usage
 
@@ -193,3 +197,27 @@ run-specific clean-test emulator is always removed.
 
 Port `8554` exposes the emulator's gRPC/WebRTC service endpoint. It is not a
 standalone browser UI.
+
+## Troubleshooting Docker Desktop on WSL
+
+If the script reports Docker as unavailable, first verify the engine:
+
+```bash
+docker info
+```
+
+The scripts automatically try the standard Windows Docker Desktop CLI at
+`/mnt/c/Program Files/Docker/Docker/resources/bin/docker.exe` when the Linux
+socket is unavailable. You can select another executable explicitly:
+
+```bash
+POCKETPAL_DOCKER_CLI=/path/to/docker \
+  python3 dev-env/android_emulator.py status
+```
+
+If both paths fail, open **Docker Desktop → Settings → Resources → WSL
+Integration**, enable the current distribution, and select **Apply & restart**.
+Restarting WSL alone does not enable a disabled distribution integration.
+
+Do not run `docker desktop start` inside WSL when Docker Desktop is installed on
+Windows. That command targets the native Linux Docker Desktop installation.

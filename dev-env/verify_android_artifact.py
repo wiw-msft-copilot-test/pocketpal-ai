@@ -11,6 +11,8 @@ import time
 import xml.etree.ElementTree as ET
 import zipfile
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from docker_cli import docker_command
 
 REPOSITORY = "wiw-msft-copilot-test/pocketpal-ai"
 WORKFLOW = "e2e-tests.yml"
@@ -284,7 +286,7 @@ def adb(
     timeout: int = 30,
 ) -> subprocess.CompletedProcess[str]:
     return run(
-        ["docker", "exec", container, ADB, *arguments],
+        docker_command("exec", container, ADB, *arguments),
         capture=capture,
         timeout=timeout,
     )
@@ -388,10 +390,10 @@ def dump_ui(container: str, evidence_dir: Path, name: str) -> ET.Element:
     device_path = f"/sdcard/{name}.xml"
     adb(container, "shell", "uiautomator", "dump", device_path, timeout=60)
     xml = binary_output(
-        ["docker", "exec", container, ADB, "exec-out", "cat", device_path]
+        docker_command("exec", container, ADB, "exec-out", "cat", device_path)
     )
     image = binary_output(
-        ["docker", "exec", container, ADB, "exec-out", "screencap", "-p"]
+        docker_command("exec", container, ADB, "exec-out", "screencap", "-p")
     )
     (evidence_dir / f"{name}.xml").write_bytes(xml)
     (evidence_dir / f"{name}.png").write_bytes(image)
@@ -588,7 +590,7 @@ def clean_install(
 ) -> None:
     name = f"{base_container}-clean-{run_id}"
     existing = subprocess.run(
-        ["docker", "inspect", name],
+        docker_command("inspect", name),
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
         timeout=30,
@@ -624,12 +626,12 @@ def clean_install(
         capture_log(name, evidence_dir / "clean-logcat.txt")
     finally:
         subprocess.run(
-            ["docker", "stop", name],
+            docker_command("stop", name),
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         )
         subprocess.run(
-            ["docker", "rm", name],
+            docker_command("rm", name),
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         )
