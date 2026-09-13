@@ -1,0 +1,8 @@
+: keepalive
+event: response.output_text.delta
+data: {"type":"response.output_text.delta",
+data: "delta":"Hi 👋"}
+
+event: response.completed
+data:{"type":"response.completed","response":{"id":"resp_sanitized"}}
+
