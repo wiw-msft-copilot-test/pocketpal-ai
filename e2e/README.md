@@ -136,17 +136,19 @@ records exclude keys, headers, URLs, prompts, generated text, tools, images,
 and reasoning content. Count every live inference request against the
 approved test budget and disable the toggle after capture.
 
-Verified at source HEAD `d848bf3`:
+Verified at source HEAD `316f939`:
 
-- build run `34791789881` produced the final application APK from `d848bf3`;
+- build run `34795803130` produced the final application APK from `316f939`;
 - APK SHA-256:
-  `b77dc6d978c8b3a32b3ca98cf2bd78b95c854fce52e55dd29da4d8327b5659ff`;
-- hosted run `34791789881` passed API 35 installation, foreground checks,
+  `03b8cbd88a329035233526598c0acfc69e8f49829930eb5f446e608363874c73`;
+- hosted run `34795803130` passed API 35 installation, foreground checks,
   fixture tests, and Appium acceptance; and
 - the final APK completed a live GitHub Copilot Responses text request on the
-  retained API 30 emulator after `temperature` and `top_p` were set to provider
-  defaults. The provider rotates output-item IDs between stream events and
-  snapshots; the compatibility path preserves strict same-index/type checks.
+  retained API 30 emulator after model-level `temperature` and `top_p` overrides
+  were set to provider defaults and survived restart/reselection. Thinking-on
+  and cancellation were also verified with synthetic prompts. The provider
+  rotates output-item IDs between stream events and snapshots; the compatibility
+  path preserves strict same-index/type checks.
 
 iOS acceptance was not run because verification used Linux without Xcode.
 The deterministic fixtures verify PocketPal behavior and are not a GitHub API
