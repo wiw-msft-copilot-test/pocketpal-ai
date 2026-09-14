@@ -73,7 +73,11 @@ def inspect_container(name: str) -> dict | None:
         ) from error
     if result.returncode != 0:
         error = result.stderr.strip()
-        if "No such object:" in error or "No such container:" in error:
+        normalized_error = error.casefold()
+        if (
+            "no such object:" in normalized_error
+            or "no such container:" in normalized_error
+        ):
             return None
         raise SystemExit(
             f"Could not inspect Docker container {name!r}: "

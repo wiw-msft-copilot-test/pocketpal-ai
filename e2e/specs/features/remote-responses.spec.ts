@@ -214,9 +214,8 @@ describe('Remote Responses protocol', () => {
     await chatPage.selectPal('Scout');
     await chatPage.resetChat();
 
-    await browser
-      .$(byPartialText('Hi, I’m Scout.'))
-      .waitForExist({timeout: 10000});
+    const greeting = browser.$(Selectors.chat.greetingBubble);
+    await greeting.waitForExist({timeout: 10000});
     await browser
       .$(Selectors.chat.suggestedPromptChip(0))
       .waitForExist({timeout: 5000});

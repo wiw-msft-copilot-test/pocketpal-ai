@@ -360,6 +360,20 @@ export class ChatPage extends BasePage {
       }
     }
     await palItem.waitForDisplayed({timeout: 5000});
+    const location = await palItem.getLocation();
+    const size = await palItem.getSize();
+    const windowSize = await browser.getWindowSize();
+    if (location.y + size.height / 2 > windowSize.height * 0.72) {
+      await Gestures.swipe({
+        startXPercent: 0.5,
+        startYPercent: 0.68,
+        endXPercent: 0.5,
+        endYPercent: 0.42,
+        duration: 300,
+      });
+      await browser.pause(500);
+      await palItem.waitForDisplayed({timeout: 5000});
+    }
     await palItem.click();
     await browser.pause(500);
   }

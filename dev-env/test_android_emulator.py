@@ -103,6 +103,14 @@ class AndroidEmulatorTest(unittest.TestCase):
 
         self.assertIsNone(android_emulator.inspect_container("emulator"))
 
+    @mock.patch.object(android_emulator.subprocess, "run")
+    def test_missing_container_from_windows_cli_returns_none(self, run):
+        run.return_value = completed(
+            stderr="error: no such object: emulator", returncode=1
+        )
+
+        self.assertIsNone(android_emulator.inspect_container("emulator"))
+
     @mock.patch.object(android_emulator.time, "sleep")
     @mock.patch.object(android_emulator.time, "monotonic", side_effect=[0, 0, 2])
     @mock.patch.object(
