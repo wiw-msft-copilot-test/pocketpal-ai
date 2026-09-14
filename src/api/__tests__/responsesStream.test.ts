@@ -514,7 +514,7 @@ describe('ResponsesStreamReducer', () => {
         status: 'completed',
         output: [
           {
-            ...message('message-item-done', 'completed'),
+            ...message('message-terminal', 'completed'),
             content: [],
           },
         ],
@@ -524,10 +524,76 @@ describe('ResponsesStreamReducer', () => {
     const finalized = reducer.finish(binding);
     expect(finalized.result.content).toBe('rotated identity');
     expect(finalized.replay?.output[0]).toMatchObject({
-      id: 'message-item-done',
+      id: 'message-terminal',
       content: [{type: 'output_text', text: 'rotated identity'}],
     });
   });
+
+  it('rejects completed snapshot id rotation without the Copilot profile', () => {
+    const reducer = createResponsesStreamReducer();
+    reducer.reduce({
+      type: 'response.output_item.added',
+      output_index: 0,
+      item: message('message-added'),
+    });
+
+    expect(() =>
+      reducer.reduce({
+        type: 'response.completed',
+        response: {
+          status: 'completed',
+          output: [message('message-terminal', 'completed')],
+        },
+      }),
+    ).toThrow('output item identity changed');
+  });
+
+  it.each([
+    [
+      'wrong item type',
+      [{type: 'reasoning', id: 'reasoning-terminal', summary: []}],
+    ],
+    [
+      'conflicting output index',
+      [
+        message('message-one', 'completed'),
+        message('message-zero', 'completed'),
+      ],
+    ],
+    [
+      'duplicate terminal id',
+      [
+        message('message-terminal', 'completed'),
+        message('message-terminal', 'completed'),
+      ],
+    ],
+  ])(
+    'rejects Copilot completed snapshot rotation with %s',
+    (_label, output) => {
+      const reducer = createResponsesStreamReducer(undefined, {
+        providerProfile: 'github-copilot',
+      });
+      reducer.reduce({
+        type: 'response.output_item.added',
+        output_index: 0,
+        item: message('message-zero'),
+      });
+      if (output.length > 1) {
+        reducer.reduce({
+          type: 'response.output_item.added',
+          output_index: 1,
+          item: message('message-one'),
+        });
+      }
+
+      expect(() =>
+        reducer.reduce({
+          type: 'response.completed',
+          response: {status: 'completed', output},
+        }),
+      ).toThrow(ResponsesStreamProtocolError);
+    },
+  );
 
   it('rejects item-scoped id rotation without the Copilot profile', () => {
     const reducer = createResponsesStreamReducer();

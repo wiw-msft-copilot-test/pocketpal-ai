@@ -293,7 +293,7 @@ describe('streamResponses', () => {
           type: 'response.completed',
           response: {
             status: 'completed',
-            output: [{...message('live content'), id: 'message-done'}],
+            output: [{...message('live content'), id: 'message-terminal'}],
           },
         },
       ]
@@ -309,7 +309,7 @@ describe('streamResponses', () => {
           output: [
             {
               type: 'message',
-              id: 'message-done',
+              id: 'message-terminal',
               content: [{type: 'output_text', text: 'live content'}],
             },
           ],

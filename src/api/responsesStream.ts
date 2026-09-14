@@ -561,12 +561,14 @@ export class ResponsesStreamReducer {
       throw malformed(eventType, 'output item identity changed');
     }
     const replacesId = existing !== undefined && existing.id !== id;
+    const isOutputItemDone = eventType === 'response.output_item.done';
+    const isCompletedSnapshot = eventType === 'response.completed';
     if (
       replacesId &&
-      (eventType !== 'response.output_item.done' ||
+      ((!isOutputItemDone && !isCompletedSnapshot) ||
         this.compatibility.providerProfile !== 'github-copilot' ||
         priorIndex !== undefined ||
-        this.doneReplacedItemIndices.has(outputIndex))
+        (isOutputItemDone && this.doneReplacedItemIndices.has(outputIndex)))
     ) {
       throw malformed(eventType, 'output item identity changed');
     }
@@ -703,7 +705,9 @@ export class ResponsesStreamReducer {
     this.items.set(outputIndex, item);
     this.itemIndices.set(id, outputIndex);
     if (replacesId) {
-      this.doneReplacedItemIndices.add(outputIndex);
+      if (isOutputItemDone) {
+        this.doneReplacedItemIndices.add(outputIndex);
+      }
       this.compatibilityRemappedItemIndices.add(outputIndex);
     }
   }
