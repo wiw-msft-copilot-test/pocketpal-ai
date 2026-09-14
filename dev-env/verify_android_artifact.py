@@ -489,7 +489,19 @@ def verify_ui_policy(container: str, evidence_dir: Path) -> None:
     assert_absent(drawer_text, ("Pals", "PalsHub", "Sign In"), "Drawer")
 
     tap_control(container, drawer, text="Settings")
-    for _ in range(3):
+    required_settings = (
+        "Search provider",
+        "API key",
+        "Hugging Face Token",
+        "Set Token",
+    )
+    settings_text: set[str] = set()
+    settings = None
+    for page in range(8):
+        settings = dump_ui(container, evidence_dir, f"settings-{page}")
+        settings_text.update(ui_text(settings))
+        if all(text in settings_text for text in required_settings):
+            break
         adb(
             container,
             "shell",
@@ -502,13 +514,8 @@ def verify_ui_policy(container: str, evidence_dir: Path) -> None:
             "500",
         )
         time.sleep(1)
-    settings = dump_ui(container, evidence_dir, "settings")
-    settings_text = ui_text(settings)
-    assert_present(
-        settings_text,
-        ("Search provider", "API key", "Hugging Face Token", "Set Token"),
-        "Settings",
-    )
+    assert settings is not None
+    assert_present(settings_text, required_settings, "Settings")
     assert_absent(settings_text, ("PalsHub", "Sign In"), "Settings")
 
     tap_control(container, settings, resource_id="menu-button")
@@ -522,12 +529,28 @@ def verify_ui_policy(container: str, evidence_dir: Path) -> None:
     url = find_control(remote, resource_id="remote-url-input")
     x, y = parse_bounds(url.get("bounds", ""))
     adb(container, "shell", "input", "tap", str(x), str(y))
-    adb(container, "shell", "input", "text", "http://10.0.2.2:9")
+    adb(container, "shell", "input", "text", "http://127.0.0.1:9")
     adb(container, "shell", "input", "keyevent", "66")
-    time.sleep(5)
-    remote = dump_ui(container, evidence_dir, "remote-model")
+    remote_text: set[str] = set()
+    for attempt in range(15):
+        time.sleep(1)
+        remote = dump_ui(container, evidence_dir, f"remote-model-{attempt}")
+        remote_text.update(ui_text(remote))
+        if {"API Key", "Stored securely on device."}.issubset(remote_text):
+            break
+        adb(
+            container,
+            "shell",
+            "input",
+            "swipe",
+            "540",
+            "1450",
+            "540",
+            "700",
+            "300",
+        )
     assert_present(
-        ui_text(remote),
+        remote_text,
         ("Add Remote Model", "API Key", "Stored securely on device."),
         "Remote model",
     )
