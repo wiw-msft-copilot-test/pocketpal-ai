@@ -28,26 +28,20 @@ import {
   type RemoteModelPreference,
   type RemoteProtocolResolution,
 } from '../utils/remoteProtocol';
+import {
+  cloneRemoteGenerationSettings,
+  credentialRevisionOf,
+  dropEntry,
+  dropServerEntries,
+  normalizeServerUrl,
+  type CachedRemoteCatalogModel,
+  withoutGenerationSettings,
+} from '../services/remote/remoteModelState';
 
 const KEYCHAIN_SERVICE_PREFIX = 'pocketpal-server-';
 
 /** Minimum interval between auto-fetch cycles (ms) */
 const FETCH_THROTTLE_MS = 60000;
-
-interface CachedRemoteCatalogModel extends NormalizedRemoteCatalogModel {
-  serverId: string;
-  normalizedUrl: string;
-  serverType?: string;
-  credentialRevision: number;
-}
-
-const normalizeServerUrl = (url: string): string => url.replace(/\/+$/, '');
-
-const credentialRevisionOf = (server: ServerConfig): number =>
-  Number.isSafeInteger(server.credentialRevision) &&
-  (server.credentialRevision ?? -1) >= 0
-    ? server.credentialRevision!
-    : 0;
 
 /**
  * The capability fields of a `RemoteModelCaps` entry — everything except the
@@ -60,35 +54,6 @@ const CAPS_FIELDS = ['contextLength', 'supportsVision'] as const;
  * Shared by every path that invalidates per-model state, so a new map cannot
  * be added to one and forgotten in the other.
  */
-function dropServerEntries<T>(
-  map: Record<string, T>,
-  serverId: string,
-): Record<string, T> {
-  const prefix = `${serverId}/`;
-  return Object.fromEntries(
-    Object.entries(map).filter(([k]) => !k.startsWith(prefix)),
-  );
-}
-
-function dropEntry<T>(map: Record<string, T>, key: string): Record<string, T> {
-  return Object.fromEntries(
-    Object.entries(map).filter(([entryKey]) => entryKey !== key),
-  );
-}
-
-function cloneRemoteGenerationSettings(
-  settings: RemoteGenerationSettings,
-): RemoteGenerationSettings {
-  return {
-    ...settings,
-    stop: settings.stop ? [...settings.stop] : settings.stop,
-    reasoning: settings.reasoning ? {...settings.reasoning} : undefined,
-    generationParameterModes: settings.generationParameterModes
-      ? {...settings.generationParameterModes}
-      : undefined,
-  };
-}
-
 class ServerStore {
   servers: ServerConfig[] = [];
   // Remote reasoning capability keyed by full model id (`${serverId}/${remoteModelId}`).
@@ -293,9 +258,8 @@ class ServerStore {
     if (!existing?.generationSettings) {
       return;
     }
-    const remaining = {...existing};
-    delete remaining.generationSettings;
-    if (Object.keys(remaining).length === 0) {
+    const remaining = withoutGenerationSettings(existing);
+    if (!remaining) {
       this.remoteModelPreferences = dropEntry(
         this.remoteModelPreferences,
         modelId,

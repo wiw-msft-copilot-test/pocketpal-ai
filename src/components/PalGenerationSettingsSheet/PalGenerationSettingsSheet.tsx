@@ -1,15 +1,12 @@
 import React, {useContext, useEffect, useState} from 'react';
 import {Sheet} from '../Sheet/Sheet';
 import {CompletionSettings} from '../CompletionSettings';
-import {
-  CompletionParams,
-  OPTIONAL_GENERATION_PARAMETER_KEYS,
-} from '../../utils/completionTypes';
+import {CompletionParams} from '../../utils/completionTypes';
 import {chatSessionStore, defaultCompletionSettings} from '../../store';
 import {
-  COMPLETION_PARAMS_METADATA,
-  validateCompletionSettings,
-} from '../../utils/modelSettings';
+  inheritedCompletionSettings,
+  processCompletionSettingsDraft,
+} from '../../services/completion/completionSettingsDraft';
 import {Alert, View} from 'react-native';
 import {Button, Text, Icon} from 'react-native-paper';
 import {L10nContext} from '../../utils';
@@ -126,12 +123,8 @@ export const PalGenerationSettingsSheet = ({
   const theme = useTheme();
   const styles = createStyles(theme);
 
-  const inheritedSettings = (): CompletionParams => ({
-    ...defaultCompletionSettings,
-    generationParameterModes: Object.fromEntries(
-      OPTIONAL_GENERATION_PARAMETER_KEYS.map(key => [key, 'inherit']),
-    ),
-  });
+  const inheritedSettings = (): CompletionParams =>
+    inheritedCompletionSettings(defaultCompletionSettings);
 
   const [settings, setSettings] = useState<CompletionParams>(
     (completionSettings as CompletionParams) || inheritedSettings(),
@@ -159,56 +152,11 @@ export const PalGenerationSettingsSheet = ({
 
   const handleSaveSettings = async () => {
     // Convert string values to numbers where needed
-    const processedSettings = Object.entries(settings).reduce(
-      (acc, [key, value]) => {
-        const metadata = COMPLETION_PARAMS_METADATA[key];
-        const mode =
-          settings.generationParameterModes?.[
-            key as keyof NonNullable<
-              CompletionParams['generationParameterModes']
-            >
-          ];
-        if (metadata?.validation.type === 'numeric') {
-          if (mode === 'omit' || mode === 'inherit') {
-            acc.settings[key] = value;
-            return acc;
-          }
-          let numValue: number;
-          if (typeof value === 'string') {
-            numValue = Number(value);
-          } else if (typeof value === 'number') {
-            numValue = value;
-          } else {
-            acc.errors[key] =
-              l10n.components.palGenerationSettingsSheet.invalidNumericValuesMessage;
-            return acc;
-          }
-
-          if (Number.isNaN(numValue)) {
-            acc.errors[key] =
-              l10n.components.palGenerationSettingsSheet.invalidNumericValuesMessage;
-          } else {
-            acc.settings[key] = numValue;
-          }
-        } else {
-          acc.settings[key] = value;
-        }
-        return acc;
-      },
-      {settings: {}, errors: {}} as {
-        settings: typeof settings;
-        errors: Record<string, string>;
-      },
+    const processedSettings = processCompletionSettingsDraft(
+      settings,
+      l10n.components.palGenerationSettingsSheet.invalidNumericValuesMessage,
     );
-
-    // Validate the converted values
-    const validationResult = validateCompletionSettings(
-      processedSettings.settings,
-    );
-    const allErrors = {
-      ...processedSettings.errors,
-      ...validationResult.errors,
-    };
+    const allErrors = processedSettings.errors;
 
     if (Object.keys(allErrors).length > 0) {
       Alert.alert(

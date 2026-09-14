@@ -36,14 +36,11 @@ import {
   protocolWarningKey,
 } from '../RemoteModelSheet/protocolUi';
 import {CompletionSettings} from '../CompletionSettings';
+import {CompletionParams} from '../../utils/completionTypes';
 import {
-  CompletionParams,
-  OPTIONAL_GENERATION_PARAMETER_KEYS,
-} from '../../utils/completionTypes';
-import {
-  COMPLETION_PARAMS_METADATA,
-  validateCompletionSettings,
-} from '../../utils/modelSettings';
+  modelCompletionSettingsDraft,
+  processCompletionSettingsDraft,
+} from '../../services/completion/completionSettingsDraft';
 
 interface ModelSettingsSheetProps {
   isVisible: boolean;
@@ -162,21 +159,9 @@ export const ModelSettingsSheet: React.FC<ModelSettingsSheetProps> = memo(
         const loadCompletionSettings = async () => {
           const inherited = await chatSessionStore.resolveCompletionSettings();
           const raw = model.completionSettings || {};
-          setTempCompletionSettings({
-            ...inherited,
-            ...raw,
-            generationParameterModes: Object.fromEntries(
-              OPTIONAL_GENERATION_PARAMETER_KEYS.map(key => [
-                key,
-                raw.generationParameterModes?.[key] ??
-                  (Object.prototype.hasOwnProperty.call(raw, key) ||
-                  (key === 'reasoning_effort' &&
-                    raw.reasoning?.effort !== undefined)
-                    ? 'send'
-                    : 'inherit'),
-              ]),
-            ),
-          });
+          setTempCompletionSettings(
+            modelCompletionSettingsDraft(inherited, raw),
+          );
         };
         loadCompletionSettings();
       }
@@ -200,43 +185,11 @@ export const ModelSettingsSheet: React.FC<ModelSettingsSheetProps> = memo(
     };
 
     const processCompletionSettings = (): CompletionParams | undefined => {
-      const processed = Object.entries(tempCompletionSettings).reduce(
-        (acc, [key, value]) => {
-          const metadata = COMPLETION_PARAMS_METADATA[key];
-          const mode =
-            tempCompletionSettings.generationParameterModes?.[
-              key as keyof NonNullable<
-                CompletionParams['generationParameterModes']
-              >
-            ];
-          if (
-            metadata?.validation.type === 'numeric' &&
-            mode !== 'omit' &&
-            mode !== 'inherit'
-          ) {
-            const numericValue =
-              typeof value === 'string' ? Number(value) : value;
-            if (
-              typeof numericValue !== 'number' ||
-              Number.isNaN(numericValue)
-            ) {
-              acc.errors[key] =
-                l10n.components.chatGenerationSettingsSheet.invalidNumericValuesMessage;
-            } else {
-              acc.settings[key] = numericValue;
-            }
-          } else {
-            acc.settings[key] = value;
-          }
-          return acc;
-        },
-        {settings: {}, errors: {}} as {
-          settings: CompletionParams;
-          errors: Record<string, string>;
-        },
+      const processed = processCompletionSettingsDraft(
+        tempCompletionSettings,
+        l10n.components.chatGenerationSettingsSheet.invalidNumericValuesMessage,
       );
-      const validation = validateCompletionSettings(processed.settings);
-      const errors = {...processed.errors, ...validation.errors};
+      const {errors} = processed;
       if (Object.keys(errors).length > 0) {
         Alert.alert(
           l10n.components.chatGenerationSettingsSheet.invalidValues,
