@@ -271,6 +271,43 @@ describe('OpenAICompletionEngine', () => {
     );
   });
 
+  it('forwards every Scout function to Chat Completions unchanged', async () => {
+    mockedStreamChat.mockResolvedValueOnce({text: '', content: ''});
+    const scoutTools = [
+      'web_search',
+      'read_url',
+      'calculate',
+      'datetime',
+      'render_html',
+    ].map(name => ({
+      type: 'function' as const,
+      function: {
+        name,
+        description: `${name} description`,
+        parameters: {type: 'object'},
+      },
+    }));
+
+    await engine.completion({
+      messages: [{role: 'user', content: 'Help me research something'}],
+      tools: scoutTools,
+      tool_choice: 'auto',
+    } as any);
+
+    expect(mockedStreamChat).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tools: scoutTools,
+        tool_choice: 'auto',
+      }),
+      'http://localhost:1234',
+      'sk-key',
+      expect.any(Object),
+      undefined,
+      undefined,
+      undefined,
+    );
+  });
+
   // Structured-output (json_schema response_format) is provider-agnostic:
   // local goes through llama.rn natively, remote needs response_format
   // forwarded down to the OpenAI request body.

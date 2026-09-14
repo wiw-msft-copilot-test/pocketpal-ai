@@ -89,8 +89,13 @@ Copilot-style Responses and Chat Completions paths, streaming and final-only
 text, reasoning summaries, structured output at the fixture boundary, restart
 history replay, cancellation, usage, and incomplete/refusal/failure outcomes.
 It also verifies exact replay of the rejection outcome for an **unenabled**
-`calculate` function. It does not claim that the fixture executes the built-in
-calculate talent; local execution is covered by the unit agent/talent tests.
+`calculate` function. Separately, it selects the seeded **Scout** Pal and
+verifies that its exact five enabled schemas reach Responses, the built-in
+calculation and HTML Preview talents execute and replay their outcomes, an
+allowed web-search call reaches the existing unconfigured-provider error
+instead of the unenabled-talent rejection, and the resulting chat survives an
+app restart. Successful provider-backed search is deterministic unit coverage,
+not a claim made by this credential-free fixture.
 
 Run the fixture checks from `e2e/`:
 

@@ -203,6 +203,74 @@ describe('ChatSessionStore - Pal Settings', () => {
       expect(sessionResult.temperature).toBe(0.2);
       expect(sessionResult.generationParameterModes?.temperature).toBe('send');
     });
+
+    it.each([
+      ['new chat', undefined, undefined],
+      [
+        'existing custom session',
+        'scout-session',
+        {
+          id: 'scout-session',
+          title: 'Scout session',
+          date: '2026-09-14',
+          messages: [],
+          completionSettings: {
+            ...defaultCompletionSettings,
+            temperature: 0.25,
+          },
+          activePalId: 'scout-id',
+          settingsSource: 'custom' as const,
+        },
+      ],
+    ])(
+      'keeps all Scout tool schemas for a %s',
+      async (_label, sessionId, session) => {
+        const scout: Pal = {
+          type: 'local',
+          id: 'scout-id',
+          name: 'Scout',
+          systemPrompt: 'Scout prompt',
+          isSystemPromptChanged: false,
+          useAIPrompt: false,
+          parameters: {},
+          parameterSchema: [],
+          source: 'local',
+          pact: {
+            talents: [
+              {name: 'web_search', necessity: 'required'},
+              {name: 'read_url', necessity: 'required'},
+              {name: 'calculate', necessity: 'required'},
+              {name: 'datetime', necessity: 'required'},
+              {name: 'render_html', necessity: 'required'},
+            ],
+          },
+        };
+        palStore.pals.push(scout);
+        if (session) {
+          chatSessionStore.sessions = [session];
+        }
+
+        const result = await chatSessionStore.resolveCompletionSettings(
+          sessionId,
+          scout.id,
+        );
+
+        expect(
+          ((result.tools ?? []) as Array<{function: {name: string}}>)
+            .map(tool => tool.function.name)
+            .sort(),
+        ).toEqual([
+          'calculate',
+          'datetime',
+          'read_url',
+          'render_html',
+          'web_search',
+        ]);
+        if (session) {
+          expect(result.temperature).toBe(0.25);
+        }
+      },
+    );
   });
 
   describe('getCurrentCompletionSettings', () => {

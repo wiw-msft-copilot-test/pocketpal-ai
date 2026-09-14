@@ -151,6 +151,34 @@ describe('encodeResponsesRequest', () => {
     expect(request.tools?.[1]).not.toHaveProperty('strict');
   });
 
+  it('advertises every Scout talent as a Responses function', () => {
+    const params = baseParams();
+    params.tools = [
+      'web_search',
+      'read_url',
+      'calculate',
+      'datetime',
+      'render_html',
+    ].map(name => ({
+      type: 'function' as const,
+      function: {
+        name,
+        description: `${name} description`,
+        parameters: {type: 'object'},
+      },
+    }));
+
+    expect(
+      encodeResponsesRequest(params).tools?.map(tool => tool.name),
+    ).toEqual([
+      'web_search',
+      'read_url',
+      'calculate',
+      'datetime',
+      'render_html',
+    ]);
+  });
+
   it.each([
     ['text', {type: 'text'}, {type: 'text'}],
     ['json object', {type: 'json_object'}, {type: 'json_object'}],

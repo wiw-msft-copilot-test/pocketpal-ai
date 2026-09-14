@@ -43,6 +43,27 @@ Modells need to be downloaded before use. You can download and use these models 
 
 After downloading, tap _Load_ to bring the model into memory. Now you’re ready to chat!
 
+### Using Scout
+
+Scout is a built-in general-purpose Pal with five talents: Internet Search,
+page reading, calculation, date and time, and HTML Preview. Open the Pal picker
+from Chat and select **Scout**. Scout does not select or download a model; it
+uses the local or remote model you already selected. That model or server must
+support function calling for talents to work.
+
+Internet Search is not configured automatically. Open **Settings → Internet
+Search**, choose a provider, accept the external-content disclosure, and add
+that provider's API key. Search queries and pages then leave the device, and a
+remote chat model also receives the conversation. The Scout Pal record and chat
+history remain stored locally.
+
+Scout can use HTML Preview for requested diagrams, charts, UI mockups, and small
+interactive explanations. A context size of at least 4,096 tokens is
+recommended for HTML generation; PocketPal displays its existing context-room
+hint when the active model is smaller. Preview rendering retains PocketPal's
+network and navigation restrictions. Scout uses ordinary prose for routine
+answers and does not need to call a tool on every turn.
+
 ### Using Remote API Protocols
 
 Remote servers can select **Auto**, **Chat Completions**, or **Responses** as

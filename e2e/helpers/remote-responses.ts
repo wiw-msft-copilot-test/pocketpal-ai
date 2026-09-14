@@ -20,6 +20,10 @@ export interface FixtureStatus {
     aborted: boolean;
   }>;
   toolReplayValidated: boolean;
+  scoutToolsValidated: boolean;
+  scoutCalculateValidated: boolean;
+  scoutHtmlValidated: boolean;
+  scoutSearchValidated: boolean;
 }
 
 async function fetchWithTimeout(

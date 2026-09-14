@@ -134,6 +134,55 @@ describe('remote responses fixture', () => {
     );
   });
 
+  it('validates Scout schemas and successful tool-result replay', async () => {
+    const server = await start();
+    const tools = [
+      'web_search',
+      'read_url',
+      'calculate',
+      'datetime',
+      'render_html',
+    ].map(name => ({type: 'function', name, parameters: {type: 'object'}}));
+    const first = await fetch(`${server.url}/responses`, {
+      method: 'POST',
+      headers: {'content-type': 'application/json'},
+      body: JSON.stringify({
+        model: RESPONSES_MODEL_ID,
+        input: [{role: 'user', content: 'fixture:scout-calculate'}],
+        tools,
+        stream: true,
+      }),
+    });
+    assert.match(await readSse(first), /call-scout-calculate/);
+
+    const second = await fetch(`${server.url}/responses`, {
+      method: 'POST',
+      headers: {'content-type': 'application/json'},
+      body: JSON.stringify({
+        model: RESPONSES_MODEL_ID,
+        input: [
+          {role: 'user', content: 'fixture:scout-calculate'},
+          {
+            type: 'function_call',
+            call_id: 'call-scout-calculate',
+            name: 'calculate',
+            arguments: '{"expression":"6*7"}',
+          },
+          {
+            type: 'function_call_output',
+            call_id: 'call-scout-calculate',
+            output: '6*7 = 42',
+          },
+        ],
+        tools,
+        stream: true,
+      }),
+    });
+    assert.match(await readSse(second), /Scout calculated 42/);
+    assert.equal(server.state.scoutToolsValidated, true);
+    assert.equal(server.state.scoutCalculateValidated, true);
+  });
+
   it('records chat routing and marks a cancelled slow stream aborted', async () => {
     const server = await start();
     const chat = await fetch(`${server.url}/chat/completions`, {

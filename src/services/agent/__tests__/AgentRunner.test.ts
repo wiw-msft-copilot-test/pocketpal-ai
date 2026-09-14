@@ -7,6 +7,7 @@ import type {
   CompletionStreamData,
 } from '../../../utils/completionTypes';
 import type {TalentEngine, TalentResult} from '../../talents/types';
+import {WebSearchEngine} from '../../talents/WebSearchEngine';
 
 /**
  * Helper: build a CompletionEngine whose `completion()` invokes the
@@ -150,6 +151,78 @@ describe('runAgent', () => {
     const finished = events.filter(e => e.type === 'tool_call_finished');
     expect(finished).toHaveLength(1);
     expect((finished[0] as any).outcome.responseContent).toBe('4');
+  });
+
+  it('executes web_search and replays its grounded result on the follow-up', async () => {
+    const engine = makeScriptedEngine({
+      scripts: [
+        {
+          tokens: [],
+          result: {
+            text: '',
+            content: '',
+            tool_calls: [
+              {
+                id: 'search-call',
+                type: 'function',
+                function: {
+                  name: 'web_search',
+                  arguments: '{"query":"PocketPal release"}',
+                },
+              },
+            ],
+          },
+        },
+        {
+          tokens: [{content: 'PocketPal has a new release.'}],
+          result: {
+            text: 'PocketPal has a new release.',
+            content: 'PocketPal has a new release.',
+          },
+        },
+      ],
+    });
+    const provider = {
+      id: 'test-search',
+      search: jest.fn().mockResolvedValue([
+        {
+          title: 'PocketPal release notes',
+          url: 'https://example.com/releases',
+          snippet: 'A new release is available.',
+        },
+      ]),
+    };
+    const webSearch = new WebSearchEngine({
+      canSearch: () => true,
+      getActiveProvider: () => provider,
+      getResultCount: () => 5,
+      readWithDefaultReader: jest.fn(),
+    } as any);
+
+    await collect(
+      runAgent({
+        engine,
+        initialParams: baseParams,
+        allowedTalentNames: ['web_search'],
+        talentLookup: name => (name === 'web_search' ? webSearch : undefined),
+        messageId: 'msg-search',
+        triggerMarkers: [],
+      }),
+    );
+
+    expect(provider.search).toHaveBeenCalledWith('PocketPal release', {
+      maxResults: 5,
+    });
+    const followUpParams = (engine.completion as jest.Mock).mock.calls[1][0];
+    expect(followUpParams.messages).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          role: 'tool',
+          tool_call_id: 'search-call',
+          content: expect.stringContaining('https://example.com/releases'),
+        }),
+      ]),
+    );
   });
 
   it('#3 tool call but second turn yields no further tool_calls → run finishes after follow-up', async () => {

@@ -23,6 +23,10 @@ export interface FixtureState {
   requestCount: number;
   requests: FixtureRequest[];
   toolReplayValidated: boolean;
+  scoutToolsValidated: boolean;
+  scoutCalculateValidated: boolean;
+  scoutHtmlValidated: boolean;
+  scoutSearchValidated: boolean;
 }
 
 export interface RemoteFixtureServer {
@@ -163,6 +167,9 @@ const scenarioFor = (body: any): string => {
   for (const scenario of [
     'reasoning',
     'final-only',
+    'scout-calculate',
+    'scout-html',
+    'scout-search',
     'tool',
     'structured-json',
     'refusal',
@@ -286,6 +293,44 @@ function validateToolReplay(body: any): {ok: boolean; detail: string} {
   return {ok: true, detail: 'ok'};
 }
 
+const SCOUT_TOOL_NAMES = [
+  'web_search',
+  'read_url',
+  'calculate',
+  'datetime',
+  'render_html',
+].sort();
+
+function validateScoutTools(body: any): boolean {
+  const names = Array.isArray(body?.tools)
+    ? body.tools
+        .map((tool: any) => tool?.name)
+        .filter((name: unknown): name is string => typeof name === 'string')
+        .sort()
+    : [];
+  return JSON.stringify(names) === JSON.stringify(SCOUT_TOOL_NAMES);
+}
+
+function findToolReplay(
+  body: any,
+  callId: string,
+  name: string,
+): {call: any; output: any} {
+  const input = Array.isArray(body?.input) ? body.input : [];
+  return {
+    call: input.find(
+      (item: any) =>
+        item?.type === 'function_call' &&
+        item?.call_id === callId &&
+        item?.name === name,
+    ),
+    output: input.find(
+      (item: any) =>
+        item?.type === 'function_call_output' && item?.call_id === callId,
+    ),
+  };
+}
+
 function streamResponsesScenario(
   response: http.ServerResponse,
   body: any,
@@ -390,6 +435,93 @@ function streamResponsesScenario(
       }),
     );
     response.end();
+    return;
+  }
+  if (scenario === 'scout-calculate') {
+    state.scoutToolsValidated =
+      state.scoutToolsValidated || validateScoutTools(body);
+    const {call, output} = findToolReplay(
+      body,
+      'call-scout-calculate',
+      'calculate',
+    );
+    if (output) {
+      state.scoutCalculateValidated =
+        call?.arguments === '{"expression":"6*7"}' &&
+        output.output === '6*7 = 42';
+      complete(response, [message('Scout calculated 42.')]);
+      return;
+    }
+    complete(response, [
+      {
+        type: 'function_call',
+        id: 'fc-scout-calculate',
+        call_id: 'call-scout-calculate',
+        name: 'calculate',
+        arguments: '{"expression":"6*7"}',
+        status: 'completed',
+      },
+    ]);
+    return;
+  }
+  if (scenario === 'scout-html') {
+    state.scoutToolsValidated =
+      state.scoutToolsValidated || validateScoutTools(body);
+    const {call, output} = findToolReplay(
+      body,
+      'call-scout-html',
+      'render_html',
+    );
+    if (output) {
+      const args = JSON.parse(call?.arguments || '{}');
+      state.scoutHtmlValidated =
+        args.title === 'Scout fixture' &&
+        args.html === '<h1>Scout works</h1>' &&
+        typeof output.output === 'string' &&
+        output.output.includes('[render_html SUCCESS]');
+      complete(response, [message('Scout rendered HTML.')]);
+      return;
+    }
+    complete(response, [
+      {
+        type: 'function_call',
+        id: 'fc-scout-html',
+        call_id: 'call-scout-html',
+        name: 'render_html',
+        arguments: JSON.stringify({
+          title: 'Scout fixture',
+          html: '<h1>Scout works</h1>',
+        }),
+        status: 'completed',
+      },
+    ]);
+    return;
+  }
+  if (scenario === 'scout-search') {
+    state.scoutToolsValidated =
+      state.scoutToolsValidated || validateScoutTools(body);
+    const {call, output} = findToolReplay(
+      body,
+      'call-scout-search',
+      'web_search',
+    );
+    if (output) {
+      state.scoutSearchValidated =
+        call?.arguments === '{"query":"PocketPal latest news"}' &&
+        /^web_search: .+ not enabled$/.test(output.output);
+      complete(response, [message('Scout search failure replayed.')]);
+      return;
+    }
+    complete(response, [
+      {
+        type: 'function_call',
+        id: 'fc-scout-search',
+        call_id: 'call-scout-search',
+        name: 'web_search',
+        arguments: '{"query":"PocketPal latest news"}',
+        status: 'completed',
+      },
+    ]);
     return;
   }
   if (scenario === 'tool') {
@@ -509,6 +641,10 @@ export async function startRemoteFixtureServer(
     requestCount: 0,
     requests: [],
     toolReplayValidated: false,
+    scoutToolsValidated: false,
+    scoutCalculateValidated: false,
+    scoutHtmlValidated: false,
+    scoutSearchValidated: false,
   };
 
   const server = http.createServer(async (request, response) => {
@@ -521,6 +657,10 @@ export async function startRemoteFixtureServer(
       state.requestCount = 0;
       state.requests.splice(0);
       state.toolReplayValidated = false;
+      state.scoutToolsValidated = false;
+      state.scoutCalculateValidated = false;
+      state.scoutHtmlValidated = false;
+      state.scoutSearchValidated = false;
       json(response, 200, {ok: true});
       return;
     }

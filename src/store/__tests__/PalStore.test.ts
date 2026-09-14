@@ -409,6 +409,121 @@ describe('PalStore', () => {
     });
   });
 
+  describe('Scout seeding', () => {
+    const callInitializeScoutPal = async () =>
+      (palStore as any).initializeScoutPal();
+
+    beforeEach(() => {
+      runInAction(() => {
+        palStore.pals = [];
+      });
+      (palRepository.createPal as jest.Mock).mockImplementation(
+        async (palData: any) => ({
+          ...palData,
+          id: `scout-${Math.random().toString(36).slice(2, 8)}`,
+          created_at: '2026-09-14T00:00:00Z',
+          updated_at: '2026-09-14T00:00:00Z',
+        }),
+      );
+    });
+
+    it('seeds Scout with the exact native talents and no model binding', async () => {
+      await callInitializeScoutPal();
+
+      const scout = palStore.pals.find(
+        p => p.name === 'Scout' && p.source === 'local',
+      );
+      expect(scout).toMatchObject({
+        type: 'local',
+        capabilities: {web: true, tools: true},
+        pact: {
+          talents: [
+            {name: 'web_search', necessity: 'required'},
+            {name: 'read_url', necessity: 'required'},
+            {name: 'calculate', necessity: 'required'},
+            {name: 'datetime', necessity: 'required'},
+            {name: 'render_html', necessity: 'required'},
+          ],
+        },
+      });
+      expect(scout?.defaultModel).toBeUndefined();
+      expect(scout?.greeting?.suggestedPrompts).toHaveLength(3);
+      expect(resolveHFModelForDownload).not.toHaveBeenCalled();
+      expect(palsHubService.getPal).not.toHaveBeenCalled();
+    });
+
+    it('does not duplicate Scout when initialized repeatedly', async () => {
+      await callInitializeScoutPal();
+      await callInitializeScoutPal();
+
+      expect(
+        palStore.pals.filter(p => p.name === 'Scout' && p.source === 'local'),
+      ).toHaveLength(1);
+      expect(palRepository.createPal).toHaveBeenCalledTimes(1);
+    });
+
+    it('preserves an existing same-named local Scout unchanged', async () => {
+      const existingScout: Pal = {
+        ...mockPal,
+        id: 'scout-existing',
+        name: 'Scout',
+        source: 'local',
+        systemPrompt: 'My customized Scout prompt',
+        defaultModel: {id: 'custom-model', name: 'Custom Model'} as any,
+        pact: {
+          talents: [{name: 'calculate', necessity: 'required'}],
+        },
+        greeting: {
+          text: 'Custom greeting',
+          suggestedPrompts: ['Custom prompt'],
+        },
+      };
+      runInAction(() => {
+        palStore.pals = [existingScout];
+      });
+
+      await callInitializeScoutPal();
+
+      expect(palStore.pals).toHaveLength(1);
+      expect(palStore.pals[0]).toMatchObject({
+        id: 'scout-existing',
+        systemPrompt: 'My customized Scout prompt',
+        defaultModel: {id: 'custom-model', name: 'Custom Model'},
+        pact: {
+          talents: [{name: 'calculate', necessity: 'required'}],
+        },
+        greeting: {
+          text: 'Custom greeting',
+          suggestedPrompts: ['Custom prompt'],
+        },
+      });
+      expect(palRepository.createPal).not.toHaveBeenCalled();
+    });
+
+    it('adds Scout to an existing built-in-only database', async () => {
+      const existingPals: Pal[] = [
+        {
+          ...mockPal,
+          id: 'lookie-existing',
+          name: 'Lookie',
+          capabilities: {video: true},
+        },
+        {...mockPal, id: 'pip-existing', name: 'Pip'},
+      ];
+      (palRepository.getAllPals as jest.Mock).mockResolvedValue(existingPals);
+
+      // eslint-disable-next-line no-new
+      new (palStore.constructor as any)();
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      const createdNames = (
+        palRepository.createPal as jest.Mock
+      ).mock.calls.map(call => call[0]?.name);
+      expect(createdNames).toEqual(['Scout']);
+      expect(resolveHFModelForDownload).not.toHaveBeenCalled();
+    });
+  });
+
   describe('Core CRUD Operations', () => {
     describe('createPal', () => {
       it('should create a new pal successfully', async () => {

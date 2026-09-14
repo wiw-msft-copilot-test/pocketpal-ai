@@ -7,7 +7,7 @@ import {
   RESPONSES_MODEL_ID,
   UNSUPPORTED_MODEL_ID,
 } from '../../fixtures/remote-responses-server';
-import {Selectors, byPartialText} from '../../helpers/selectors';
+import {Selectors, byPartialText, byTestId} from '../../helpers/selectors';
 import {Gestures} from '../../helpers/gestures';
 import {saveFailureScreenshot} from '../../helpers/screenshots';
 import {
@@ -207,5 +207,52 @@ describe('Remote Responses protocol', () => {
     );
     const status = await fixtureStatus(FIXTURE_URL);
     expect(status.toolReplayValidated).toBe(true);
+  });
+
+  it('runs Scout calculation, HTML, and unconfigured-search gating after restart', async () => {
+    await chatPage.openPalPicker();
+    await chatPage.selectPal('Scout');
+    await chatPage.resetChat();
+
+    await browser
+      .$(byPartialText('Hi, I’m Scout.'))
+      .waitForExist({timeout: 10000});
+    await browser
+      .$(Selectors.chat.suggestedPromptChip(0))
+      .waitForExist({timeout: 5000});
+
+    await chatPage.sendMessage('fixture:scout-calculate');
+    await waitForAssistantText('Scout calculated 42.', 45000);
+
+    await chatPage.sendMessage('fixture:scout-html');
+    await waitForAssistantText('Scout rendered HTML.', 45000);
+    await browser.$(byTestId('html-preview-bubble')).waitForExist({
+      timeout: 10000,
+    });
+
+    await chatPage.sendMessage('fixture:scout-search');
+    await waitForAssistantText('Scout search failure replayed.', 45000);
+
+    let status = await fixtureStatus(FIXTURE_URL);
+    expect(status.scoutToolsValidated).toBe(true);
+    expect(status.scoutCalculateValidated).toBe(true);
+    expect(status.scoutHtmlValidated).toBe(true);
+    expect(status.scoutSearchValidated).toBe(true);
+
+    await driver.terminateApp(APP_ID);
+    await browser.pause(800);
+    await driver.activateApp(APP_ID);
+    await chatPage.waitForReady(TIMEOUTS.appReady);
+    await chatPage.openDrawer();
+    await drawerPage.waitForOpen();
+    await drawerPage.tapSession('fixture:scout-calculate');
+    expect(await latestAssistantText()).toContain(
+      'Scout search failure replayed.',
+    );
+
+    status = await fixtureStatus(FIXTURE_URL);
+    expect(status.scoutCalculateValidated).toBe(true);
+    expect(status.scoutHtmlValidated).toBe(true);
+    expect(status.scoutSearchValidated).toBe(true);
   });
 });
