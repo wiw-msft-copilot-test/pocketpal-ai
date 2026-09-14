@@ -29,12 +29,9 @@ import {
   toApiCompletionParams,
   ApiCompletionParams,
   CompletionParams,
+  CompletionResult,
   CompletionResultSnapshot,
 } from '../utils/completionTypes';
-import {
-  completionResultSnapshot,
-  responsesOutcomeMetadata,
-} from '../services/remote/responsesOutcome';
 import {
   collectSystemPromptFragments,
   seedReadUrlAllowlist,
@@ -243,6 +240,44 @@ type TtsRunState = {
   prevReasoning: string;
 };
 
+// Normalise a finished turn's result into the snapshot the banner reads.
+// Responses output-token exhaustion is not evidence that the input context is
+// full. Chat Completions retains its legacy length mapping.
+function deriveSnapshotFromResult(
+  result: CompletionResult,
+  effectiveNCtx: number | undefined,
+  isRemote: boolean,
+): CompletionResultSnapshot {
+  const used = (result.tokens_evaluated ?? 0) + (result.tokens_predicted ?? 0);
+  // Local turns set context_full/truncated directly; finishReason only bridges
+  // the remote engine's signal (stopped_limit) into the OR predicate below, so
+  // it is intentionally remote-only.
+  const finishReason =
+    result.incomplete_reason === 'max_output_tokens'
+      ? 'output-limit'
+      : isRemote &&
+          result.terminal_status === undefined &&
+          result.stopped_limit === 1
+        ? 'length'
+        : undefined;
+  const contextFull =
+    result.context_full === true ||
+    result.truncated === true ||
+    finishReason === 'length';
+  return {
+    content: result.content,
+    reasoning_content: result.reasoning_content,
+    used,
+    contextFull,
+    tokensPredicted: result.tokens_predicted,
+    finishReason,
+    terminalStatus: result.terminal_status,
+    incompleteReason: result.incomplete_reason,
+    refusal: result.refusal,
+    isRemote,
+  };
+}
+
 /**
  * Map a single AgentEvent into the corresponding store mutation(s).
  * Free of business logic — every event maps to a known action surface
@@ -392,8 +427,9 @@ async function applyEventToStore(
       // (not in the runner) because timings are an observability
       // concern of the hook, not the runner.
       const finalResult = event.result.finalResult;
-      const snapshot = completionResultSnapshot(
+      const snapshot = deriveSnapshotFromResult(
         finalResult,
+        modelStore.activeContextSettings?.n_ctx,
         modelStore.activeModel?.origin === ModelOrigin.REMOTE,
       );
       const draftTimings =
@@ -411,7 +447,14 @@ async function applyEventToStore(
             ...draftTimings,
           },
           copyable: true,
-          ...responsesOutcomeMetadata(finalResult),
+          ...(finalResult.interrupted ? {interrupted: true} : {}),
+          ...(finalResult.refusal ? {responseStatus: 'refused'} : {}),
+          ...(!finalResult.refusal && finalResult.terminal_status
+            ? {responseStatus: finalResult.terminal_status}
+            : {}),
+          ...(finalResult.incomplete_reason
+            ? {incompleteReason: finalResult.incomplete_reason}
+            : {}),
           multimodal: ctx.hasImages && ctx.isMultimodalEnabled,
           completionResult: snapshot,
           ...(event.result.hitMaxTurns ? {hitMaxTurns: true} : {}),
