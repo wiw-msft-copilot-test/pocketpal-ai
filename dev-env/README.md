@@ -31,12 +31,12 @@ translate WSL file paths for APK copies and key mounts.
 Follow these steps from the repository root. The commands below use the
 retained default emulator:
 
-| Setting | Value |
-| --- | --- |
-| Container | `pocketpal-android-emulator` |
-| Android version | Android 11 / API 30 |
-| ADB address | `127.0.0.1:5555` |
-| PocketPal E2E package | `com.pocketpalai.e2e` |
+| Setting               | Value                        |
+| --------------------- | ---------------------------- |
+| Container             | `pocketpal-android-emulator` |
+| Android version       | Android 11 / API 30          |
+| ADB address           | `127.0.0.1:5555`             |
+| PocketPal E2E package | `com.pocketpalai.e2e`        |
 
 #### 1. Open a terminal in the repository and check prerequisites
 
@@ -166,6 +166,50 @@ echo "WAYLAND_DISPLAY=$WAYLAND_DISPLAY"
 
 At least one of these values should be populated. Run scrcpy from a WSLg
 terminal rather than an SSH-only shell.
+
+#### Optional: capture safe Responses diagnostics while playtesting
+
+If a remote Responses model fails, you can capture structural event information
+without logging credentials or conversation content. This is optional and
+should be disabled when finished.
+
+1. In PocketPal, open **Settings**, scroll to **Diagnostics**, and turn on
+   **Responses protocol logging**.
+2. In a second terminal, start a local collector:
+
+   ```bash
+   mkdir -p /tmp/pocketpal-responses-diagnostics
+   adb -s 127.0.0.1:5555 logcat -v threadtime '*:I' \
+     | grep --line-buffered 'PP_RESPONSES_DIAG' \
+     > /tmp/pocketpal-responses-diagnostics/trace.log
+   ```
+
+3. Send a short synthetic prompt in a new chat, such as `Reply with OK`.
+   Count every inference attempt, including failed requests, against your
+   approved test budget.
+4. Read the trace:
+
+   ```bash
+   cat /tmp/pocketpal-responses-diagnostics/trace.log
+   ```
+
+   **Verify:** records contain only event names, indices, item/part types,
+   status, aliases, parameter-presence flags, and safe error classes. They must
+   not contain API keys, headers, URLs, prompts, generated text, tool payloads,
+   images, or reasoning content.
+
+5. Turn the setting off in PocketPal, press `Ctrl+C` in the collector terminal,
+   and remove the temporary trace:
+
+   ```bash
+   rm -f /tmp/pocketpal-responses-diagnostics/trace.log
+   rmdir /tmp/pocketpal-responses-diagnostics 2>/dev/null || true
+   ```
+
+Diagnostics are memory-only and turn off after an app restart. Existing
+`logcat` lines are not retroactively erased. Do not use the normal full-reset
+Appium configuration for a credential-configured playtest; use
+`E2E_NO_RESET=true E2E_FULL_RESET=false` so app data is preserved.
 
 #### Reload a different APK later
 

@@ -10,8 +10,8 @@ Note: Part of this guide is outdated. It will be updated soon.
 
 Note: This is a personal project, so I am working on it in my spare time. It might have bugs and issues, and obviously, I have not tested it on all devices. If you encounter any issues, open an issue, or even better, contribute to the project!
 
-
 ### Available Models
+
 PocketPal AI comes pre-configured with some popular SLMs:
 
 - Danube 2 and 3
@@ -33,7 +33,6 @@ Modells need to be downloaded before use. You can download and use these models 
 - Navigate to the “Models” page
 - Choose your desired model and hit download
 
-
 <div style="display: flex; justify-content: center;">
     <img src="../assets/add_model_1.webp" alt="Navigate to Models Page" style="width: 33%;">
     <img src="../assets/add_model_2.webp" alt="Download a Model" style="width: 33%;">
@@ -41,7 +40,8 @@ Modells need to be downloaded before use. You can download and use these models 
 </div>
 
 ### Loading a Model
-After downloading, tap *Load* to bring the model into memory. Now you’re ready to chat!
+
+After downloading, tap _Load_ to bring the model into memory. Now you’re ready to chat!
 
 ### Using Remote API Protocols
 
@@ -76,6 +76,40 @@ reuse opaque state after the provider server, model, or protocol changes.
 
 Hosted OpenAI tools, background responses, WebSocket mode, and the Conversations
 API are outside this integration's scope.
+
+### Generation parameter defaults
+
+Each optional generation setting has an explicit mode in the generation
+settings sheets:
+
+- **Use provider/native default** does not send that parameter.
+- **Use custom value** sends the retained value.
+- **Inherit** follows the parent preset where the setting is inherited.
+
+Switching to the provider default keeps the custom value so it can be restored
+later. A valid `0`, `false`, or backend-specific sentinel remains a real custom
+value; it is not treated as omission. Omitting a parameter also does not disable
+the corresponding algorithm—the active provider or local runtime chooses its
+default. Required request fields, tools, schemas, routing, and safety controls
+are not optional.
+
+The same controls apply to remote and on-device generation settings. Thinking
+has separate **backend default**, **On**, and **Off** intent; reasoning effort
+can likewise inherit, use the backend default, or send an explicit supported
+level. A provider may support only some optional parameters. For example, the
+verified GitHub Copilot Responses model rejected `temperature` and `top_p`; set
+those fields to **Use provider/native default** rather than changing their
+saved custom values.
+
+### Responses diagnostics
+
+For troubleshooting a Responses provider, open **Settings → Diagnostics** and
+turn on **Responses protocol logging**. The setting is memory-only and returns
+to off after an app restart. It logs only bounded structural metadata such as
+event types, indices, item types, status, and request parameter presence. It
+does not log API keys, headers, URLs, prompts, generated text, tool payloads,
+images, or reasoning content. Disable it when finished; existing Android
+`logcat` lines are not retroactively erased.
 
 ### Using a GitHub Copilot Remote Model
 
@@ -156,6 +190,7 @@ The generation performance metric is also displayed. If interested, watch the ch
 Important Note: As of now, I haven’t found an easy way to select and copy text from the generated responses while preserving the text formatting, particularly Markdown support.
 
 In the meantime, here are the current options for copying text:
+
 - Paragraph-level copying: Long-press on a specific paragraph to copy its content.
 - Full response copying: Use the copy icon at the bottom of the text bubble to copy the entire AI-generated response.
 

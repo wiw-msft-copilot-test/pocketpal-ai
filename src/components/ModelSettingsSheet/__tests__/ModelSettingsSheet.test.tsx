@@ -95,6 +95,7 @@ describe('ModelSettingsSheet', () => {
     jest.clearAllMocks();
     (serverStore as any).getRemoteModelPreference = jest.fn();
     (serverStore as any).setRemoteModelPreference = jest.fn();
+    (serverStore as any).setRemoteModelGenerationSettings = jest.fn();
     (serverStore as any).getRemoteCatalogModel = jest.fn();
     serverStore.servers = [];
     serverStore.remoteReasoning = {};
@@ -538,6 +539,28 @@ describe('ModelSettingsSheet', () => {
       expect(serverStore.setRemoteModelPreference).toHaveBeenCalledWith(
         remoteModel.id,
         expect.objectContaining({wireApi: 'responses', vision: 'on'}),
+      );
+    });
+
+    it('persists remote generation overrides and requires reselection', async () => {
+      const {getByTestId, getByText, queryByTestId} = render(
+        <ModelSettingsSheet {...remoteProps} />,
+      );
+      await waitFor(() =>
+        expect(getByTestId('temperature-mode-omit')).toBeTruthy(),
+      );
+
+      fireEvent.press(getByTestId('temperature-mode-omit'));
+      expect(queryByTestId('remote-reselect-required')).toBeNull();
+      fireEvent.press(getByText('Save Changes'));
+
+      expect(serverStore.setRemoteModelGenerationSettings).toHaveBeenCalledWith(
+        remoteModel.id,
+        expect.objectContaining({
+          generationParameterModes: expect.objectContaining({
+            temperature: 'omit',
+          }),
+        }),
       );
     });
 

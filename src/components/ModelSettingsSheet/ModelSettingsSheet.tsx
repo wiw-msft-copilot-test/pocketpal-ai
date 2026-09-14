@@ -78,6 +78,8 @@ export const ModelSettingsSheet: React.FC<ModelSettingsSheetProps> = memo(
       () => seedPreference().vision || 'auto',
     );
     const [remotePreferenceDirty, setRemotePreferenceDirty] = useState(false);
+    const [generationOverridesDirty, setGenerationOverridesDirty] =
+      useState(false);
 
     // Reasoning override (seeded from the resolver so the controls show the
     // effective state). Axis-1 is reasoning yes/no; axis-2 graded effort + set.
@@ -147,6 +149,7 @@ export const ModelSettingsSheet: React.FC<ModelSettingsSheetProps> = memo(
         setRemoteApiMode(preference.wireApi || 'inherit');
         setRemoteVision(preference.vision || 'auto');
         setRemotePreferenceDirty(false);
+        setGenerationOverridesDirty(false);
         const cap = resolveReasoningCapability(
           model,
           serverStore.remoteReasoning,
@@ -192,6 +195,7 @@ export const ModelSettingsSheet: React.FC<ModelSettingsSheetProps> = memo(
     };
 
     const handleCompletionSettingsUpdate = (name: string, value: any) => {
+      setGenerationOverridesDirty(true);
       setTempCompletionSettings(previous => ({...previous, [name]: value}));
     };
 
@@ -265,6 +269,10 @@ export const ModelSettingsSheet: React.FC<ModelSettingsSheetProps> = memo(
             persistedModel.completionSettings = processedCompletionSettings;
           }
         } else {
+          serverStore.setRemoteModelGenerationSettings(
+            model.id,
+            processedCompletionSettings,
+          );
           model.completionSettings = processedCompletionSettings;
         }
         // Persist a source:'user' reasoning override only when the user
@@ -335,6 +343,7 @@ export const ModelSettingsSheet: React.FC<ModelSettingsSheetProps> = memo(
       isRemote &&
       binding?.modelId === model.id &&
       (remotePreferenceDirty ||
+        generationOverridesDirty ||
         (protocol?.wireApi !== undefined &&
           binding.wireApi !== protocol.wireApi));
     const protocolWarning = protocol ? protocolWarningKey(protocol) : undefined;
