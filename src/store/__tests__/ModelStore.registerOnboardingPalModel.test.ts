@@ -1,4 +1,8 @@
 jest.unmock('../../store');
+jest.mock('mobx-persist-store', () => ({
+  makePersistable: jest.fn(() => new Promise(() => {})),
+  isHydrated: jest.fn(() => true),
+}));
 
 import {downloadManager} from '../../services/downloads';
 import {modelStore} from '..';

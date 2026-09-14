@@ -432,6 +432,75 @@ describe('OpenAICompletionEngine', () => {
     );
   });
 
+  it('forwards every explicitly enabled remote-only generation parameter', async () => {
+    mockedStreamChat.mockResolvedValueOnce({text: '', content: ''});
+
+    await engine.completion({
+      messages: [{role: 'user', content: 'Hi'}],
+      top_k: 0,
+      min_p: 0,
+      xtc_threshold: 0,
+      xtc_probability: 0,
+      typical_p: 0,
+      penalty_last_n: -1,
+      penalty_repeat: 0,
+      penalty_freq: 0,
+      penalty_present: 0,
+      mirostat: 0,
+      mirostat_tau: 0,
+      mirostat_eta: 0,
+      seed: -1,
+      n_probs: 0,
+      jinja: false,
+      enable_thinking: false,
+      generationParameterModes: {
+        top_k: 'send',
+        min_p: 'send',
+        xtc_threshold: 'send',
+        xtc_probability: 'send',
+        typical_p: 'send',
+        penalty_last_n: 'send',
+        penalty_repeat: 'send',
+        penalty_freq: 'send',
+        penalty_present: 'send',
+        mirostat: 'send',
+        mirostat_tau: 'send',
+        mirostat_eta: 'send',
+        seed: 'send',
+        n_probs: 'send',
+        jinja: 'send',
+        enable_thinking: 'send',
+      },
+    } as any);
+
+    expect(mockedStreamChat).toHaveBeenCalledWith(
+      expect.objectContaining({
+        top_k: 0,
+        min_p: 0,
+        xtc_threshold: 0,
+        xtc_probability: 0,
+        typical_p: 0,
+        penalty_last_n: -1,
+        penalty_repeat: 0,
+        penalty_freq: 0,
+        penalty_present: 0,
+        mirostat: 0,
+        mirostat_tau: 0,
+        mirostat_eta: 0,
+        seed: -1,
+        n_probs: 0,
+        jinja: false,
+        enable_thinking: false,
+      }),
+      expect.anything(),
+      expect.anything(),
+      expect.any(AbortSignal),
+      undefined,
+      undefined,
+      undefined,
+    );
+  });
+
   it('dispatches Responses with replay input and immutable binding', async () => {
     const responsesEngine = new OpenAICompletionEngine(
       'https://api.githubcopilot.com',

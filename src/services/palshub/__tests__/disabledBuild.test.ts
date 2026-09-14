@@ -16,7 +16,9 @@ jest.mock('@react-native-google-signin/google-signin', () => {
   throw new Error('Google Sign-In must not load in a disabled build');
 });
 
-describe('disabled centralized integrations build', () => {
+const describeDisabledBuild = __ENABLE_PALSHUB__ ? describe.skip : describe;
+
+describeDisabledBuild('disabled centralized integrations build', () => {
   it('does not initialize centralized authentication dependencies', () => {
     expect(() => require('../AuthService')).not.toThrow();
     expect(() => require('../supabase')).not.toThrow();

@@ -28,8 +28,12 @@ module.exports = function (api) {
       [
         'transform-define',
         {
-          __E2E__: isE2E,
-          __E2E_SKIP_ONBOARDING__: skipOnboarding,
+          ...(!isTest
+            ? {
+                __E2E__: isE2E,
+                __E2E_SKIP_ONBOARDING__: skipOnboarding,
+              }
+            : {}),
           __ENABLE_PALSHUB__: enablePalsHub,
         },
       ],

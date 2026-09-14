@@ -617,6 +617,42 @@ describe('ServerStore', () => {
       });
     });
 
+    it('clears generation settings while preserving protocol and vision preferences', () => {
+      const id = addCatalogServer();
+      const modelId = `${id}/responses-model`;
+      serverStore.setRemoteModelPreference(modelId, {
+        wireApi: 'responses',
+        vision: 'off',
+        generationSettings: {
+          temperature: 0.2,
+          generationParameterModes: {temperature: 'omit'},
+        },
+      });
+
+      serverStore.clearRemoteModelGenerationSettings(modelId);
+
+      expect(serverStore.getRemoteModelPreference(modelId)).toEqual({
+        wireApi: 'responses',
+        vision: 'off',
+      });
+      expect(
+        serverStore.getRemoteModelGenerationSettings(modelId),
+      ).toBeUndefined();
+    });
+
+    it('removes an empty preference after clearing its only generation settings', () => {
+      const id = addCatalogServer();
+      const modelId = `${id}/responses-model`;
+      serverStore.setRemoteModelGenerationSettings(modelId, {
+        temperature: 0.2,
+      });
+
+      serverStore.clearRemoteModelGenerationSettings(modelId);
+      serverStore.clearRemoteModelGenerationSettings(modelId);
+
+      expect(serverStore.getRemoteModelPreference(modelId)).toBeUndefined();
+    });
+
     it('removes preferences and cached metadata with a selected model', () => {
       const id = addCatalogServer();
       const modelId = `${id}/responses-model`;

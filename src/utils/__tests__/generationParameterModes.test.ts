@@ -129,4 +129,81 @@ describe('generation parameter modes', () => {
       true,
     );
   });
+
+  it('inherits nested reasoning effort while retaining the overriding enabled state', () => {
+    const result = mergeCompletionParameterLayers(
+      {
+        reasoning: {enabled: true, effort: 'low'},
+        generationParameterModes: {reasoning_effort: 'send'},
+      },
+      {
+        reasoning: {enabled: false, effort: 'high'},
+        generationParameterModes: {reasoning_effort: 'inherit'},
+      },
+    );
+
+    expect(result.reasoning).toEqual({enabled: false, effort: 'low'});
+    expect(result.generationParameterModes?.reasoning_effort).toBe('send');
+  });
+
+  it('removes an inherited effort when the lower layer does not define one', () => {
+    const result = mergeCompletionParameterLayers(
+      {reasoning: {enabled: true}},
+      {
+        reasoning: {enabled: false, effort: 'high'},
+        generationParameterModes: {reasoning_effort: 'inherit'},
+      },
+    );
+
+    expect(result.reasoning).toEqual({enabled: false});
+    expect(result.generationParameterModes?.reasoning_effort).toBeUndefined();
+  });
+
+  it('removes derived aliases and empty template kwargs for omitted fields', () => {
+    const result = applyGenerationParameterModes({
+      n_predict: 256,
+      max_tokens: 256,
+      max_completion_tokens: 256,
+      max_output_tokens: 256,
+      penalty_last_n: 64,
+      repeat_last_n: 64,
+      penalty_repeat: 1.2,
+      repeat_penalty: 1.2,
+      reasoning: {enabled: true, effort: 'high'},
+      reasoning_effort: 'high',
+      chat_template_kwargs: {reasoning_effort: 'high'},
+      generationParameterModes: {
+        n_predict: 'omit',
+        penalty_last_n: 'omit',
+        penalty_repeat: 'omit',
+        reasoning_effort: 'omit',
+      },
+    });
+
+    expect(result).not.toHaveProperty('n_predict');
+    expect(result).not.toHaveProperty('max_tokens');
+    expect(result).not.toHaveProperty('max_completion_tokens');
+    expect(result).not.toHaveProperty('max_output_tokens');
+    expect(result).not.toHaveProperty('penalty_last_n');
+    expect(result).not.toHaveProperty('repeat_last_n');
+    expect(result).not.toHaveProperty('penalty_repeat');
+    expect(result).not.toHaveProperty('repeat_penalty');
+    expect(result.reasoning).toEqual({enabled: true});
+    expect(result).not.toHaveProperty('reasoning_effort');
+    expect(result).not.toHaveProperty('chat_template_kwargs');
+  });
+
+  it('treats unresolved inherit as omission at the engine boundary', () => {
+    const result = applyGenerationParameterModes({
+      include_thinking_in_context: false,
+      enable_thinking: false,
+      generationParameterModes: {
+        include_thinking_in_context: 'inherit',
+        enable_thinking: 'inherit',
+      },
+    });
+
+    expect(result).not.toHaveProperty('include_thinking_in_context');
+    expect(result).not.toHaveProperty('enable_thinking');
+  });
 });
