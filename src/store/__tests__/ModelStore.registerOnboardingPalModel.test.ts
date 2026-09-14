@@ -4,6 +4,10 @@ jest.mock('mobx-persist-store', () => ({
   isHydrated: jest.fn(() => true),
 }));
 
+jest.mock('../../services/deviceRules/rules', () => ({
+  fetchRules: jest.fn().mockResolvedValue(null),
+}));
+
 import {downloadManager} from '../../services/downloads';
 import {modelStore} from '..';
 import {ModelOrigin} from '../../utils/types';

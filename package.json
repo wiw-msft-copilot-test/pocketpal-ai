@@ -26,7 +26,7 @@
     "start": "react-native start",
     "start:reset": "react-native start --reset-cache",
     "test": "jest",
-    "test:disabled-build": "ENABLE_PALSHUB_INTEGRATION=false jest src/services/palshub/__tests__/disabledBuild.test.ts --runInBand --coverage=false"
+    "test:disabled-build": "ENABLE_PALSHUB_INTEGRATION=false jest src/services/palshub/__tests__/disabledBuild.test.ts src/screens/AboutScreen/__tests__/AboutScreen.disabledBuild.test.tsx --runInBand --coverage=false"
   },
   "dependencies": {
     "@dr.pogodin/react-native-fs": "^2.36.0",
@@ -53,7 +53,7 @@
     "date-fns": "^4.1.0",
     "dayjs": "^1.11.18",
     "expr-eval": "^2.0.2",
-    "llama.rn": "0.13.0-rc.1",
+    "llama.rn": "0.13.0-rc.3",
     "marked": "^16.4.0",
     "mobx": "^6.15.0",
     "mobx-persist-store": "^1.1.8",

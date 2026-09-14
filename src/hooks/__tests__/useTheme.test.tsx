@@ -10,6 +10,10 @@ jest.mock('mobx-persist-store', () => ({
   makePersistable: jest.fn(() => new Promise(() => {})),
   isHydrated: jest.fn(() => true),
 }));
+
+jest.mock('../../services/deviceRules/rules', () => ({
+  fetchRules: jest.fn().mockResolvedValue(null),
+}));
 import {useTheme} from '../useTheme';
 
 import {uiStore} from '../../store';

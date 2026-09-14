@@ -1,12 +1,5 @@
 import React, {useState, useContext} from 'react';
-import {
-  View,
-  ScrollView,
-  TouchableOpacity,
-  Alert,
-  Linking,
-  Platform,
-} from 'react-native';
+import {View, ScrollView, TouchableOpacity, Alert, Linking} from 'react-native';
 
 import DeviceInfo from 'react-native-device-info';
 import Clipboard from '@react-native-clipboard/clipboard';
@@ -14,14 +7,10 @@ import {Text, Button, SegmentedButtons} from 'react-native-paper';
 import {SafeAreaView, useSafeAreaInsets} from 'react-native-safe-area-context';
 import {BuildInfo} from 'llama.rn';
 
-import {
-  CopyIcon,
-  GithubIcon,
-  ChevronRightIcon,
-  HeartIcon,
-} from '../../assets/icons';
+import {CopyIcon, GithubIcon, ChevronRightIcon} from '../../assets/icons';
 
-import {Sheet, TextInput} from '../../components';
+import {Sheet} from '../../components/Sheet';
+import {TextInput} from '../../components/TextInput';
 import {useTheme} from '../../hooks';
 import {createStyles} from './styles';
 import {L10nContext} from '../../utils';
@@ -152,21 +141,6 @@ export const AboutScreen: React.FC = () => {
               icon={GithubButtonIcon}>
               {l10n.about.githubButton}
             </Button>
-            {Platform.OS !== 'ios' && (
-              <>
-                <Text style={styles.orText}>{l10n.about.orText}</Text>
-                <TouchableOpacity
-                  style={styles.supportButton}
-                  onPress={() =>
-                    Linking.openURL('https://www.buymeacoffee.com/aghorbani')
-                  }>
-                  <HeartIcon stroke={theme.colors.onPrimary} />
-                  <Text style={styles.supportButtonText}>
-                    {l10n.about.sponsorButton}
-                  </Text>
-                </TouchableOpacity>
-              </>
-            )}
             {__ENABLE_PALSHUB__ ? (
               <>
                 <Text style={styles.orText}>{l10n.about.orBy}</Text>
