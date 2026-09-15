@@ -47,6 +47,14 @@ interface ServerDetailsSheetProps {
   serverId: string | null;
 }
 
+const hasSameOrigin = (left: string, right: string): boolean => {
+  try {
+    return new URL(left).origin === new URL(right).origin;
+  } catch {
+    return false;
+  }
+};
+
 export const ServerDetailsSheet: React.FC<ServerDetailsSheetProps> = observer(
   ({isVisible, onDismiss, serverId}) => {
     const theme = useTheme();
@@ -143,10 +151,13 @@ export const ServerDetailsSheet: React.FC<ServerDetailsSheetProps> = observer(
         setIsProbing(true);
         setProbeResult(null);
         try {
-          const key = apiKeyRef.current.trim() || undefined;
           const savedServer = serverId
             ? serverStore.servers.find(s => s.id === serverId)
             : undefined;
+          const key =
+            savedServer && hasSameOrigin(trimmedUrl, savedServer.url)
+              ? apiKeyRef.current.trim() || undefined
+              : undefined;
           const timeoutMs =
             parseTimeoutMs(timeoutSecondsRef.current) ??
             savedServer?.requestTimeoutMs;

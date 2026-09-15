@@ -1045,6 +1045,36 @@ describe('ServerStore', () => {
       expect(serverStore.remoteCatalogMetadata[`${id}/stale`]).toBeUndefined();
     });
 
+    it('does not send a loaded key after the server URL changes', async () => {
+      const id = serverStore.addServer({
+        name: 'Server',
+        url: 'https://old.example.com',
+      });
+      let resolveCredentials!: (credentials: {
+        username: string;
+        password: string;
+        service: string;
+        storage: string;
+      }) => void;
+      (Keychain.getGenericPassword as jest.Mock).mockReturnValueOnce(
+        new Promise(resolve => {
+          resolveCredentials = resolve;
+        }),
+      );
+
+      const fetchPromise = serverStore.fetchModelsForServer(id);
+      serverStore.updateServer(id, {url: 'https://new.example.com'});
+      resolveCredentials({
+        username: 'apiKey',
+        password: 'sk-original',
+        service: `pocketpal-server-${id}`,
+        storage: 'keychain',
+      });
+      await fetchPromise;
+
+      expect(mockedFetchModels).not.toHaveBeenCalled();
+    });
+
     it('lets only the newest overlapping fetch commit', async () => {
       const id = serverStore.addServer({
         name: 'Server',
@@ -1272,6 +1302,40 @@ describe('ServerStore', () => {
         600000,
         'GitHub Copilot',
       );
+    });
+
+    it('does not test with a loaded key after configuration changes', async () => {
+      const id = serverStore.addServer({
+        name: 'Server',
+        url: 'https://old.example.com',
+      });
+      let resolveCredentials!: (credentials: {
+        username: string;
+        password: string;
+        service: string;
+        storage: string;
+      }) => void;
+      (Keychain.getGenericPassword as jest.Mock).mockReturnValueOnce(
+        new Promise(resolve => {
+          resolveCredentials = resolve;
+        }),
+      );
+
+      const connectionPromise = serverStore.testServerConnection(id);
+      serverStore.updateServer(id, {url: 'https://new.example.com'});
+      resolveCredentials({
+        username: 'apiKey',
+        password: 'sk-original',
+        service: `pocketpal-server-${id}`,
+        storage: 'keychain',
+      });
+
+      await expect(connectionPromise).resolves.toEqual({
+        ok: false,
+        modelCount: 0,
+        error: 'Server configuration changed',
+      });
+      expect(mockedTestConnection).not.toHaveBeenCalled();
     });
 
     it('passes API key to testConnection', async () => {

@@ -429,8 +429,10 @@ class ServerStore {
     }
 
     const generation = this.bumpFetchGeneration(serverId);
+    const requestUrl = server.url;
+    const requestTimeoutMs = server.requestTimeoutMs;
     const snapshot = {
-      normalizedUrl: normalizeServerUrl(server.url),
+      normalizedUrl: normalizeServerUrl(requestUrl),
       serverType: server.serverType,
       credentialRevision: credentialRevisionOf(server),
     };
@@ -442,11 +444,14 @@ class ServerStore {
 
     try {
       const apiKey = await this.getApiKey(serverId);
+      if (!this.isCurrentFetch(serverId, generation, snapshot)) {
+        return;
+      }
       const models = await fetchModels(
-        server.url,
+        requestUrl,
         apiKey,
-        server.requestTimeoutMs,
-        server.serverType,
+        requestTimeoutMs,
+        snapshot.serverType,
       );
 
       runInAction(() => {
@@ -666,12 +671,29 @@ class ServerStore {
       return {ok: false, modelCount: 0, error: 'Server not found'};
     }
 
+    const requestUrl = server.url;
+    const requestTimeoutMs = server.requestTimeoutMs;
+    const requestServerType = server.serverType;
+    const requestCredentialRevision = credentialRevisionOf(server);
     const apiKey = await this.getApiKey(serverId);
+    const current = this.servers.find(candidate => candidate.id === serverId);
+    if (
+      !current ||
+      current.url !== requestUrl ||
+      current.serverType !== requestServerType ||
+      credentialRevisionOf(current) !== requestCredentialRevision
+    ) {
+      return {
+        ok: false,
+        modelCount: 0,
+        error: 'Server configuration changed',
+      };
+    }
     return testConnection(
-      server.url,
+      requestUrl,
       apiKey,
-      server.requestTimeoutMs,
-      server.serverType,
+      requestTimeoutMs,
+      requestServerType,
     );
   }
 

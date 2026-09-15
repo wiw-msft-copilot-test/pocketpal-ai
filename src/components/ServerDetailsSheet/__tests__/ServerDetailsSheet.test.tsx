@@ -311,6 +311,33 @@ describe('ServerDetailsSheet', () => {
     expect(call[3]).toBe('GitHub Copilot');
   });
 
+  it('does not send the saved key when probing a different origin', async () => {
+    const {getByTestId} = render(
+      <ServerDetailsSheet
+        isVisible={true}
+        onDismiss={jest.fn()}
+        serverId="srv-1"
+      />,
+    );
+
+    await waitFor(() => {
+      expect(serverStore.getApiKey).toHaveBeenCalledWith('srv-1');
+    });
+    fireEvent.changeText(
+      getByTestId('server-details-url-input'),
+      'https://other.example.com',
+    );
+
+    await waitFor(() => {
+      expect(mockedTestConnection).toHaveBeenCalledWith(
+        'https://other.example.com',
+        undefined,
+        undefined,
+        'GitHub Copilot',
+      );
+    });
+  });
+
   // When the in-edit field is empty, the probe falls back to the server's
   // saved requestTimeoutMs.
   it('falls back to the saved requestTimeoutMs when the field is empty', async () => {
