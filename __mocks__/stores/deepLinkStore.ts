@@ -31,6 +31,10 @@ export class DeepLinkStore {
       .nextVoiceConversationRequestId++;
   });
 
+  clearVoiceConversationRequest = jest.fn(() => {
+    this.pendingVoiceConversationRequestId = null;
+  });
+
   consumeVoiceConversationRequest = jest.fn((requestId: number) => {
     if (this.pendingVoiceConversationRequestId === requestId) {
       this.pendingVoiceConversationRequestId = null;

@@ -281,11 +281,13 @@ export const ChatInput = observer(
         return;
       }
       if (conversation.active) {
-        conversation.stop(false);
+        deepLinkStore.consumeVoiceConversationRequest(pendingVoiceRequestId);
+        return;
+      }
+      if (!isDictationEligible) {
         return;
       }
       if (
-        !isDictationEligible ||
         isStreaming ||
         isStopVisible ||
         isCameraActive ||
@@ -294,6 +296,7 @@ export const ChatInput = observer(
         !modelStore.engine ||
         modelStore.isContextLoading
       ) {
+        deepLinkStore.consumeVoiceConversationRequest(pendingVoiceRequestId);
         return;
       }
       if (value.trim() || selectedImages.length > 0) {
@@ -318,6 +321,15 @@ export const ChatInput = observer(
       startupSelectionReady,
       value,
     ]);
+
+    React.useEffect(() => {
+      if (pendingVoiceRequestId === null || !isDictationEligible) {
+        return;
+      }
+      return () => {
+        deepLinkStore.consumeVoiceConversationRequest(pendingVoiceRequestId);
+      };
+    }, [isDictationEligible, pendingVoiceRequestId]);
 
     React.useEffect(() => {
       if (!dictation.errorCode) {
@@ -432,6 +444,9 @@ export const ChatInput = observer(
     };
 
     const handleConversationPress = () => {
+      if (pendingVoiceRequestId !== null) {
+        deepLinkStore.consumeVoiceConversationRequest(pendingVoiceRequestId);
+      }
       if (conversation.active) {
         conversation.stop();
         return;

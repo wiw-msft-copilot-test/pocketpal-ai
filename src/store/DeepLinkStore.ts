@@ -49,6 +49,12 @@ class DeepLinkStore {
     });
   }
 
+  clearVoiceConversationRequest() {
+    runInAction(() => {
+      this.pendingVoiceConversationRequestId = null;
+    });
+  }
+
   consumeVoiceConversationRequest(requestId: number) {
     runInAction(() => {
       if (this.pendingVoiceConversationRequestId === requestId) {

@@ -65,6 +65,7 @@ describe('Android hardware declarations', () => {
           'android:name': '.VoiceChatActivity',
           'android:targetActivity': '.MainActivity',
           'android:label': '@string/voice_chat_app_name',
+          'android:enabled': 'false',
           'android:exported': 'true',
         }),
       ).toBeDefined();
@@ -83,6 +84,29 @@ describe('Android hardware declarations', () => {
       expect(mainActivity).toContain(
         'val normalizedIntent = normalizeVoiceChatIntent(intent)',
       );
+    });
+
+    it('resets the launcher disabled when the app process starts', () => {
+      const mainApplication = fs.readFileSync(
+        path.join(
+          __dirname,
+          '..',
+          '..',
+          'android',
+          'app',
+          'src',
+          'main',
+          'java',
+          'com',
+          'pocketpalai',
+          'MainApplication.kt',
+        ),
+        'utf8',
+      );
+      expect(mainApplication).toContain(
+        'VoiceChatLauncher.setEnabled(this, false)',
+      );
+      expect(mainApplication).toContain('add(VoiceChatLauncherPackage())');
     });
   });
 

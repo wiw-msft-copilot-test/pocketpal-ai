@@ -6,8 +6,9 @@
  */
 
 import {useEffect, useCallback} from 'react';
-import {Alert, Linking} from 'react-native';
+import {Alert, AppState, Linking} from 'react-native';
 import {useNavigation} from '@react-navigation/native';
+import {reaction} from 'mobx';
 import {deepLinkService, DeepLinkParams} from '../services/DeepLinkService';
 import {
   chatSessionStore,
@@ -17,6 +18,8 @@ import {
   uiStore,
 } from '../store';
 import {ROUTES} from '../utils/navigationConstants';
+import {hasVideoCapability} from '../utils/pal-capabilities';
+import {setVoiceChatLauncherEnabled} from '../services/voiceChatLauncher';
 import {
   isBenchmarkRunnerUrl,
   parseBenchmarkAutostart,
@@ -30,6 +33,22 @@ export const useDeepLinking = () => {
   const navigation = useNavigation();
 
   const handleVoiceChatLaunch = useCallback(() => {
+    const activePal = palStore.pals.find(
+      pal => pal.id === chatSessionStore.activePalId,
+    );
+    if (
+      !modelStore.engine ||
+      modelStore.isContextLoading ||
+      (activePal && hasVideoCapability(activePal))
+    ) {
+      deepLinkStore.clearVoiceConversationRequest();
+      Alert.alert(
+        uiStore.l10n.components.chatInput.speechInput
+          .conversationUnavailableTitle,
+        uiStore.l10n.chat.voiceLaunchUnavailableMessage,
+      );
+      return;
+    }
     if (
       modelStore.inferencing ||
       chatSessionStore.isGenerating ||
@@ -47,6 +66,25 @@ export const useDeepLinking = () => {
     deepLinkStore.requestVoiceConversation();
     (navigation as any).navigate(ROUTES.CHAT);
   }, [navigation]);
+
+  useEffect(
+    () =>
+      reaction(
+        () => Boolean(modelStore.engine) && !modelStore.isContextLoading,
+        enabled => setVoiceChatLauncherEnabled(enabled),
+        {fireImmediately: true},
+      ),
+    [],
+  );
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', nextState => {
+      if (nextState !== 'active') {
+        deepLinkStore.clearVoiceConversationRequest();
+      }
+    });
+    return () => subscription?.remove();
+  }, []);
 
   const handleChatDeepLink = useCallback(
     async (palId: string, palName?: string, message?: string) => {

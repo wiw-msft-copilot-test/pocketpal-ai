@@ -21,4 +21,12 @@ describe('DeepLinkStore voice conversation requests', () => {
     deepLinkStore.consumeVoiceConversationRequest(second!);
     expect(deepLinkStore.pendingVoiceConversationRequestId).toBeNull();
   });
+
+  it('clears the current request without requiring its ID', () => {
+    deepLinkStore.requestVoiceConversation();
+
+    deepLinkStore.clearVoiceConversationRequest();
+
+    expect(deepLinkStore.pendingVoiceConversationRequestId).toBeNull();
+  });
 });
