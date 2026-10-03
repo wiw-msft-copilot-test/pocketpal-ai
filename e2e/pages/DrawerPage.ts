@@ -73,6 +73,13 @@ export class DrawerPage extends BasePage {
     await this.waitForClose();
   }
 
+  async navigateToSearchChats(): Promise<void> {
+    await this.waitForOpen();
+    await this.tap(Selectors.drawer.searchChatsTab);
+    await browser.pause(300);
+    await this.waitForClose();
+  }
+
   /**
    * Tap a chat session in the sidebar by matching its title text
    */

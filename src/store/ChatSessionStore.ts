@@ -121,6 +121,7 @@ class ChatSessionStore {
   // Selection mode state
   isSelectionMode: boolean = false;
   selectedSessionIds: Set<string> = new Set();
+  searchReturnAvailable: boolean = false;
 
   // UX state for the active agent run. Driven by `agentStateReducer`
   // from `AgentEvent`s emitted by the runner. The only writer is
@@ -383,39 +384,42 @@ class ChatSessionStore {
       this.dismissedBannerVariants = new Set();
       this.consecutiveFullFailures = 0;
       this.palLoadHintSeen = new Set();
+      this.searchReturnAvailable = false;
     });
+  }
+
+  setSearchReturnAvailable(value: boolean) {
+    this.searchReturnAvailable = value;
   }
 
   // Helper method to load messages for a session
   private async loadSessionMessages(sessionId: string): Promise<void> {
-    try {
-      const sessionData = await chatSessionRepository.getSessionById(sessionId);
-      if (!sessionData) {
-        console.warn(`Session ${sessionId} not found when loading messages`);
-        return;
-      }
-
-      const session = this.sessions.find(s => s.id === sessionId);
-      if (!session) {
-        return;
-      }
-
-      const messages = sessionData.messages.map(msg => msg.toMessageObject());
-
-      runInAction(() => {
-        session.messages = messages;
-        session.messagesLoaded = true;
-      });
-    } catch (error) {
-      console.error(`Failed to load messages for session ${sessionId}:`, error);
+    const sessionData = await chatSessionRepository.getSessionById(sessionId);
+    if (!sessionData) {
+      throw new Error(`Session ${sessionId} was not found`);
     }
+
+    const session = this.sessions.find(s => s.id === sessionId);
+    if (!session) {
+      throw new Error(`Session ${sessionId} is not available`);
+    }
+
+    const messages = sessionData.messages.map(msg => msg.toMessageObject());
+
+    runInAction(() => {
+      session.messages = messages;
+      session.messagesLoaded = true;
+    });
   }
 
   async setActiveSession(sessionId: string): Promise<void> {
     const session = this.sessions.find(s => s.id === sessionId);
+    if (!session) {
+      throw new Error(`Session ${sessionId} is not available`);
+    }
 
     // Lazy-load messages if not already loaded
-    if (session && !session.messagesLoaded) {
+    if (!session.messagesLoaded) {
       await this.loadSessionMessages(sessionId);
     }
 

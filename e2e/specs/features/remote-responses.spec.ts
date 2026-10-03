@@ -2,6 +2,7 @@ import {expect} from '@wdio/globals';
 import {ChatPage} from '../../pages/ChatPage';
 import {DrawerPage} from '../../pages/DrawerPage';
 import {ModelsPage} from '../../pages/ModelsPage';
+import {SearchChatsPage} from '../../pages/SearchChatsPage';
 import {TIMEOUTS} from '../../fixtures/models';
 import {
   RESPONSES_MODEL_ID,
@@ -59,6 +60,7 @@ describe('Remote Responses protocol', () => {
   let chatPage: ChatPage;
   let drawerPage: DrawerPage;
   let modelsPage: ModelsPage;
+  let searchChatsPage: SearchChatsPage;
 
   before(async () => {
     await fixtureStatus(FIXTURE_URL);
@@ -66,6 +68,7 @@ describe('Remote Responses protocol', () => {
     chatPage = new ChatPage();
     drawerPage = new DrawerPage();
     modelsPage = new ModelsPage();
+    searchChatsPage = new SearchChatsPage();
     await chatPage.waitForReady(TIMEOUTS.appReady);
   });
 
@@ -73,6 +76,7 @@ describe('Remote Responses protocol', () => {
     chatPage = new ChatPage();
     drawerPage = new DrawerPage();
     modelsPage = new ModelsPage();
+    searchChatsPage = new SearchChatsPage();
   });
 
   afterEach(async function (this: Mocha.Context) {
@@ -177,6 +181,32 @@ describe('Remote Responses protocol', () => {
     await stop.waitForDisplayed({timeout: 5000});
     await stop.click();
     await stop.waitForDisplayed({reverse: true, timeout: 10000});
+    await browser.waitUntil(
+      async () => {
+        const status = await fixtureStatus(FIXTURE_URL);
+        return status.requests.some(
+          request => request.scenario === 'slow' && request.aborted,
+        );
+      },
+      {timeout: 10000, interval: 300},
+    );
+  });
+
+  it('searches persisted chats and aborts an active reply before opening one', async () => {
+    await chatPage.sendMessage('fixture:slow');
+    await waitForAssistantText('Slow fixture started.');
+
+    await chatPage.openDrawer();
+    await drawerPage.waitForOpen();
+    await drawerPage.navigateToSearchChats();
+    await searchChatsPage.waitForReady();
+    await searchChatsPage.search('fixture:incremental');
+    await searchChatsPage.openResult('fixture:incremental');
+
+    await chatPage.waitForReady();
+    expect(await latestAssistantText()).toContain(
+      'Streaming fixture complete.',
+    );
     await browser.waitUntil(
       async () => {
         const status = await fixtureStatus(FIXTURE_URL);

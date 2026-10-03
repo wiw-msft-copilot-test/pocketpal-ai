@@ -47,6 +47,8 @@ export const mockChatSessionStore = {
   // Selection mode state
   isSelectionMode: false,
   selectedSessionIds: new Set<string>(),
+  searchReturnAvailable: false,
+  setSearchReturnAvailable: jest.fn(),
   loadSessionList: jest.fn().mockResolvedValue(undefined),
   loadGlobalSettings: jest.fn().mockResolvedValue(undefined),
   deleteSession: jest.fn().mockResolvedValue(undefined),

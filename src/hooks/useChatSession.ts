@@ -49,6 +49,7 @@ import {
   type AgentEvent,
   type AgentUiState,
 } from '../services/agent';
+import {chatRunControl} from '../services/chatRunControl';
 
 const SAFE_COMPLETION_ERROR_NAMES = new Set([
   'AbortError',
@@ -588,6 +589,9 @@ export const useChatSession = (
   const handleSendPress = async (
     message: MessageType.PartialText,
   ): Promise<boolean | {narration: TTSPlaybackOutcome}> => {
+    if (chatRunControl.isSwitchingSession) {
+      return false;
+    }
     const engine = modelStore.engine;
     if (!engine) {
       await addSystemMessage(l10n.chat.modelNotLoaded);
@@ -604,384 +608,392 @@ export const useChatSession = (
     const hasImages = !!(imageUris && imageUris.length > 0);
     const runAbortController = new AbortController();
     abortRef.current = runAbortController;
-
-    const isMultimodalEnabled = modelStore.activeModelCaps.visionActive;
-
-    const currentMessages = toJS(chatSessionStore.currentSessionMessages);
-
-    const textMessage: MessageType.Text = {
-      author: user,
-      createdAt: Date.now(),
-      id: '',
-      text: message.text,
-      type: 'text',
-      imageUris: hasImages ? imageUris : undefined,
-      metadata: {
-        contextId,
-        conversationId: conversationIdRef.current,
-        copyable: true,
-        multimodal: hasImages,
-      },
-    };
-    await addMessage(textMessage);
-    modelStore.setInferencing(true);
-    modelStore.setIsStreaming(false);
-    chatSessionStore.setIsGenerating(true);
+    const runToken = chatRunControl.beginRun(() => runAbortController.abort());
+    currentMessageInfo.current = null;
 
     try {
-      activateKeepAwake();
-    } catch (error) {
-      console.error('Failed to activate keep awake during chat:', error);
-    }
+      const isMultimodalEnabled = modelStore.activeModelCaps.visionActive;
 
-    const activeSession = chatSessionStore.sessions.find(
-      s => s.id === chatSessionStore.activeSessionId,
-    );
-    const pal = activeSession?.activePalId
-      ? palStore.pals.find(p => p.id === activeSession.activePalId)
-      : null;
+      const currentMessages = toJS(chatSessionStore.currentSessionMessages);
 
-    const systemMessages = resolveSystemMessages({
-      pal,
-      model: modelStore.activeModel,
-    });
+      const textMessage: MessageType.Text = {
+        author: user,
+        createdAt: Date.now(),
+        id: '',
+        text: message.text,
+        type: 'text',
+        imageUris: hasImages ? imageUris : undefined,
+        metadata: {
+          contextId,
+          conversationId: conversationIdRef.current,
+          copyable: true,
+          multimodal: hasImages,
+        },
+      };
+      await addMessage(textMessage);
+      modelStore.setInferencing(true);
+      modelStore.setIsStreaming(false);
+      chatSessionStore.setIsGenerating(true);
 
-    const {cleanCompletionParams, messageInfo} = await prepareCompletion({
-      imageUris: imageUris || [],
-      message,
-      systemMessages,
-      contextId,
-      assistant,
-      conversationIdRef: conversationIdRef.current,
-      isMultimodalEnabled,
-      l10n,
-      currentMessages,
-    });
-
-    currentMessageInfo.current = messageInfo;
-
-    // Allowed talent names for this Pal. The runner rejects any
-    // tool call whose function.name isn't in this list.
-    const palTalents = (pal?.pact?.talents ?? []).map(t => t.name);
-
-    const completionStartTime = Date.now();
-    const timeToFirstTokenMs: {value: number | null} = {value: null};
-    const tts: TtsRunState = {
-      enabled: ttsStore.effectiveAutoSpeakEnabled,
-      started: false,
-      prevContent: '',
-      prevReasoning: '',
-    };
-    let uiState: AgentUiState = initialAgentUiState;
-
-    // Precompute trigger markers via the per-hook cache. We use the
-    // CLOSURE form of `getFormattedChat` (NOT `.bind(...)`) because the
-    // method is multi-arg and requires `params: {tools, jinja: true}`
-    // to populate `grammar_triggers`. A bare bind would call the
-    // method with no arguments and silently return empty markers,
-    // defeating marker detection. Failure is non-fatal: we fall back
-    // to `[]` and let `tool_call_started` drive the UX flip (one beat
-    // later) instead of `marker_seen`.
-    const tools =
-      (cleanCompletionParams.tools as ToolDefinition[] | undefined) ?? [];
-    let triggerMarkers: string[] = [];
-    // Marker detection reads `grammar_triggers` from a local Jinja
-    // `getFormattedChat` call — only meaningful when a local llama.rn
-    // context exists. In server mode (`modelStore.context` undefined)
-    // the remote llama.cpp parser handles tool-call detection on its
-    // own, so this whole step is skipped. Without the guard the
-    // non-null assertion below throws TypeError on every server-mode
-    // turn (caught + warned, but noisy).
-    const localContext = modelStore.context;
-    if (localContext) {
       try {
-        triggerMarkers = await triggerCacheRef.current.getMarkers(
-          String(localContext.id),
-          tools,
-          () =>
-            localContext.getFormattedChat(
-              cleanCompletionParams.messages ?? [],
-              undefined,
-              {tools: cleanCompletionParams.tools, jinja: true},
-            ) as Promise<JinjaFormattedChatResult>,
-        );
-      } catch (e) {
-        console.warn('[chat] trigger marker compute failed; falling back', e);
+        activateKeepAwake();
+      } catch (error) {
+        console.error('Failed to activate keep awake during chat:', error);
       }
-    }
 
-    try {
-      const events = runAgent({
-        engine,
-        initialParams: cleanCompletionParams as ApiCompletionParams,
-        allowedTalentNames: palTalents,
-        talentLookup: name => talentRegistry.get(name),
-        triggerMarkers,
-        messageId: messageInfo.id,
-        signal: runAbortController.signal,
+      const activeSession = chatSessionStore.sessions.find(
+        s => s.id === chatSessionStore.activeSessionId,
+      );
+      const pal = activeSession?.activePalId
+        ? palStore.pals.find(p => p.id === activeSession.activePalId)
+        : null;
+
+      const systemMessages = resolveSystemMessages({
+        pal,
+        model: modelStore.activeModel,
       });
 
-      // The chunk-cycle would otherwise run entirely via microtask
-      // resumption from queue.next(), starving the macrotask queue
-      // where touch events ride — Stop taps could sit for tens of
-      // seconds during long streams. A setTimeout(_, 0) yield every
-      // YIELD_INTERVAL_MS lets touches dispatch. The yield also
-      // decouples native production from consumption, so a backlog
-      // can grow on fast models; the abort guard below drops queued
-      // token events on stop while lifecycle events still run.
-      let lastYieldTs = performance.now();
-      const YIELD_INTERVAL_MS = 100;
+      const {cleanCompletionParams, messageInfo} = await prepareCompletion({
+        imageUris: imageUris || [],
+        message,
+        systemMessages,
+        contextId,
+        assistant,
+        conversationIdRef: conversationIdRef.current,
+        isMultimodalEnabled,
+        l10n,
+        currentMessages,
+      });
 
-      // Bucket the tool-token counter: PendingIndicator hides counts
-      // below 10, so publish every increment up to 10, then only on
-      // bucket boundaries. Drops the indicator's re-render rate by
-      // ~10× without visible loss.
-      let toolCallTokensRaw = 0;
-      const TOOL_TOKEN_BUCKET = 10;
+      currentMessageInfo.current = messageInfo;
 
-      for await (const event of events) {
-        if (runAbortController.signal.aborted && event.type === 'token') {
-          continue;
+      // Allowed talent names for this Pal. The runner rejects any
+      // tool call whose function.name isn't in this list.
+      const palTalents = (pal?.pact?.talents ?? []).map(t => t.name);
+
+      const completionStartTime = Date.now();
+      const timeToFirstTokenMs: {value: number | null} = {value: null};
+      const tts: TtsRunState = {
+        enabled: ttsStore.effectiveAutoSpeakEnabled,
+        started: false,
+        prevContent: '',
+        prevReasoning: '',
+      };
+      let uiState: AgentUiState = initialAgentUiState;
+
+      // Precompute trigger markers via the per-hook cache. We use the
+      // CLOSURE form of `getFormattedChat` (NOT `.bind(...)`) because the
+      // method is multi-arg and requires `params: {tools, jinja: true}`
+      // to populate `grammar_triggers`. A bare bind would call the
+      // method with no arguments and silently return empty markers,
+      // defeating marker detection. Failure is non-fatal: we fall back
+      // to `[]` and let `tool_call_started` drive the UX flip (one beat
+      // later) instead of `marker_seen`.
+      const tools =
+        (cleanCompletionParams.tools as ToolDefinition[] | undefined) ?? [];
+      let triggerMarkers: string[] = [];
+      // Marker detection reads `grammar_triggers` from a local Jinja
+      // `getFormattedChat` call — only meaningful when a local llama.rn
+      // context exists. In server mode (`modelStore.context` undefined)
+      // the remote llama.cpp parser handles tool-call detection on its
+      // own, so this whole step is skipped. Without the guard the
+      // non-null assertion below throws TypeError on every server-mode
+      // turn (caught + warned, but noisy).
+      const localContext = modelStore.context;
+      if (localContext) {
+        try {
+          triggerMarkers = await triggerCacheRef.current.getMarkers(
+            String(localContext.id),
+            tools,
+            () =>
+              localContext.getFormattedChat(
+                cleanCompletionParams.messages ?? [],
+                undefined,
+                {tools: cleanCompletionParams.tools, jinja: true},
+              ) as Promise<JinjaFormattedChatResult>,
+          );
+        } catch (e) {
+          console.warn('[chat] trigger marker compute failed; falling back', e);
         }
+      }
 
-        // Reference guard before MobX write: deep observables wrap
-        // values in a proxy, so equality inside the setter can't see
-        // "same object". The reducer returns the input ref when nothing
-        // changed; without this guard every event still publishes.
-        const nextUiState = agentStateReducer(uiState, event);
-        if (nextUiState !== uiState) {
-          uiState = nextUiState;
-          chatSessionStore.setAgentUiState(nextUiState);
-        }
-
-        switch (event.type) {
-          case 'run_started':
-          case 'step_started':
-          case 'tool_call_started':
-          case 'run_finished':
-          case 'run_failed':
-            toolCallTokensRaw = 0;
-            chatSessionStore.setToolCallTokenCount(0);
-            break;
-          case 'token':
-            if (event.delta.toolCalls && event.delta.toolCalls.length > 0) {
-              toolCallTokensRaw += 1;
-              if (
-                toolCallTokensRaw < TOOL_TOKEN_BUCKET ||
-                toolCallTokensRaw % TOOL_TOKEN_BUCKET === 0
-              ) {
-                chatSessionStore.setToolCallTokenCount(toolCallTokensRaw);
-              }
-            }
-            break;
-          default:
-            break;
-        }
-
-        await applyEventToStore(event, {
+      try {
+        const events = runAgent({
+          engine,
+          initialParams: cleanCompletionParams as ApiCompletionParams,
+          allowedTalentNames: palTalents,
+          talentLookup: name => talentRegistry.get(name),
+          triggerMarkers,
           messageId: messageInfo.id,
-          sessionId: messageInfo.sessionId,
-          completionStartTime,
-          timeToFirstTokenMs,
-          hasImages,
-          isMultimodalEnabled,
-          tts,
+          signal: runAbortController.signal,
         });
 
-        if (performance.now() - lastYieldTs >= YIELD_INTERVAL_MS) {
-          await new Promise(resolve => setTimeout(resolve, 0));
-          lastYieldTs = performance.now();
+        // The chunk-cycle would otherwise run entirely via microtask
+        // resumption from queue.next(), starving the macrotask queue
+        // where touch events ride — Stop taps could sit for tens of
+        // seconds during long streams. A setTimeout(_, 0) yield every
+        // YIELD_INTERVAL_MS lets touches dispatch. The yield also
+        // decouples native production from consumption, so a backlog
+        // can grow on fast models; the abort guard below drops queued
+        // token events on stop while lifecycle events still run.
+        let lastYieldTs = performance.now();
+        const YIELD_INTERVAL_MS = 100;
+
+        // Bucket the tool-token counter: PendingIndicator hides counts
+        // below 10, so publish every increment up to 10, then only on
+        // bucket boundaries. Drops the indicator's re-render rate by
+        // ~10× without visible loss.
+        let toolCallTokensRaw = 0;
+        const TOOL_TOKEN_BUCKET = 10;
+
+        for await (const event of events) {
+          if (runAbortController.signal.aborted && event.type === 'token') {
+            continue;
+          }
+
+          // Reference guard before MobX write: deep observables wrap
+          // values in a proxy, so equality inside the setter can't see
+          // "same object". The reducer returns the input ref when nothing
+          // changed; without this guard every event still publishes.
+          const nextUiState = agentStateReducer(uiState, event);
+          if (nextUiState !== uiState) {
+            uiState = nextUiState;
+            chatSessionStore.setAgentUiState(nextUiState);
+          }
+
+          switch (event.type) {
+            case 'run_started':
+            case 'step_started':
+            case 'tool_call_started':
+            case 'run_finished':
+            case 'run_failed':
+              toolCallTokensRaw = 0;
+              chatSessionStore.setToolCallTokenCount(0);
+              break;
+            case 'token':
+              if (event.delta.toolCalls && event.delta.toolCalls.length > 0) {
+                toolCallTokensRaw += 1;
+                if (
+                  toolCallTokensRaw < TOOL_TOKEN_BUCKET ||
+                  toolCallTokensRaw % TOOL_TOKEN_BUCKET === 0
+                ) {
+                  chatSessionStore.setToolCallTokenCount(toolCallTokensRaw);
+                }
+              }
+              break;
+            default:
+              break;
+          }
+
+          await applyEventToStore(event, {
+            messageId: messageInfo.id,
+            sessionId: messageInfo.sessionId,
+            completionStartTime,
+            timeToFirstTokenMs,
+            hasImages,
+            isMultimodalEnabled,
+            tts,
+          });
+
+          if (performance.now() - lastYieldTs >= YIELD_INTERVAL_MS) {
+            await new Promise(resolve => setTimeout(resolve, 0));
+            lastYieldTs = performance.now();
+          }
+
+          if (event.type === 'run_failed') {
+            throw event.error;
+          }
         }
 
-        if (event.type === 'run_failed') {
-          throw event.error;
-        }
-      }
+        modelStore.setInferencing(false);
+        modelStore.setIsStreaming(false);
+        chatSessionStore.setIsGenerating(false);
+        chatSessionStore.setIsStopping(false);
+        const narration = await tts.completion;
+        return message.metadata?.voiceConversation === true
+          ? {narration: narration ?? 'none'}
+          : true;
+      } catch (error) {
+        console.error('Completion error:', completionErrorMetadata(error));
+        modelStore.setInferencing(false);
+        modelStore.setIsStreaming(false);
+        chatSessionStore.setIsGenerating(false);
+        chatSessionStore.setIsStopping(false);
+        // Reset agentUiState back to idle so renderers don't get
+        // stuck in a failed state across the next user message.
+        chatSessionStore.setAgentUiState(initialAgentUiState);
+        chatSessionStore.setToolCallTokenCount(0);
 
-      modelStore.setInferencing(false);
-      modelStore.setIsStreaming(false);
-      chatSessionStore.setIsGenerating(false);
-      chatSessionStore.setIsStopping(false);
-      const narration = await tts.completion;
-      return message.metadata?.voiceConversation === true
-        ? {narration: narration ?? 'none'}
-        : true;
-    } catch (error) {
-      console.error('Completion error:', completionErrorMetadata(error));
-      modelStore.setInferencing(false);
-      modelStore.setIsStreaming(false);
-      chatSessionStore.setIsGenerating(false);
-      chatSessionStore.setIsStopping(false);
-      // Reset agentUiState back to idle so renderers don't get
-      // stuck in a failed state across the next user message.
-      chatSessionStore.setAgentUiState(initialAgentUiState);
-      chatSessionStore.setToolCallTokenCount(0);
+        // Stop any in-flight TTS — the completion errored, so buffered
+        // audio should not keep playing.
+        ttsStore.stop().catch(ttsErr => {
+          console.warn('[useChatSession] TTS stop on error failed:', ttsErr);
+        });
 
-      // Stop any in-flight TTS — the completion errored, so buffered
-      // audio should not keep playing.
-      ttsStore.stop().catch(ttsErr => {
-        console.warn('[useChatSession] TTS stop on error failed:', ttsErr);
-      });
+        const errorMessage = (error as Error).message;
+        const responseErrorCode =
+          typeof (error as {code?: unknown}).code === 'string'
+            ? (error as {code: string}).code
+            : undefined;
+        // Native tool-call parser throws on truncated JSON when the model
+        // ran out of context mid-args (most often `render_html` with a
+        // long string). Detect by error shape and route through the
+        // turn's metadata so the footer can show a friendlier hint
+        // instead of a multi-KB raw error dump.
+        const isToolArgsParseError =
+          /Failed to parse tool call arguments as JSON/i.test(errorMessage);
+        // Prompt-processing overflow: when the prompt itself exceeds n_ctx
+        // (ctx_shift is off — the llama.rn default), the native layer throws
+        // "Context is full" before any token is generated, so it never reaches
+        // run_finished. Treat it as an n_ctx-exhaustion signal so the banner
+        // surfaces instead of a raw error dump.
+        // LLAMARN-DEP: string-coupled to the native throw in RNLlamaJSI.cpp.
+        // No typed flag exists yet; a llama.rn reword would silently stop the
+        // prompt-overflow banner. Re-verify on upgrade; prefer a typed
+        // CompletionResult flag upstream when available.
+        const isContextFullError = /context is full/i.test(errorMessage);
+        const treatAsContextFull = isToolArgsParseError || isContextFullError;
+        // Low-RAM devices can fail to allocate the speculative draft context at
+        // first completion (the load-time memory check has no term for it).
+        // LLAMARN-DEP: string-coupled to the throw in rn-completion.cpp; a
+        // reword would silently demote this back to the raw dump.
+        const isSpeculativeInitError =
+          /failed to create MTP draft context/i.test(errorMessage);
 
-      const errorMessage = (error as Error).message;
-      const responseErrorCode =
-        typeof (error as {code?: unknown}).code === 'string'
-          ? (error as {code: string}).code
-          : undefined;
-      // Native tool-call parser throws on truncated JSON when the model
-      // ran out of context mid-args (most often `render_html` with a
-      // long string). Detect by error shape and route through the
-      // turn's metadata so the footer can show a friendlier hint
-      // instead of a multi-KB raw error dump.
-      const isToolArgsParseError =
-        /Failed to parse tool call arguments as JSON/i.test(errorMessage);
-      // Prompt-processing overflow: when the prompt itself exceeds n_ctx
-      // (ctx_shift is off — the llama.rn default), the native layer throws
-      // "Context is full" before any token is generated, so it never reaches
-      // run_finished. Treat it as an n_ctx-exhaustion signal so the banner
-      // surfaces instead of a raw error dump.
-      // LLAMARN-DEP: string-coupled to the native throw in RNLlamaJSI.cpp.
-      // No typed flag exists yet; a llama.rn reword would silently stop the
-      // prompt-overflow banner. Re-verify on upgrade; prefer a typed
-      // CompletionResult flag upstream when available.
-      const isContextFullError = /context is full/i.test(errorMessage);
-      const treatAsContextFull = isToolArgsParseError || isContextFullError;
-      // Low-RAM devices can fail to allocate the speculative draft context at
-      // first completion (the load-time memory check has no term for it).
-      // LLAMARN-DEP: string-coupled to the throw in rn-completion.cpp; a
-      // reword would silently demote this back to the raw dump.
-      const isSpeculativeInitError = /failed to create MTP draft context/i.test(
-        errorMessage,
-      );
-
-      // Error rollback path. The empty/in-flight AssistantTurn row
-      // already exists; preserve any partial steps and tag with
-      // {interrupted, copyable} (plus {truncationLikely} on the
-      // tool-call parse case). The store widening from step 2 ensures
-      // this metadata write does not silently no-op on assistant_turn
-      // rows and does not clobber metadata.steps.
-      let turnAbsorbedError = false;
-      if (currentMessageInfo.current) {
-        const session = chatSessionStore.sessions.find(
-          s => s.id === currentMessageInfo.current!.sessionId,
-        );
-        const currentMsg = session?.messages.find(
-          msg => msg.id === currentMessageInfo.current!.id,
-        );
-
-        const hasAnyStepContent =
-          currentMsg?.type === 'assistant_turn' &&
-          ((currentMsg as MessageType.AssistantTurn).steps ?? []).some(
-            s => (s.content?.length ?? 0) > 0 || (s.toolCalls?.length ?? 0) > 0,
+        // Error rollback path. The empty/in-flight AssistantTurn row
+        // already exists; preserve any partial steps and tag with
+        // {interrupted, copyable} (plus {truncationLikely} on the
+        // tool-call parse case). The store widening from step 2 ensures
+        // this metadata write does not silently no-op on assistant_turn
+        // rows and does not clobber metadata.steps.
+        let turnAbsorbedError = false;
+        if (currentMessageInfo.current) {
+          const session = chatSessionStore.sessions.find(
+            s => s.id === currentMessageInfo.current!.sessionId,
           );
-        const hasLegacyText =
-          currentMsg?.type === 'text' &&
-          !!(currentMsg as MessageType.Text).text;
-        const hasPartialContent = hasAnyStepContent || hasLegacyText;
-
-        if (hasPartialContent) {
-          // No finalResult on the abort path, so no turn reported a count.
-          // truncationLikely is the n_ctx-exhaustion signal: when set, treat
-          // the turn as full and pin `used` to the context window so the
-          // sticky banner's freshness gate holds. Otherwise the count is
-          // unknown, which is not zero.
-          const isRemote =
-            modelStore.activeModel?.origin === ModelOrigin.REMOTE;
-          const effectiveNCtx =
-            modelStore.activeModelCaps.effectiveContextLength;
-          const abortSnapshot: CompletionResultSnapshot = {
-            used: treatAsContextFull ? effectiveNCtx : undefined,
-            contextFull: treatAsContextFull,
-            isRemote,
-          };
-          await chatSessionStore.updateMessage(
-            currentMessageInfo.current.id,
-            currentMessageInfo.current.sessionId,
-            {
-              metadata: {
-                interrupted: true,
-                ...(responseErrorCode
-                  ? {responseErrorCode, responseStatus: 'failed'}
-                  : {}),
-                copyable: true,
-                completionResult: abortSnapshot,
-                ...(isToolArgsParseError ? {truncationLikely: true} : {}),
-              },
-            },
+          const currentMsg = session?.messages.find(
+            msg => msg.id === currentMessageInfo.current!.id,
           );
-          chatSessionStore.recordCompletionSnapshot(abortSnapshot);
-          // The turn now carries the failure context; suppress the
-          // duplicate `Completion failed: …` system message dump.
-          turnAbsorbedError = true;
-        } else {
-          // A prompt that overflows n_ctx throws before any token, so there
-          // is no content to keep — but still record the snapshot so the
-          // banner surfaces the full state. The empty turn is cleaned up
-          // below; the store snapshot drives the banner independently.
-          // Per-process for this draft: with no message persisted, the banner
-          // does not rehydrate after a session switch / restart (it re-fires
-          // on the next overflowing send).
-          if (isContextFullError) {
+
+          const hasAnyStepContent =
+            currentMsg?.type === 'assistant_turn' &&
+            ((currentMsg as MessageType.AssistantTurn).steps ?? []).some(
+              s =>
+                (s.content?.length ?? 0) > 0 || (s.toolCalls?.length ?? 0) > 0,
+            );
+          const hasLegacyText =
+            currentMsg?.type === 'text' &&
+            !!(currentMsg as MessageType.Text).text;
+          const hasPartialContent = hasAnyStepContent || hasLegacyText;
+
+          if (hasPartialContent) {
+            // No finalResult on the abort path, so no turn reported a count.
+            // truncationLikely is the n_ctx-exhaustion signal: when set, treat
+            // the turn as full and pin `used` to the context window so the
+            // sticky banner's freshness gate holds. Otherwise the count is
+            // unknown, which is not zero.
             const isRemote =
               modelStore.activeModel?.origin === ModelOrigin.REMOTE;
             const effectiveNCtx =
               modelStore.activeModelCaps.effectiveContextLength;
-            chatSessionStore.recordCompletionSnapshot({
-              used: effectiveNCtx,
-              contextFull: true,
+            const abortSnapshot: CompletionResultSnapshot = {
+              used: treatAsContextFull ? effectiveNCtx : undefined,
+              contextFull: treatAsContextFull,
               isRemote,
-            });
-            turnAbsorbedError = true;
-          }
-          try {
-            await chatSessionRepository.deleteMessage(
+            };
+            await chatSessionStore.updateMessage(
               currentMessageInfo.current.id,
+              currentMessageInfo.current.sessionId,
+              {
+                metadata: {
+                  interrupted: true,
+                  ...(responseErrorCode
+                    ? {responseErrorCode, responseStatus: 'failed'}
+                    : {}),
+                  copyable: true,
+                  completionResult: abortSnapshot,
+                  ...(isToolArgsParseError ? {truncationLikely: true} : {}),
+                },
+              },
             );
-            if (session) {
-              runInAction(() => {
-                session.messages = session.messages.filter(
-                  msg => msg.id !== currentMessageInfo.current!.id,
-                );
+            chatSessionStore.recordCompletionSnapshot(abortSnapshot);
+            // The turn now carries the failure context; suppress the
+            // duplicate `Completion failed: …` system message dump.
+            turnAbsorbedError = true;
+          } else {
+            // A prompt that overflows n_ctx throws before any token, so there
+            // is no content to keep — but still record the snapshot so the
+            // banner surfaces the full state. The empty turn is cleaned up
+            // below; the store snapshot drives the banner independently.
+            // Per-process for this draft: with no message persisted, the banner
+            // does not rehydrate after a session switch / restart (it re-fires
+            // on the next overflowing send).
+            if (isContextFullError) {
+              const isRemote =
+                modelStore.activeModel?.origin === ModelOrigin.REMOTE;
+              const effectiveNCtx =
+                modelStore.activeModelCaps.effectiveContextLength;
+              chatSessionStore.recordCompletionSnapshot({
+                used: effectiveNCtx,
+                contextFull: true,
+                isRemote,
               });
+              turnAbsorbedError = true;
             }
-          } catch (cleanupError) {
-            console.error(
-              'Failed to clean up empty message after error:',
-              cleanupError,
-            );
+            try {
+              await chatSessionRepository.deleteMessage(
+                currentMessageInfo.current.id,
+              );
+              if (session) {
+                runInAction(() => {
+                  session.messages = session.messages.filter(
+                    msg => msg.id !== currentMessageInfo.current!.id,
+                  );
+                });
+              }
+            } catch (cleanupError) {
+              console.error(
+                'Failed to clean up empty message after error:',
+                cleanupError,
+              );
+            }
           }
         }
-      }
 
-      if (turnAbsorbedError) {
-        // Footer already surfaces interrupted / truncationLikely; nothing
-        // more to add to chat.
-      } else if (errorMessage.includes('network')) {
-        await addSystemMessage(l10n.common.networkError);
-      } else if (isToolArgsParseError) {
-        // No turn content to attach the hint to — fall back to a
-        // friendly system message instead of the raw native error dump.
-        await addSystemMessage(l10n.chat.toolCallTruncated);
-      } else if (isSpeculativeInitError) {
-        await addSystemMessage(l10n.chat.speculativeInitFailed);
-      } else if (isContextFullError) {
-        // No turn to attach to; surface the banner via a store snapshot
-        // rather than dumping the raw "Context is full" native error.
-        chatSessionStore.recordCompletionSnapshot({
-          used: modelStore.activeModelCaps.effectiveContextLength,
-          contextFull: true,
-          isRemote: modelStore.activeModel?.origin === ModelOrigin.REMOTE,
-        });
-      } else {
-        await addSystemMessage(`${l10n.chat.completionFailed}${errorMessage}`);
+        if (turnAbsorbedError) {
+          // Footer already surfaces interrupted / truncationLikely; nothing
+          // more to add to chat.
+        } else if (errorMessage.includes('network')) {
+          await addSystemMessage(l10n.common.networkError);
+        } else if (isToolArgsParseError) {
+          // No turn content to attach the hint to — fall back to a
+          // friendly system message instead of the raw native error dump.
+          await addSystemMessage(l10n.chat.toolCallTruncated);
+        } else if (isSpeculativeInitError) {
+          await addSystemMessage(l10n.chat.speculativeInitFailed);
+        } else if (isContextFullError) {
+          // No turn to attach to; surface the banner via a store snapshot
+          // rather than dumping the raw "Context is full" native error.
+          chatSessionStore.recordCompletionSnapshot({
+            used: modelStore.activeModelCaps.effectiveContextLength,
+            contextFull: true,
+            isRemote: modelStore.activeModel?.origin === ModelOrigin.REMOTE,
+          });
+        } else {
+          await addSystemMessage(
+            `${l10n.chat.completionFailed}${errorMessage}`,
+          );
+        }
+        return false;
+      } finally {
+        try {
+          deactivateKeepAwake();
+        } catch (error) {
+          console.error('Failed to deactivate keep awake after chat:', error);
+        }
       }
-      return false;
     } finally {
-      try {
-        deactivateKeepAwake();
-      } catch (error) {
-        console.error('Failed to deactivate keep awake after chat:', error);
-      }
+      chatRunControl.endRun(runToken);
     }
   };
 

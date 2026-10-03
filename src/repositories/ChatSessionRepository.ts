@@ -23,6 +23,22 @@ const defaultCompletionSettings = {...defaultCompletionParams};
 delete defaultCompletionSettings.prompt;
 delete defaultCompletionSettings.stop;
 
+export interface ChatSearchSessionRow {
+  sessionId: string;
+  title: string;
+  sessionDate: string;
+}
+
+export interface ChatSearchMessageRow {
+  id: string;
+  sessionId: string;
+  author: string;
+  type: string;
+  text?: string;
+  metadata?: string;
+  createdAt: number;
+}
+
 const metadataObject = (metadata: unknown): Record<string, any> =>
   metadata && typeof metadata === 'object' && !Array.isArray(metadata)
     ? {...metadata}
@@ -190,6 +206,52 @@ class ChatSessionRepository {
       .query()
       .fetch();
     return sessions as unknown as ChatSession[];
+  }
+
+  async getChatSearchSessions(): Promise<ChatSearchSessionRow[]> {
+    const rows = await database.collections
+      .get('chat_sessions')
+      .query(Q.sortBy('id', Q.asc))
+      .unsafeFetchRaw();
+    return rows.map((row: any) => ({
+      sessionId: row.id,
+      title: row.title,
+      sessionDate: row.date,
+    }));
+  }
+
+  async getChatSearchMessageUpperBound(): Promise<string | null> {
+    const rows = await database.collections
+      .get('messages')
+      .query(Q.sortBy('id', Q.desc), Q.take(1))
+      .unsafeFetchRaw();
+    return rows[0]?.id ?? null;
+  }
+
+  async getChatSearchMessagePage(
+    afterId: string | null,
+    throughId: string,
+    limit: number,
+  ): Promise<ChatSearchMessageRow[]> {
+    const cursor = afterId ? [Q.where('id', Q.gt(afterId))] : [];
+    const rows = await database.collections
+      .get('messages')
+      .query(
+        ...cursor,
+        Q.where('id', Q.lte(throughId)),
+        Q.sortBy('id', Q.asc),
+        Q.take(limit),
+      )
+      .unsafeFetchRaw();
+    return rows.map((row: any) => ({
+      id: row.id,
+      sessionId: row.session_id,
+      author: row.author,
+      type: row.type,
+      text: row.text,
+      metadata: row.metadata,
+      createdAt: row.created_at,
+    }));
   }
 
   // Get a single session with its messages and settings
