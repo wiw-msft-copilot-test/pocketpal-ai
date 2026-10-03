@@ -14,6 +14,22 @@ const manifest = fs.readFileSync(
   ),
   'utf8',
 );
+const mainActivity = fs.readFileSync(
+  path.join(
+    __dirname,
+    '..',
+    '..',
+    'android',
+    'app',
+    'src',
+    'main',
+    'java',
+    'com',
+    'pocketpalai',
+    'MainActivity.kt',
+  ),
+  'utf8',
+);
 
 const tags = name =>
   [...manifest.matchAll(new RegExp(`<${name}\\b[^>]*>`, 'g'))].map(
@@ -40,6 +56,34 @@ describe('Android hardware declarations', () => {
         'android:name': 'android.permission.RECORD_AUDIO',
       }),
     ).toBeDefined();
+  });
+
+  describe('Android voice chat launcher', () => {
+    it('keeps a distinct exported launcher alias targeting MainActivity', () => {
+      expect(
+        findTag('activity-alias', {
+          'android:name': '.VoiceChatActivity',
+          'android:targetActivity': '.MainActivity',
+          'android:label': '@string/voice_chat_app_name',
+          'android:exported': 'true',
+        }),
+      ).toBeDefined();
+    });
+
+    it('normalizes alias launches to the scoped assistant route', () => {
+      expect(mainActivity).toContain(
+        'private const val VOICE_CHAT_ALIAS = ".VoiceChatActivity"',
+      );
+      expect(mainActivity).toContain(
+        'private const val VOICE_CHAT_URL = "pocketpal://assistant/new-chat"',
+      );
+      expect(mainActivity).toContain(
+        'setIntent(normalizeVoiceChatIntent(intent))',
+      );
+      expect(mainActivity).toContain(
+        'val normalizedIntent = normalizeVoiceChatIntent(intent)',
+      );
+    });
   });
 
   it.each(['android.hardware.camera', 'android.hardware.camera.any'])(

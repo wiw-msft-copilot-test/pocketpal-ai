@@ -19,7 +19,13 @@ import {renderHook} from '@testing-library/react-native';
 import {useDeepLinking} from '../useDeepLinking';
 import {ROUTES} from '../../utils/navigationConstants';
 import {deepLinkService} from '../../services/DeepLinkService';
-import {checkoutFlowStore, chatSessionStore, palStore} from '../../store';
+import {
+  checkoutFlowStore,
+  chatSessionStore,
+  deepLinkStore,
+  modelStore,
+  palStore,
+} from '../../store';
 
 // Stable navigate spy that we re-assert across the file. The hook reads
 // `useNavigation()` once per render, so capturing the function from a
@@ -56,6 +62,10 @@ describe('useDeepLinking — cold-launch routing', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    modelStore.inferencing = false;
+    chatSessionStore.isGenerating = false;
+    chatSessionStore.isStopping = false;
+    deepLinkStore.pendingVoiceConversationRequestId = null;
     getInitialURLSpy = jest.spyOn(Linking, 'getInitialURL');
     // The prod hub/run Linking effect surfaces an Alert on invalid links.
     // Benchmark URLs are invalid hub links, so silence the Alert here.
@@ -139,6 +149,36 @@ describe('useDeepLinking — cold-launch routing', () => {
     await Promise.resolve();
     await Promise.resolve();
 
+    expect(mockNavigate).not.toHaveBeenCalled();
+  });
+
+  it('starts a fresh voice chat for an assistant launch URL', async () => {
+    (global as any).__E2E__ = false;
+    getInitialURLSpy.mockResolvedValue('pocketpal://assistant/new-chat');
+
+    renderHook(() => useDeepLinking());
+
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(chatSessionStore.resetActiveSession).toHaveBeenCalledTimes(1);
+    expect(deepLinkStore.requestVoiceConversation).toHaveBeenCalledTimes(1);
+    expect(mockNavigate).toHaveBeenCalledWith(ROUTES.CHAT);
+  });
+
+  it('does not replace an active generation with a voice chat', async () => {
+    (global as any).__E2E__ = false;
+    modelStore.inferencing = true;
+    getInitialURLSpy.mockResolvedValue('pocketpal://assistant/new-chat');
+
+    renderHook(() => useDeepLinking());
+
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(Alert.alert).toHaveBeenCalled();
+    expect(chatSessionStore.resetActiveSession).not.toHaveBeenCalled();
+    expect(deepLinkStore.requestVoiceConversation).not.toHaveBeenCalled();
     expect(mockNavigate).not.toHaveBeenCalled();
   });
 

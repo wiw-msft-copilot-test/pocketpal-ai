@@ -9,7 +9,13 @@ import {useEffect, useCallback} from 'react';
 import {Alert, Linking} from 'react-native';
 import {useNavigation} from '@react-navigation/native';
 import {deepLinkService, DeepLinkParams} from '../services/DeepLinkService';
-import {chatSessionStore, palStore, deepLinkStore, uiStore} from '../store';
+import {
+  chatSessionStore,
+  deepLinkStore,
+  modelStore,
+  palStore,
+  uiStore,
+} from '../store';
 import {ROUTES} from '../utils/navigationConstants';
 import {
   isBenchmarkRunnerUrl,
@@ -22,6 +28,25 @@ import {
  */
 export const useDeepLinking = () => {
   const navigation = useNavigation();
+
+  const handleVoiceChatLaunch = useCallback(() => {
+    if (
+      modelStore.inferencing ||
+      chatSessionStore.isGenerating ||
+      chatSessionStore.isStopping
+    ) {
+      Alert.alert(
+        uiStore.l10n.chat.voiceLaunchBusyTitle,
+        uiStore.l10n.chat.voiceLaunchBusyMessage,
+        [{text: uiStore.l10n.common.ok}],
+      );
+      return;
+    }
+
+    chatSessionStore.resetActiveSession();
+    deepLinkStore.requestVoiceConversation();
+    (navigation as any).navigate(ROUTES.CHAT);
+  }, [navigation]);
 
   const handleChatDeepLink = useCallback(
     async (palId: string, palName?: string, message?: string) => {
@@ -109,6 +134,14 @@ export const useDeepLinking = () => {
         }
       }
 
+      if (
+        params.scheme === 'pocketpal' &&
+        params.host === 'assistant' &&
+        new URL(params.url).pathname === '/new-chat'
+      ) {
+        handleVoiceChatLaunch();
+      }
+
       // Handle hub/run download deep links (iOS native-emitter path). Only the
       // exact hub/run route is handled; unknown hub paths are ignored silently,
       // matching the prod Linking path.
@@ -119,7 +152,7 @@ export const useDeepLinking = () => {
         handleHubRunLink(params.url);
       }
     },
-    [handleChatDeepLink, handleHubRunLink, navigation],
+    [handleChatDeepLink, handleHubRunLink, handleVoiceChatLaunch, navigation],
   );
 
   // E2E-only routing for the BenchmarkRunnerScreen. Two paths:
@@ -184,24 +217,38 @@ export const useDeepLinking = () => {
     };
   }, [handleDeepLink]);
 
-  // Prod, always-on delivery for the hub/run route. iOS arrives via the native
-  // emitter above; Android prod has no native deep-link bridge, so this RN
-  // Linking path (cold getInitialURL + warm 'url' event) is the only delivery.
-  // Gated by isHubLink so non-hub URLs (chat, e2e/benchmark, memory) and unknown
-  // hub paths are ignored silently — only the exact hub/run route reaches
-  // handleHubRunLink, matching the native emitter path. A malformed hub/run
-  // payload still alerts.
+  // Prod, always-on Android delivery for supported routes. iOS arrives via the
+  // native emitter above; Android uses RN Linking for cold and warm intents.
   useEffect(() => {
+    const routeProdUrl = (url: string | null) => {
+      if (!url) {
+        return;
+      }
+      let isVoiceChatLaunch = false;
+      try {
+        const parsed = new URL(url);
+        isVoiceChatLaunch =
+          parsed.protocol === 'pocketpal:' &&
+          parsed.hostname === 'assistant' &&
+          parsed.pathname === '/new-chat';
+      } catch {
+        isVoiceChatLaunch = false;
+      }
+      if (isVoiceChatLaunch) {
+        handleVoiceChatLaunch();
+        return;
+      }
+
+      if (
+        __ENABLE_PALSHUB__ &&
+        require('../services/hubRunLink').isHubLink(url)
+      ) {
+        handleHubRunLink(url);
+      }
+    };
+
     Linking.getInitialURL()
-      .then(url => {
-        if (
-          __ENABLE_PALSHUB__ &&
-          url &&
-          require('../services/hubRunLink').isHubLink(url)
-        ) {
-          handleHubRunLink(url);
-        }
-      })
+      .then(routeProdUrl)
       .catch(() => {
         // getInitialURL rejects on some surfaces; the warm listener still runs.
       });
@@ -210,15 +257,7 @@ export const useDeepLinking = () => {
     // throw so it can't tear down the rest of the hook's lifecycle.
     let sub: {remove: () => void} | null = null;
     try {
-      sub = Linking.addEventListener('url', ({url}) => {
-        if (
-          __ENABLE_PALSHUB__ &&
-          url &&
-          require('../services/hubRunLink').isHubLink(url)
-        ) {
-          handleHubRunLink(url);
-        }
-      });
+      sub = Linking.addEventListener('url', ({url}) => routeProdUrl(url));
     } catch {
       sub = null;
     }
@@ -226,7 +265,7 @@ export const useDeepLinking = () => {
     return () => {
       sub?.remove();
     };
-  }, [handleHubRunLink]);
+  }, [handleHubRunLink, handleVoiceChatLaunch]);
 };
 
 /**
