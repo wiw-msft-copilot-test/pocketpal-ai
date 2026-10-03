@@ -6,7 +6,13 @@ import {IconButton} from 'react-native-paper';
 
 import {user} from '../../../../jest/fixtures';
 import {render} from '../../../../jest/test-utils';
-import {chatSessionStore, modelStore, palStore} from '../../../store';
+import {
+  chatSessionStore,
+  deepLinkStore,
+  modelStore,
+  palStore,
+  startupSelectionStore,
+} from '../../../store';
 import {UserContext} from '../../../utils';
 import {useVoiceConversation} from '../../../hooks/useVoiceConversation';
 import {ChatInput} from '../ChatInput';
@@ -52,6 +58,10 @@ describe('ChatInput dictation', () => {
     mockUseVoiceConversation.mockReturnValue(conversationResult);
     runInAction(() => {
       modelStore.activeModelId = 'test-model-id';
+      modelStore.engine = undefined;
+      deepLinkStore.pendingVoiceConversationRequestId = null;
+      startupSelectionStore.restoreAttempted = true;
+      startupSelectionStore.isRestoring = false;
     });
     jest.clearAllMocks();
   });
@@ -72,6 +82,60 @@ describe('ChatInput dictation', () => {
 
     expect(conversationResult.start).toHaveBeenCalledTimes(1);
     expect(onSendPress).not.toHaveBeenCalled();
+  });
+
+  it('starts a pending launcher voice request once the model is ready', () => {
+    runInAction(() => {
+      modelStore.engine = {} as any;
+      deepLinkStore.pendingVoiceConversationRequestId = 42;
+    });
+
+    render(
+      <UserContext.Provider value={user}>
+        <ChatInput onSendPress={jest.fn()} />
+      </UserContext.Provider>,
+    );
+
+    expect(conversationResult.start).toHaveBeenCalledTimes(1);
+    expect(deepLinkStore.consumeVoiceConversationRequest).toHaveBeenCalledWith(
+      42,
+    );
+  });
+
+  it('keeps a launcher voice request pending while the model loads', () => {
+    runInAction(() => {
+      deepLinkStore.pendingVoiceConversationRequestId = 43;
+    });
+
+    render(
+      <UserContext.Provider value={user}>
+        <ChatInput onSendPress={jest.fn()} />
+      </UserContext.Provider>,
+    );
+
+    expect(conversationResult.start).not.toHaveBeenCalled();
+    expect(
+      deepLinkStore.consumeVoiceConversationRequest,
+    ).not.toHaveBeenCalled();
+  });
+
+  it('keeps a launcher voice request pending until startup selections settle', () => {
+    runInAction(() => {
+      modelStore.engine = {} as any;
+      startupSelectionStore.isRestoring = true;
+      deepLinkStore.pendingVoiceConversationRequestId = 44;
+    });
+
+    render(
+      <UserContext.Provider value={user}>
+        <ChatInput onSendPress={jest.fn()} />
+      </UserContext.Provider>,
+    );
+
+    expect(conversationResult.start).not.toHaveBeenCalled();
+    expect(
+      deepLinkStore.consumeVoiceConversationRequest,
+    ).not.toHaveBeenCalled();
   });
 
   it('shows partial text and uses the same button to stop conversation', () => {

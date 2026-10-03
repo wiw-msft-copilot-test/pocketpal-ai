@@ -248,6 +248,13 @@ conversation ends when PocketPal leaves the foreground. Recognition stays on
 device, but recognized text is still sent to a remote model when a remote
 server is selected.
 
+Android builds also expose a separate **PocketPal Voice Chat** launcher entry.
+Opening it creates a new chat with the currently selected Pal and model, then
+starts hands-free conversation when the model is ready. This private-build
+fallback can be launched by name when Google Assistant permits app launches,
+but it is not a Google Play App Action and Android Auto may block it while
+driving because PocketPal is not an Android Auto app.
+
 <div style="display: flex; justify-content: center;">
     <img src="../assets/chat_1.webp" alt="Navigate to Models Page" style="width: 33%;">
     <img src="../assets/chat_2.webp" alt="Download a Model" style="width: 33%;">
