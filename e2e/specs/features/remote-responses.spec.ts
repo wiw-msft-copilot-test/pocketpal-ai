@@ -193,6 +193,14 @@ describe('Remote Responses protocol', () => {
   });
 
   it('searches persisted chats and aborts an active reply before opening one', async () => {
+    await chatPage.resetChat();
+    await chatPage.sendMessage('fixture:final-only search-anchor');
+    await waitForAssistantText('Final-only fixture output.');
+    await chatPage.resetChat();
+    const abortedBefore = (await fixtureStatus(FIXTURE_URL)).requests.filter(
+      request => request.scenario === 'slow' && request.aborted,
+    ).length;
+
     await chatPage.sendMessage('fixture:slow');
     await waitForAssistantText('Slow fixture started.');
 
@@ -200,18 +208,18 @@ describe('Remote Responses protocol', () => {
     await drawerPage.waitForOpen();
     await drawerPage.navigateToSearchChats();
     await searchChatsPage.waitForReady();
-    await searchChatsPage.search('fixture:incremental');
-    await searchChatsPage.openResult('fixture:incremental');
+    await searchChatsPage.search('search-anchor');
+    await searchChatsPage.openResult('search-anchor');
 
     await chatPage.waitForReady();
-    expect(await latestAssistantText()).toContain(
-      'Streaming fixture complete.',
-    );
+    expect(await latestAssistantText()).toContain('Final-only fixture output.');
     await browser.waitUntil(
       async () => {
         const status = await fixtureStatus(FIXTURE_URL);
-        return status.requests.some(
-          request => request.scenario === 'slow' && request.aborted,
+        return (
+          status.requests.filter(
+            request => request.scenario === 'slow' && request.aborted,
+          ).length > abortedBefore
         );
       },
       {timeout: 10000, interval: 300},
