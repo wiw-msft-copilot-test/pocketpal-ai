@@ -1,6 +1,7 @@
 import React from 'react';
-import {Platform, View} from 'react-native';
+import {Platform, TouchableOpacity, View} from 'react-native';
 import {observer} from 'mobx-react';
+import {useNavigation} from '@react-navigation/native';
 
 import {createStyles} from './styles';
 import {HeaderRight} from '../HeaderRight';
@@ -13,6 +14,30 @@ import {getDefaultHeaderHeight} from '@react-navigation/elements';
 import {useTheme} from '../../hooks';
 import {chatSessionStore} from '../../store';
 import {HeaderLeft} from '../HeaderLeft';
+import {ArrowLeftMdIcon} from '../../assets/icons';
+import {ROUTES} from '../../utils/navigationConstants';
+import {L10nContext} from '../../utils';
+
+const SearchReturnButton = () => {
+  const navigation = useNavigation<any>();
+  const theme = useTheme();
+  const l10n = React.useContext(L10nContext);
+  return (
+    <TouchableOpacity
+      testID="back-to-chat-search"
+      accessibilityLabel={l10n.searchChats.backToSearch}
+      onPress={() => navigation.navigate(ROUTES.SEARCH_CHATS)}
+      style={
+        createStyles({
+          theme,
+          insets: {top: 0, right: 0, bottom: 0, left: 0},
+          headerHeight: 0,
+        }).menuIcon
+      }>
+      <ArrowLeftMdIcon stroke={theme.colors.primary} />
+    </TouchableOpacity>
+  );
+};
 
 export const ChatHeader: React.FC = observer(() => {
   const theme = useTheme();
@@ -38,6 +63,7 @@ export const ChatHeader: React.FC = observer(() => {
   return (
     <View testID="header-view" style={[styles.container, headerStyle]}>
       <View style={styles.leftSection}>
+        {chatSessionStore.searchReturnAvailable ? <SearchReturnButton /> : null}
         <HeaderLeft />
         <ChatHeaderTitle />
       </View>

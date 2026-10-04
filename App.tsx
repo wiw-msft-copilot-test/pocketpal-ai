@@ -40,6 +40,7 @@ import {
   SettingsScreen,
   BenchmarkScreen,
   AboutScreen,
+  SearchChatsScreen,
 
   // Dev tools screen. Only available in debug mode.
   DevToolsScreen,
@@ -142,6 +143,14 @@ const App = observer(() => {
                             component={gestureHandlerRootHOC(ChatScreen)}
                             options={{
                               headerShown: false,
+                            }}
+                          />
+                          <Drawer.Screen
+                            name={ROUTES.SEARCH_CHATS}
+                            component={gestureHandlerRootHOC(SearchChatsScreen)}
+                            options={{
+                              headerStyle: styles.headerWithoutDivider,
+                              title: currentL10n.screenTitles.searchChats,
                             }}
                           />
                           {__ENABLE_PALSHUB__ && PalsScreen ? (

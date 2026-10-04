@@ -275,11 +275,23 @@ export function useVoiceConversation({
     [deactivate, recognition],
   );
 
+  const stopAndWait = React.useCallback(
+    async (cancelGeneration = true) => {
+      deactivate(cancelGeneration);
+      await Promise.all([
+        recognition.cancel().catch(() => {}),
+        ttsStore.stop().catch(() => {}),
+      ]);
+    },
+    [deactivate, recognition],
+  );
+
   return {
     active,
     phase,
     recognition,
     start,
     stop,
+    stopAndWait,
   };
 }

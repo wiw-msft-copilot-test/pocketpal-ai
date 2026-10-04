@@ -18,6 +18,7 @@ import {
   PalIcon,
   SettingsIcon,
   ShareIcon,
+  SearchIcon,
   StarIcon,
   TrashIcon,
   AppInfoIcon,
@@ -342,10 +343,19 @@ export const SidebarContent: React.FC<DrawerContentComponentProps> = observer(
 
     const handleSessionPress = React.useCallback(
       async (sessionId: string) => {
-        await chatSessionStore.setActiveSession(sessionId);
-        props.navigation.navigate(ROUTES.CHAT);
+        try {
+          chatSessionStore.setSearchReturnAvailable(false);
+          await chatSessionStore.setActiveSession(sessionId);
+          props.navigation.navigate(ROUTES.CHAT);
+        } catch (error) {
+          console.error('Failed to open chat session:', error);
+          Alert.alert(
+            l10n.common.error,
+            l10n.components.sidebarContent.openError,
+          );
+        }
       },
-      [props.navigation],
+      [l10n, props.navigation],
     );
 
     const handleSessionLongPress = React.useCallback(
@@ -540,9 +550,19 @@ export const SidebarContent: React.FC<DrawerContentComponentProps> = observer(
             <Drawer.Item
               label={l10n.components.sidebarContent.menuItems.chat}
               icon={() => <ChatIcon stroke={theme.colors.primary} />}
-              onPress={() => props.navigation.navigate(ROUTES.CHAT)}
+              onPress={() => {
+                chatSessionStore.setSearchReturnAvailable(false);
+                props.navigation.navigate(ROUTES.CHAT);
+              }}
               style={styles.menuDrawerItem}
               testID="drawer-item-chat"
+            />
+            <Drawer.Item
+              label={l10n.components.sidebarContent.menuItems.searchChats}
+              icon={() => <SearchIcon stroke={theme.colors.primary} />}
+              onPress={() => props.navigation.navigate(ROUTES.SEARCH_CHATS)}
+              style={styles.menuDrawerItem}
+              testID="drawer-item-search-chats"
             />
             {__ENABLE_PALSHUB__ ? (
               <Drawer.Item

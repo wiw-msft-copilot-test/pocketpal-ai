@@ -568,6 +568,17 @@ describe('chatSessionStore', () => {
   describe('setActiveSession', () => {
     it('sets the active session id', async () => {
       const sessionId = 'session1';
+      chatSessionStore.sessions = [
+        {
+          id: sessionId,
+          title: 'Session 1',
+          date: new Date().toISOString(),
+          messages: [],
+          completionSettings: defaultCompletionSettings,
+          settingsSource: 'pal',
+          messagesLoaded: true,
+        },
+      ];
       await chatSessionStore.setActiveSession(sessionId);
       expect(chatSessionStore.activeSessionId).toBe(sessionId);
     });
@@ -1786,7 +1797,7 @@ describe('chatSessionStore', () => {
       expect(chatSessionStore.sessions[0].messages[1].id).toBe('msg1');
     });
 
-    it('handles missing session gracefully during lazy load', async () => {
+    it('rejects a missing persisted session without activating it', async () => {
       const mockSession = {
         id: 'session1',
         title: 'Session 1',
@@ -1803,21 +1814,20 @@ describe('chatSessionStore', () => {
         null,
       );
 
-      await chatSessionStore.setActiveSession('session1');
+      chatSessionStore.activeSessionId = null;
+      await expect(
+        chatSessionStore.setActiveSession('session1'),
+      ).rejects.toThrow('was not found');
 
       expect(chatSessionRepository.getSessionById).toHaveBeenCalledWith(
         'session1',
       );
       expect(chatSessionStore.sessions[0].messages.length).toBe(0);
       expect(chatSessionStore.sessions[0].messagesLoaded).toBe(false);
-      expect(chatSessionStore.activeSessionId).toBe('session1');
+      expect(chatSessionStore.activeSessionId).toBeNull();
     });
 
-    it('handles errors during lazy load gracefully', async () => {
-      const consoleErrorSpy = jest
-        .spyOn(console, 'error')
-        .mockImplementation(() => {});
-
+    it('rejects database errors during lazy load without activating', async () => {
       const mockSession = {
         id: 'session1',
         title: 'Session 1',
@@ -1834,20 +1844,17 @@ describe('chatSessionStore', () => {
         new Error('Database error'),
       );
 
-      await chatSessionStore.setActiveSession('session1');
+      chatSessionStore.activeSessionId = null;
+      await expect(
+        chatSessionStore.setActiveSession('session1'),
+      ).rejects.toThrow('Database error');
 
       expect(chatSessionRepository.getSessionById).toHaveBeenCalledWith(
         'session1',
       );
       expect(chatSessionStore.sessions[0].messages.length).toBe(0);
       expect(chatSessionStore.sessions[0].messagesLoaded).toBe(false);
-      expect(chatSessionStore.activeSessionId).toBe('session1');
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        'Failed to load messages for session session1:',
-        expect.any(Error),
-      );
-
-      consoleErrorSpy.mockRestore();
+      expect(chatSessionStore.activeSessionId).toBeNull();
     });
 
     it('loads messages for multiple sessions independently', async () => {

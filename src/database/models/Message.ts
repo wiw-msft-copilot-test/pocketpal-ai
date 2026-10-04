@@ -1,41 +1,7 @@
 import {Model} from '@nozbe/watermelondb';
 import {field, text} from '@nozbe/watermelondb/decorators';
-import {AgentStep, MessageType, User} from '../../utils/types';
-import {isResponsesReplayState} from '../../api/responsesTypes';
-
-const parseMetadata = (metadata?: string): Record<string, any> => {
-  try {
-    const parsed = JSON.parse(metadata || '{}');
-    return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
-      ? parsed
-      : {};
-  } catch {
-    return {};
-  }
-};
-
-const readableSteps = (value: unknown, legacyText?: string): AgentStep[] => {
-  const steps = Array.isArray(value)
-    ? value.filter(
-        (step): step is AgentStep =>
-          !!step && typeof step === 'object' && !Array.isArray(step),
-      )
-    : [];
-  const sanitized = steps.map(step => {
-    if (
-      step.responsesState !== undefined &&
-      !isResponsesReplayState(step.responsesState)
-    ) {
-      const visibleStep = {...step};
-      delete visibleStep.responsesState;
-      return visibleStep;
-    }
-    return step;
-  });
-  return sanitized.length === 0 && legacyText
-    ? [{content: legacyText}]
-    : sanitized;
-};
+import {MessageType} from '../../utils/types';
+import {decodeStoredMessage} from './messageDecoder';
 
 export default class Message extends Model {
   static table = 'messages';
@@ -53,52 +19,13 @@ export default class Message extends Model {
   @field('position') position!: number;
 
   toMessageObject(): MessageType.Any {
-    const rawMetadata = parseMetadata(this.metadata);
-
-    const author: User = {
-      id: this.author,
-      ...(rawMetadata.authorData || {}),
-    };
-
-    if (this.type === 'text') {
-      return {
-        id: this.id,
-        type: 'text',
-        text: this.text || '',
-        author,
-        createdAt: this.createdAt,
-        metadata: rawMetadata,
-        // Extract imageUris from metadata if present
-        imageUris: rawMetadata.imageUris,
-      } as MessageType.Text;
-    }
-
-    if (this.type === 'assistant_turn') {
-      // Lift metadata.steps to the top-level `steps` field for the
-      // in-memory type. The persisted metadata keeps `steps` (the DB is
-      // the source of truth for crash recovery), but the in-memory
-      // metadata strips it so consumers reading `message.metadata.steps`
-      // get `undefined` — they must use `message.steps`. The
-      // persistence layer (ChatSessionRepository) is the sole writer of
-      // `metadata.steps` on the way back to disk.
-      const {steps: liftedSteps, ...metadataWithoutSteps} = rawMetadata;
-      const steps = readableSteps(liftedSteps, this.text);
-      return {
-        id: this.id,
-        type: 'assistant_turn',
-        author,
-        createdAt: this.createdAt,
-        steps,
-        metadata: metadataWithoutSteps,
-      } as MessageType.AssistantTurn;
-    }
-
-    return {
+    return decodeStoredMessage({
       id: this.id,
-      type: this.type as any,
-      author,
+      author: this.author,
+      type: this.type,
+      text: this.text,
       createdAt: this.createdAt,
-      metadata: rawMetadata,
-    } as any;
+      metadata: this.metadata,
+    });
   }
 }
