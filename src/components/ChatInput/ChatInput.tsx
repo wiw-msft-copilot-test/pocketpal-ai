@@ -287,15 +287,13 @@ export const ChatInput = observer(
       if (!isDictationEligible) {
         return;
       }
-      if (
-        isStreaming ||
-        isStopVisible ||
-        isCameraActive ||
-        isVideoCapable ||
-        !startupSelectionReady ||
-        !modelStore.engine ||
-        modelStore.isContextLoading
-      ) {
+      if (!startupSelectionReady || modelStore.isContextLoading) {
+        return;
+      }
+      if (!modelStore.engine || isVideoCapable) {
+        return;
+      }
+      if (isStreaming || isStopVisible || isCameraActive) {
         deepLinkStore.consumeVoiceConversationRequest(pendingVoiceRequestId);
         return;
       }

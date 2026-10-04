@@ -5,7 +5,7 @@
  * Must be called from a component inside NavigationContainer
  */
 
-import {useEffect, useCallback} from 'react';
+import {useEffect, useCallback, useRef} from 'react';
 import {Alert, AppState, Linking} from 'react-native';
 import {useNavigation} from '@react-navigation/native';
 import {reaction} from 'mobx';
@@ -15,6 +15,7 @@ import {
   deepLinkStore,
   modelStore,
   palStore,
+  startupSelectionStore,
   uiStore,
 } from '../store';
 import {ROUTES} from '../utils/navigationConstants';
@@ -31,24 +32,9 @@ import {
  */
 export const useDeepLinking = () => {
   const navigation = useNavigation();
+  const validatedVoiceRequestId = useRef<number | null>(null);
 
   const handleVoiceChatLaunch = useCallback(() => {
-    const activePal = palStore.pals.find(
-      pal => pal.id === chatSessionStore.activePalId,
-    );
-    if (
-      !modelStore.engine ||
-      modelStore.isContextLoading ||
-      (activePal && hasVideoCapability(activePal))
-    ) {
-      deepLinkStore.clearVoiceConversationRequest();
-      Alert.alert(
-        uiStore.l10n.components.chatInput.speechInput
-          .conversationUnavailableTitle,
-        uiStore.l10n.chat.voiceLaunchUnavailableMessage,
-      );
-      return;
-    }
     if (
       modelStore.inferencing ||
       chatSessionStore.isGenerating ||
@@ -62,10 +48,69 @@ export const useDeepLinking = () => {
       return;
     }
 
-    chatSessionStore.resetActiveSession();
     deepLinkStore.requestVoiceConversation();
     (navigation as any).navigate(ROUTES.CHAT);
   }, [navigation]);
+
+  useEffect(
+    () =>
+      reaction(
+        () => ({
+          requestId: deepLinkStore.pendingVoiceConversationRequestId,
+          restoreAttempted: startupSelectionStore.restoreAttempted,
+          isRestoring: startupSelectionStore.isRestoring,
+          isContextLoading: modelStore.isContextLoading,
+          hasEngine: Boolean(modelStore.engine),
+          activePal: palStore.pals.find(
+            pal => pal.id === chatSessionStore.activePalId,
+          ),
+          isBusy:
+            modelStore.inferencing ||
+            chatSessionStore.isGenerating ||
+            chatSessionStore.isStopping,
+        }),
+        state => {
+          if (state.requestId === null) {
+            validatedVoiceRequestId.current = null;
+            return;
+          }
+          if (
+            validatedVoiceRequestId.current === state.requestId ||
+            !state.restoreAttempted ||
+            state.isRestoring ||
+            state.isContextLoading
+          ) {
+            return;
+          }
+          if (
+            !state.hasEngine ||
+            (state.activePal && hasVideoCapability(state.activePal))
+          ) {
+            Alert.alert(
+              uiStore.l10n.components.chatInput.speechInput
+                .conversationUnavailableTitle,
+              uiStore.l10n.chat.voiceLaunchUnavailableMessage,
+            );
+            deepLinkStore.consumeVoiceConversationRequest(state.requestId);
+            return;
+          }
+          if (state.isBusy) {
+            Alert.alert(
+              uiStore.l10n.chat.voiceLaunchBusyTitle,
+              uiStore.l10n.chat.voiceLaunchBusyMessage,
+              [{text: uiStore.l10n.common.ok}],
+            );
+            deepLinkStore.consumeVoiceConversationRequest(state.requestId);
+            return;
+          }
+
+          validatedVoiceRequestId.current = state.requestId;
+          chatSessionStore.resetActiveSession();
+        },
+        {fireImmediately: true},
+      ),
+    [],
+  );
 
   useEffect(
     () =>

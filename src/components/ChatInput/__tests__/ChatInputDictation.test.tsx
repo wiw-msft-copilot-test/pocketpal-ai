@@ -1,5 +1,5 @@
 import React from 'react';
-import {fireEvent} from '@testing-library/react-native';
+import {act, fireEvent, waitFor} from '@testing-library/react-native';
 import {Platform, StyleSheet} from 'react-native';
 import {runInAction} from 'mobx';
 import {IconButton} from 'react-native-paper';
@@ -62,6 +62,10 @@ describe('ChatInput dictation', () => {
       deepLinkStore.pendingVoiceConversationRequestId = null;
       startupSelectionStore.restoreAttempted = true;
       startupSelectionStore.isRestoring = false;
+      chatSessionStore.activeSessionId = null;
+      chatSessionStore.newChatPalId = undefined;
+      chatSessionStore.sessions = [];
+      palStore.pals = [];
     });
     jest.clearAllMocks();
   });
@@ -102,7 +106,7 @@ describe('ChatInput dictation', () => {
     );
   });
 
-  it('abandons a launcher voice request when the model is unavailable', () => {
+  it('keeps a launcher request pending when restored model is unavailable', () => {
     runInAction(() => {
       deepLinkStore.pendingVoiceConversationRequestId = 43;
     });
@@ -114,28 +118,43 @@ describe('ChatInput dictation', () => {
     );
 
     expect(conversationResult.start).not.toHaveBeenCalled();
-    expect(deepLinkStore.consumeVoiceConversationRequest).toHaveBeenCalledWith(
-      43,
-    );
+    expect(
+      deepLinkStore.consumeVoiceConversationRequest,
+    ).not.toHaveBeenCalled();
   });
 
-  it('abandons a launcher voice request while startup selections settle', () => {
+  it('waits for startup selection and model restoration before starting', async () => {
     runInAction(() => {
-      modelStore.engine = {} as any;
       startupSelectionStore.isRestoring = true;
       deepLinkStore.pendingVoiceConversationRequestId = 44;
     });
 
-    render(
+    const renderInput = () => (
       <UserContext.Provider value={user}>
         <ChatInput onSendPress={jest.fn()} />
-      </UserContext.Provider>,
+      </UserContext.Provider>
     );
+    const {rerender} = render(renderInput());
 
     expect(conversationResult.start).not.toHaveBeenCalled();
-    expect(deepLinkStore.consumeVoiceConversationRequest).toHaveBeenCalledWith(
-      44,
-    );
+    expect(
+      deepLinkStore.consumeVoiceConversationRequest,
+    ).not.toHaveBeenCalled();
+
+    act(() => {
+      runInAction(() => {
+        modelStore.engine = {} as any;
+        startupSelectionStore.isRestoring = false;
+      });
+    });
+    rerender(renderInput());
+
+    await waitFor(() => {
+      expect(conversationResult.start).toHaveBeenCalledTimes(1);
+      expect(
+        deepLinkStore.consumeVoiceConversationRequest,
+      ).toHaveBeenCalledWith(44);
+    });
   });
 
   it('does not stop a manually active conversation for a pending request', () => {
