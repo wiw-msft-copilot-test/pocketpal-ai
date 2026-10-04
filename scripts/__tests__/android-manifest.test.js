@@ -30,6 +30,22 @@ const mainActivity = fs.readFileSync(
   ),
   'utf8',
 );
+const voiceChatLauncherModule = fs.readFileSync(
+  path.join(
+    __dirname,
+    '..',
+    '..',
+    'android',
+    'app',
+    'src',
+    'main',
+    'java',
+    'com',
+    'pocketpalai',
+    'VoiceChatLauncherModule.kt',
+  ),
+  'utf8',
+);
 
 const tags = name =>
   [...manifest.matchAll(new RegExp(`<${name}\\b[^>]*>`, 'g'))].map(
@@ -107,6 +123,15 @@ describe('Android hardware declarations', () => {
         'VoiceChatLauncher.setEnabled(this, false)',
       );
       expect(mainApplication).toContain('add(VoiceChatLauncherPackage())');
+    });
+
+    it('targets the manifest namespace instead of the flavor application ID', () => {
+      expect(voiceChatLauncherModule).toContain(
+        '"${MainActivity::class.java.packageName}.VoiceChatActivity"',
+      );
+      expect(voiceChatLauncherModule).not.toContain(
+        '"${context.packageName}.VoiceChatActivity"',
+      );
     });
   });
 

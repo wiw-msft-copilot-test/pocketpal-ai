@@ -29,6 +29,7 @@ import {
 
 import {useTheme} from '../../hooks';
 import {useVoiceConversation} from '../../hooks/useVoiceConversation';
+import {chatRunControl} from '../../services/chatRunControl';
 
 import {createStyles} from './styles';
 
@@ -268,6 +269,12 @@ export const ChatInput = observer(
     });
     const dictation = conversation.recognition;
     const dictationActive = conversation.active;
+    const stopVoiceConversation = conversation.stopAndWait;
+    React.useEffect(
+      () =>
+        chatRunControl.registerVoiceStop(() => stopVoiceConversation(false)),
+      [stopVoiceConversation],
+    );
     const {clearError: clearDictationError, requestModelDownload} = dictation;
     const speechInputL10n = l10n.components.chatInput.speechInput;
     const pendingVoiceRequestId =

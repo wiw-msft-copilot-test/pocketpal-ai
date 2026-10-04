@@ -16,6 +16,18 @@ class ChatSessionRepository {
     return []; // Mock: return empty array
   }
 
+  async getChatSearchSessions() {
+    return [];
+  }
+
+  async getChatSearchMessageUpperBound() {
+    return null;
+  }
+
+  async getChatSearchMessagePage() {
+    return [];
+  }
+
   // Get a single session with its messages and settings
   async getSessionById(id) {
     return {

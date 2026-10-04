@@ -16,6 +16,7 @@ import {chatSessionStore} from '../../../store';
 const ChatScreen = () => <Text>Chat Screen</Text>;
 const ModelsScreen = () => <Text>Models Screen</Text>;
 const SettingsScreen = () => <Text>Settings Screen</Text>;
+const SearchChatsScreen = () => <Text>Search Chats Screen</Text>;
 
 const Drawer = createDrawerNavigator();
 
@@ -27,6 +28,7 @@ const TestNavigator = () => (
   <NavigationContainer>
     <Drawer.Navigator drawerContent={renderSidebarContent}>
       <Drawer.Screen name="Chat" component={ChatScreen} />
+      <Drawer.Screen name="Search chats" component={SearchChatsScreen} />
       <Drawer.Screen name="Models" component={ModelsScreen} />
       <Drawer.Screen name="Settings" component={SettingsScreen} />
     </Drawer.Navigator>
@@ -78,6 +80,16 @@ describe('SidebarContent Component', () => {
     fireEvent.press(getByText('Settings'));
     expect(getByText('Settings Screen')).toBeTruthy();
     expect(queryByText('Models Screen')).toBeNull();
+  });
+
+  it('places Search chats below Chat and opens it', () => {
+    const {getByText, getByTestId} = render(<TestNavigator />);
+    const chat = getByTestId('drawer-item-chat');
+    const search = getByTestId('drawer-item-search-chats');
+    expect(chat).toBeTruthy();
+    expect(search).toBeTruthy();
+    fireEvent.press(getByText('Search chats'));
+    expect(getByText('Search Chats Screen')).toBeTruthy();
   });
 
   describe('Selection Mode', () => {

@@ -118,6 +118,9 @@ export const Selectors = {
     get modelsTab(): string {
       return byText('Models');
     },
+    get searchChatsTab(): string {
+      return byText('Search chats');
+    },
     get palsTab(): string {
       return byTestId('drawer-item-pals');
     },
@@ -190,6 +193,15 @@ export const Selectors = {
      */
     get inferenceComplete(): string {
       return byAccessibilityLabelContains('tokens/sec');
+    },
+  },
+
+  chatSearch: {
+    get input(): string {
+      return byTestId('chat-search-input');
+    },
+    result(sessionId: string): string {
+      return byTestId(`chat-search-result-${sessionId}`);
     },
   },
 

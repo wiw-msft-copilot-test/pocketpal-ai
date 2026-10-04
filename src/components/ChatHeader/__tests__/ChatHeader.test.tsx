@@ -1,6 +1,20 @@
 import React from 'react';
-import {render} from '../../../../jest/test-utils';
+import {fireEvent, render} from '../../../../jest/test-utils';
 import {ChatHeader} from '../ChatHeader';
+import {chatSessionStore} from '../../../store';
+
+jest.mock('../../../store', () => ({
+  __esModule: true,
+  chatSessionStore: {
+    shouldShowHeaderDivider: false,
+    searchReturnAvailable: false,
+  },
+}));
+
+const mockNavigate = jest.fn();
+jest.mock('@react-navigation/native', () => ({
+  useNavigation: () => ({navigate: mockNavigate}),
+}));
 
 // Mock the child components
 jest.mock('../../HeaderLeft', () => ({
@@ -24,21 +38,24 @@ jest.mock('../../ChatHeaderTitle', () => ({
   },
 }));
 
-// Create a mock store object
-const mockChatSessionStore = {
-  shouldShowHeaderDivider: false,
+const mockChatSessionStore = chatSessionStore as typeof chatSessionStore & {
+  shouldShowHeaderDivider: boolean;
+  searchReturnAvailable: boolean;
 };
-
-// Mock the stores
-jest.mock('../../../store', () => ({
-  chatSessionStore: mockChatSessionStore,
-}));
 
 describe('ChatHeader', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     // Reset the mock store value
     mockChatSessionStore.shouldShowHeaderDivider = false;
+    mockChatSessionStore.searchReturnAvailable = false;
+  });
+
+  it('returns to search when chat was opened from a result', () => {
+    mockChatSessionStore.searchReturnAvailable = true;
+    const {getByTestId} = render(<ChatHeader />, {withSafeArea: true});
+    fireEvent.press(getByTestId('back-to-chat-search'));
+    expect(mockNavigate).toHaveBeenCalledWith('Search chats');
   });
 
   it('renders all child components', () => {

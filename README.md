@@ -121,6 +121,7 @@ PocketPal is a four-layer stack, from the silicon up to the chat UI. Each layer 
 4. The screen stays awake during inference and deactivates when idle.
 5. **Copy** a full response with the copy icon, or long-press a paragraph to copy just that.
 6. **Edit** any of your messages with a long-press — the AI regenerates from your change. Hit **retry** for a fresh answer, optionally with a different model.
+7. Open the drawer and choose **Search chats** to search local chat titles and visible messages. Results are ranked by the number of exact phrase matches, then by the latest message. For large histories you can reveal results while scanning continues; opening one stops the remaining search and any active reply before switching chats.
 
 Dictation is foreground-only and never sends automatically. Downloading a missing speech-language model may require a network connection, but recognition then uses Android's explicitly on-device service. Sending the resulting prompt can still use the network if you selected a remote language model; system TTS voices can also have provider-specific network behavior.
 

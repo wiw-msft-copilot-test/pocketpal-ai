@@ -29,6 +29,24 @@ yarn ios
 Keep changes focused on one logical concern. Add or update tests when behavior
 changes. Follow Conventional Commits (`feat:`, `fix:`, `docs:`, or `chore:`).
 
+## Pull request safety
+
+Treat the upstream repository as fetch-only. Agents must **never** create,
+open, or submit a pull request against upstream, including through `gh`, the
+GitHub API, browser automation, or any other integration. Agents must also
+never surface a one-click URL, compare link, or UI action that could open or
+prefill a pull request against upstream.
+
+Before creating or linking to any pull request, verify the repository owner,
+repository name, base branch, and head branch explicitly. Pull requests for
+fork work may target only this fork's `origin` repository. If the intended
+target is ambiguous or differs from `origin`, stop and ask the user rather than
+assuming upstream.
+
+Fetching, inspecting, and merging from the upstream remote remain allowed.
+Those operations do not authorize pushing to upstream or proposing changes
+there.
+
 ## Preserve fork invariants
 
 Before syncing upstream or resolving a conflict, read
