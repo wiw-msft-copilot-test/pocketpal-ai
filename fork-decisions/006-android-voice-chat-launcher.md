@@ -16,7 +16,7 @@ The launcher is a private-build fallback for opening PocketPal by name. It is
 not a Google Play App Action, an Android Auto integration, or permission to
 bypass Android's restrictions on app launches while driving.
 
-**Fork history:** `68619e1`
+**Fork history:** `68619e1`, `e1595223`
 
 ## Decision
 
@@ -26,18 +26,24 @@ context, so Android does not advertise a launcher that cannot begin a
 conversation.
 
 Normalize both cold and warm alias launches to the internal
-`pocketpal://assistant/new-chat` route. A valid request resets the active
-session, navigates to a fresh chat with the currently selected Pal and model,
-and starts hands-free conversation only after startup selection restoration
-and chat-input readiness permit it. Resetting the session or handling the
-request must not rewrite the remembered startup model, Pal, or explicit
-`No Pal` preference.
+`pocketpal://assistant/new-chat` route. An alias that was enabled before process
+death can deliver a cold-start request before JavaScript has restored the
+remembered selection or model engine. Keep that request transiently pending
+while startup selection restoration and model context loading are in progress.
+After restoration succeeds, reset the active session, navigate to a fresh chat
+with the restored Pal and model, and start hands-free conversation when chat
+input readiness permits it. Resetting the session or handling the request must
+not rewrite the remembered startup model, Pal, or explicit `No Pal` preference.
 
 Treat every launch as a bounded, single-use request:
 
-- reject it before resetting the chat when no usable model engine is ready,
-  model context is loading, the selected Pal requires video, or generation is
-  active or stopping;
+- wait only while startup restoration or model context loading is actively
+  unresolved, and do not reset the current chat during that wait;
+- after restoration settles, reject the request before resetting the chat when
+  no usable model engine is ready or the selected Pal requires video, and
+  explain how to select a compatible Pal and loaded model before retrying;
+- reject the request when generation is active or stopping, including if that
+  state begins while restoration is pending;
 - do not leave rejected requests queued to activate later;
 - consume the request after conversation starts, if conversation is already
   active, or when readiness is lost;
@@ -67,7 +73,8 @@ user started manually.
 ## Rejected alternatives
 
 - Enabling the alias permanently would advertise voice chat before a model can
-  serve it and create launch requests that may activate unexpectedly later.
+  serve it. Waiting is limited to a launcher request that already arrived from
+  an alias enabled before process death and remains in the active foreground.
 - Starting conversation directly in native Android code would bypass startup
   restoration, Pal capabilities, generation state, React navigation, and the
   existing conversation guards.
@@ -83,7 +90,8 @@ user started manually.
 Run the focused deep-link hook, deep-link store, ChatInput dictation, and
 Android manifest contract tests. Cover cold and warm intent normalization,
 dynamic alias enablement, new-session routing, preservation of remembered
-selections, startup and model readiness, active-generation rejection, video
+selections, pending behavior during startup restoration and model loading,
+actionable restoration-failure handling, active-generation rejection, video
 Pal rejection, single-use request identity, manual-control ownership,
 background and unmount cleanup, and draft or image clearing.
 
