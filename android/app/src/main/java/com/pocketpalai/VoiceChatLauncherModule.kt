@@ -9,6 +9,12 @@ import com.facebook.react.module.annotations.ReactModule
 import com.pocketpal.specs.NativeVoiceChatLauncherSpec
 
 object VoiceChatLauncher {
+  private fun component(context: Context) =
+    ComponentName(
+      context,
+      "${MainActivity::class.java.packageName}.VoiceChatActivity"
+    )
+
   fun setEnabled(context: Context, enabled: Boolean) {
     val state = if (enabled) {
       PackageManager.COMPONENT_ENABLED_STATE_ENABLED
@@ -16,7 +22,7 @@ object VoiceChatLauncher {
       PackageManager.COMPONENT_ENABLED_STATE_DISABLED
     }
     context.packageManager.setComponentEnabledSetting(
-      ComponentName(context.packageName, "${context.packageName}.VoiceChatActivity"),
+      component(context),
       state,
       PackageManager.DONT_KILL_APP
     )
