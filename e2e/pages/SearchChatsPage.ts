@@ -1,5 +1,5 @@
 import {BasePage} from './BasePage';
-import {Selectors, byPartialText} from '../helpers/selectors';
+import {Selectors, byAccessibilityLabelContains} from '../helpers/selectors';
 
 declare const browser: WebdriverIO.Browser;
 
@@ -14,7 +14,7 @@ export class SearchChatsPage extends BasePage {
   }
 
   async openResult(titleFragment: string): Promise<void> {
-    const result = browser.$(byPartialText(titleFragment));
+    const result = browser.$(byAccessibilityLabelContains(titleFragment));
     await result.waitForDisplayed({timeout: 15000});
     await result.click();
   }
