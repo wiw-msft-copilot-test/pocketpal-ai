@@ -254,13 +254,16 @@ chat with the currently selected Pal and model, then starts hands-free
 conversation. On a cold start, the request waits for PocketPal to restore the
 remembered Pal and finish loading the last-used model, whether it is local or
 remote. Remote models are restored only after the saved server configuration
-and current connection pass validation. If restoration fails or the restored
-Pal does not support hands-free conversation, PocketPal explains how to select
-a compatible Pal and model before retrying the launcher. Rejected requests are
-not started later. This private-build fallback can be launched by name when
-Google Assistant permits app launches, but it is not a Google Play App Action
-and Android Auto may block it while driving because PocketPal is not an Android
-Auto app.
+and current connection pass validation. If that model cannot be loaded or the
+restored Pal requires video, PocketPal automatically looks for a compatible
+combination. It keeps a working model when possible, otherwise preferring the
+replacement Pal's available default model before trying other available local
+and configured remote models. PocketPal shows recovery guidance only when no
+compatible model and non-video Pal combination can be prepared. Rejected
+requests are not started later. This private-build fallback can be launched by
+name when Google Assistant permits app launches, but it is not a Google Play
+App Action and Android Auto may block it while driving because PocketPal is not
+an Android Auto app.
 
 <div style="display: flex; justify-content: center;">
     <img src="../assets/chat_1.webp" alt="Navigate to Models Page" style="width: 33%;">

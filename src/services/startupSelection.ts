@@ -42,7 +42,7 @@ const remoteSelectionIsCurrent = (
   );
 };
 
-const restoreRememberedModel = async (
+export const loadValidatedModelSelection = async (
   selection: StartupModelSelection,
   selectModel: typeof modelStore.selectModel,
 ): Promise<void> => {
@@ -116,7 +116,7 @@ export const restoreStartupSelection = async (
     const startupModel = getStartupModelSelection();
     if (startupModel) {
       try {
-        await restoreRememberedModel(
+        await loadValidatedModelSelection(
           startupModel.selection,
           options.selectModel ?? modelStore.selectModel,
         );

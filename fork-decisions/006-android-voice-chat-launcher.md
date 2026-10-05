@@ -35,6 +35,9 @@ with the restored Pal and model, and start hands-free conversation when chat
 input readiness permits it. If an installation has no explicit startup model
 preference, restoration first adopts an available last-used model as described
 by [007](007-last-used-model-restoration.md).
+If the restored Pal requires video or no model engine is ready, attempt the
+compatible fallback selection described by
+[008](008-voice-launch-compatible-fallback.md) before rejecting the request.
 Resetting the session or handling the request must not rewrite the remembered
 Pal or explicit `No Pal` preference.
 
@@ -42,9 +45,12 @@ Treat every launch as a bounded, single-use request:
 
 - wait only while startup restoration or model context loading is actively
   unresolved, and do not reset the current chat during that wait;
-- after restoration settles, reject the request before resetting the chat when
-  no usable model engine is ready or the selected Pal requires video, and
-  explain how to select a compatible Pal and loaded model before retrying;
+- after restoration settles, keep a usable model when possible, replace a
+  video Pal with a non-video Pal, and load a compatible available model when
+  needed;
+- reject the request before resetting the chat only when no usable model and
+  non-video Pal combination can be prepared, and explain how to select one
+  before retrying;
 - reject the request when generation is active or stopping, including if that
   state begins while restoration is pending;
 - do not leave rejected requests queued to activate later;
@@ -67,6 +73,7 @@ user started manually.
 - `android/app/src/main/java/com/pocketpalai/VoiceChatLauncherPackage.kt`
 - `src/specs/NativeVoiceChatLauncher.ts`
 - `src/services/voiceChatLauncher.ts`
+- `src/services/voiceChatSelection.ts`
 - `src/hooks/useDeepLinking.ts`
 - `src/store/DeepLinkStore.ts`
 - `src/components/ChatInput/ChatInput.tsx`
@@ -94,9 +101,10 @@ Run the focused deep-link hook, deep-link store, ChatInput dictation, and
 Android manifest contract tests. Cover cold and warm intent normalization,
 dynamic alias enablement, new-session routing, preservation of remembered
 selections, pending behavior during startup restoration and model loading,
-actionable restoration-failure handling, active-generation rejection, video
-Pal rejection, single-use request identity, manual-control ownership,
-background and unmount cleanup, and draft or image clearing.
+compatible local and remote fallback selection, actionable fallback-failure
+handling, active-generation rejection, single-use request identity,
+manual-control ownership, background and unmount cleanup, and draft or image
+clearing.
 
 An Android build and emulator launch can establish manifest registration,
 native-module wiring, and basic routing. They do not establish Google Assistant
