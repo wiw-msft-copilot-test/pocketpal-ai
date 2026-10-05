@@ -131,6 +131,8 @@ describe('ModelStore', () => {
     modelStore.models = []; // Clear models before each test
     modelStore.context = undefined;
     modelStore.activeModelId = undefined;
+    modelStore.lastUsedModelId = undefined;
+    modelStore.lastUsedModelSelection = undefined;
 
     // Re-setup download manager mocks after clearAllMocks
     (downloadManager.syncWithActiveDownloads as jest.Mock).mockResolvedValue(
@@ -5103,6 +5105,15 @@ describe('ModelStore', () => {
       await modelStore.setRemoteModel(remoteModel);
 
       expect((modelStore.engine as any).timeoutMs).toBe(600000);
+      expect(modelStore.lastUsedModelSelection).toEqual({
+        modelId: remoteModel.id,
+        origin: ModelOrigin.REMOTE,
+        remoteServer: {
+          normalizedUrl: 'http://localhost:1234',
+          serverType: undefined,
+          credentialRevision: 0,
+        },
+      });
     });
 
     it('builds the engine with undefined timeout for a server without the field', async () => {

@@ -68,12 +68,19 @@ const restoreRememberedModel = async (
 
 const getStartupModelSelection = (): {
   selection: StartupModelSelection;
-  adoptsLegacyLastUsedModel: boolean;
+  adoptsLastUsedModel: boolean;
 } | null => {
   if (startupSelectionStore.modelSelection) {
     return {
       selection: startupSelectionStore.modelSelection,
-      adoptsLegacyLastUsedModel: false,
+      adoptsLastUsedModel: false,
+    };
+  }
+
+  if (modelStore.lastUsedModelSelection) {
+    return {
+      selection: modelStore.lastUsedModelSelection,
+      adoptsLastUsedModel: true,
     };
   }
 
@@ -87,7 +94,7 @@ const getStartupModelSelection = (): {
       modelId: lastUsedModel.id,
       origin: lastUsedModel.origin,
     },
-    adoptsLegacyLastUsedModel: true,
+    adoptsLastUsedModel: true,
   };
 };
 
@@ -113,15 +120,21 @@ export const restoreStartupSelection = async (
           startupModel.selection,
           options.selectModel ?? modelStore.selectModel,
         );
-        if (startupModel.adoptsLegacyLastUsedModel) {
+        if (startupModel.adoptsLastUsedModel) {
           const model = modelStore.displayModels.find(
             candidate => candidate.id === startupModel.selection.modelId,
           );
           if (model) {
-            startupSelectionStore.rememberModel(model);
+            const server = model.serverId
+              ? serverStore.servers.find(
+                  candidate => candidate.id === model.serverId,
+                )
+              : undefined;
+            startupSelectionStore.rememberModel(model, server);
           }
         }
       } catch (error) {
+        modelStore.clearLastUsedModelSelection(startupModel.selection.modelId);
         startupSelectionStore.markModelRestoreFailed();
         console.warn('[StartupSelection] Failed to restore model:', error);
       }

@@ -32,9 +32,9 @@ remembered selection or model engine. Keep that request transiently pending
 while startup selection restoration and model context loading are in progress.
 After restoration succeeds, reset the active session, navigate to a fresh chat
 with the restored Pal and model, and start hands-free conversation when chat
-input readiness permits it. If an upgraded installation has no newer startup
-model preference yet, restoration first adopts an available legacy last-used
-local model as described by [007](007-legacy-startup-model-fallback.md).
+input readiness permits it. If an installation has no explicit startup model
+preference, restoration first adopts an available last-used model as described
+by [007](007-last-used-model-restoration.md).
 Resetting the session or handling the request must not rewrite the remembered
 Pal or explicit `No Pal` preference.
 

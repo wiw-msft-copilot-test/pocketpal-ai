@@ -22,6 +22,7 @@ import type {
   CapabilityEnv,
   ModelCapabilityView,
 } from '../../src/utils/modelCaps';
+import type {StartupModelSelection} from '../../src/store/StartupSelectionStore';
 
 class MockModelStore {
   models = modelsList;
@@ -56,6 +57,8 @@ class MockModelStore {
   selectModel: jest.Mock;
   setRemoteModel: jest.Mock;
   lastUsedModelId: any;
+  lastUsedModelSelection: StartupModelSelection | undefined;
+  clearLastUsedModelSelection: jest.Mock;
   checkSpaceAndDownload: jest.Mock;
   getDownloadProgress: jest.Mock;
   manualReleaseContext: jest.Mock;
@@ -110,6 +113,7 @@ class MockModelStore {
       initContext: false,
       selectModel: false,
       setRemoteModel: false,
+      clearLastUsedModelSelection: false,
       checkSpaceAndDownload: false,
       getDownloadProgress: false,
       manualReleaseContext: false,
@@ -170,6 +174,7 @@ class MockModelStore {
     this.initContext = jest.fn().mockResolvedValue(Promise.resolve());
     this.selectModel = jest.fn().mockResolvedValue(Promise.resolve());
     this.setRemoteModel = jest.fn().mockResolvedValue(Promise.resolve());
+    this.clearLastUsedModelSelection = jest.fn();
     this.checkSpaceAndDownload = jest.fn().mockResolvedValue(undefined);
     this.getDownloadProgress = jest.fn();
     this.manualReleaseContext = jest.fn();
@@ -262,8 +267,10 @@ class MockModelStore {
   }
 
   get lastUsedModel(): Model | undefined {
-    return this.lastUsedModelId
-      ? this.models.find(m => m.id === this.lastUsedModelId)
+    const modelId =
+      this.lastUsedModelSelection?.modelId ?? this.lastUsedModelId;
+    return modelId
+      ? this.displayModels.find(model => model.id === modelId)
       : undefined;
   }
 

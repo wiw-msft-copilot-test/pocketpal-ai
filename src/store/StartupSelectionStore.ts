@@ -18,6 +18,22 @@ export interface StartupModelSelection {
   };
 }
 
+export const createStartupModelSelection = (
+  model: Model,
+  server?: ServerConfig,
+): StartupModelSelection => ({
+  modelId: model.id,
+  origin: model.origin,
+  remoteServer:
+    model.origin === ModelOrigin.REMOTE && server
+      ? {
+          normalizedUrl: normalizeServerUrl(server.url),
+          serverType: server.serverType,
+          credentialRevision: credentialRevisionOf(server),
+        }
+      : undefined,
+});
+
 class StartupSelectionStore {
   hasPalPreference = false;
   palId: string | undefined = undefined;
@@ -58,18 +74,7 @@ class StartupSelectionStore {
   }
 
   rememberModel(model: Model, server?: ServerConfig) {
-    this.modelSelection = {
-      modelId: model.id,
-      origin: model.origin,
-      remoteServer:
-        model.origin === ModelOrigin.REMOTE && server
-          ? {
-              normalizedUrl: normalizeServerUrl(server.url),
-              serverType: server.serverType,
-              credentialRevision: credentialRevisionOf(server),
-            }
-          : undefined,
-    };
+    this.modelSelection = createStartupModelSelection(model, server);
     this.suppressPalDefaultAutoLoad = false;
   }
 

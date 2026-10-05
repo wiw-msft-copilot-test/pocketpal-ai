@@ -27,7 +27,11 @@ import {
 import {uiStore, hfStore} from '.';
 import {serverStore} from './ServerStore';
 import {chatSessionStore} from './ChatSessionStore';
-import {startupSelectionStore} from './StartupSelectionStore';
+import {
+  createStartupModelSelection,
+  startupSelectionStore,
+  type StartupModelSelection,
+} from './StartupSelectionStore';
 import {
   draftCacheDefaults,
   effectiveDraftModeOf,
@@ -214,6 +218,7 @@ class ModelStore {
   activeRemoteBinding: RemoteSessionBinding | undefined = undefined;
 
   lastUsedModelId: string | undefined = undefined;
+  lastUsedModelSelection: StartupModelSelection | undefined = undefined;
 
   // Auto-release tracking (persistent)
   wasAutoReleased: boolean = false;
@@ -282,6 +287,7 @@ class ModelStore {
         'useAutoRelease',
         'contextInitParams',
         'lastUsedModelId',
+        'lastUsedModelSelection',
         'wasAutoReleased',
         'lastAutoReleasedModelId',
         'availableMemoryCeiling',
@@ -2398,6 +2404,7 @@ class ModelStore {
         this.activeContextSettings = contextInitParams;
         this.setActiveModel(model.id);
         this.lastUsedModelId = model.id;
+        this.lastUsedModelSelection = createStartupModelSelection(model);
         this.pendingModelId = null;
       });
 
@@ -2640,8 +2647,16 @@ class ModelStore {
   }
 
   get lastUsedModel(): Model | undefined {
-    return this.lastUsedModelId
-      ? this.models.find(m => m.id === this.lastUsedModelId && m.isDownloaded)
+    const modelId =
+      this.lastUsedModelSelection?.modelId ?? this.lastUsedModelId;
+    if (!modelId) {
+      return undefined;
+    }
+    const model = this.displayModels.find(
+      candidate => candidate.id === modelId,
+    );
+    return model?.origin === ModelOrigin.REMOTE || model?.isDownloaded
+      ? model
       : undefined;
   }
 
@@ -2780,7 +2795,8 @@ class ModelStore {
       );
       this.activeRemoteBinding = activeBinding;
       this.setActiveModel(model.id);
-      // Do NOT set lastUsedModelId for remote models -- server may be offline on next launch
+      this.lastUsedModelId = model.id;
+      this.lastUsedModelSelection = createStartupModelSelection(model, server);
     });
 
     serverStore
@@ -2815,6 +2831,15 @@ class ModelStore {
       startupSelectionStore.rememberModel(model, server);
     }
   };
+
+  clearLastUsedModelSelection(modelId: string) {
+    if (this.lastUsedModelSelection?.modelId === modelId) {
+      this.lastUsedModelSelection = undefined;
+    }
+    if (this.lastUsedModelId === modelId) {
+      this.lastUsedModelId = undefined;
+    }
+  }
 
   downloadHFModel = async (
     hfModel: HuggingFaceModel,

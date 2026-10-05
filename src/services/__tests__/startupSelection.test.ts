@@ -35,6 +35,7 @@ describe('restoreStartupSelection', () => {
       modelStore.models = [];
       modelStore.activeModelId = undefined;
       modelStore.lastUsedModelId = undefined;
+      modelStore.lastUsedModelSelection = undefined;
       palStore.pals = [];
       serverStore.servers = [];
       serverStore.serverModels.clear();
@@ -91,6 +92,81 @@ describe('restoreStartupSelection', () => {
       origin: ModelOrigin.LOCAL,
       remoteServer: undefined,
     });
+  });
+
+  it('restores a last-used remote model with its saved server safeguards', async () => {
+    serverStore.servers = [
+      {
+        id: 'server-1',
+        name: 'Server',
+        url: 'https://example.test/v1/',
+        serverType: 'OpenAI',
+        apiMode: 'chat-completions',
+        credentialRevision: 2,
+      },
+    ];
+    serverStore.userSelectedModels = [
+      {serverId: 'server-1', remoteModelId: 'model-a'},
+    ];
+    modelStore.lastUsedModelSelection = {
+      modelId: 'server-1/model-a',
+      origin: ModelOrigin.REMOTE,
+      remoteServer: {
+        normalizedUrl: 'https://example.test/v1',
+        serverType: 'OpenAI',
+        credentialRevision: 2,
+      },
+    };
+    jest
+      .spyOn(serverStore, 'testServerConnection')
+      .mockResolvedValue({ok: true, modelCount: 1});
+    const selectModel = jest.fn().mockResolvedValue(undefined);
+
+    await restoreStartupSelection({selectModel});
+
+    expect(selectModel).toHaveBeenCalledWith(
+      expect.objectContaining({id: 'server-1/model-a'}),
+    );
+    expect(startupSelectionStore.modelSelection).toEqual(
+      modelStore.lastUsedModelSelection,
+    );
+  });
+
+  it('clears a last-used remote model when its connection fails', async () => {
+    serverStore.servers = [
+      {
+        id: 'server-1',
+        name: 'Server',
+        url: 'https://example.test/v1',
+        serverType: 'OpenAI',
+        apiMode: 'chat-completions',
+        credentialRevision: 2,
+      },
+    ];
+    serverStore.userSelectedModels = [
+      {serverId: 'server-1', remoteModelId: 'model-a'},
+    ];
+    modelStore.lastUsedModelId = 'server-1/model-a';
+    modelStore.lastUsedModelSelection = {
+      modelId: 'server-1/model-a',
+      origin: ModelOrigin.REMOTE,
+      remoteServer: {
+        normalizedUrl: 'https://example.test/v1',
+        serverType: 'OpenAI',
+        credentialRevision: 2,
+      },
+    };
+    jest
+      .spyOn(serverStore, 'testServerConnection')
+      .mockResolvedValue({ok: false, modelCount: 0, error: 'Offline'});
+    const selectModel = jest.fn();
+
+    await restoreStartupSelection({selectModel});
+
+    expect(selectModel).not.toHaveBeenCalled();
+    expect(modelStore.lastUsedModelSelection).toBeUndefined();
+    expect(modelStore.lastUsedModelId).toBeUndefined();
+    expect(startupSelectionStore.suppressPalDefaultAutoLoad).toBe(true);
   });
 
   it('does not replace an explicit startup model with the legacy last-used model', async () => {
