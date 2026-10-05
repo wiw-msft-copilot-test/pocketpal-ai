@@ -21,6 +21,7 @@ import {useDeepLinking} from '../useDeepLinking';
 import {ROUTES} from '../../utils/navigationConstants';
 import {deepLinkService} from '../../services/DeepLinkService';
 import {setVoiceChatLauncherEnabled} from '../../services/voiceChatLauncher';
+import {prepareVoiceChatSelection} from '../../services/voiceChatSelection';
 import {
   checkoutFlowStore,
   chatSessionStore,
@@ -37,6 +38,10 @@ const mockNavigate = jest.fn();
 
 jest.mock('../../services/voiceChatLauncher', () => ({
   setVoiceChatLauncherEnabled: jest.fn(),
+}));
+
+jest.mock('../../services/voiceChatSelection', () => ({
+  prepareVoiceChatSelection: jest.fn(),
 }));
 
 jest.mock('@react-navigation/native', () => {
@@ -87,6 +92,10 @@ describe('useDeepLinking — cold-launch routing', () => {
     // The prod hub/run Linking effect surfaces an Alert on invalid links.
     // Benchmark URLs are invalid hub links, so silence the Alert here.
     alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    jest.mocked(prepareVoiceChatSelection).mockResolvedValue({
+      ready: true,
+      replacePal: false,
+    });
     // Default: __E2E__ is true via jest/setup.ts; individual tests flip
     // it to false to assert the gate.
     (global as any).__E2E__ = true;
@@ -103,6 +112,8 @@ describe('useDeepLinking — cold-launch routing', () => {
     renderHook(() => useDeepLinking());
 
     // Flush the microtask queue so the .then() in the effect fires.
+    await Promise.resolve();
+    await Promise.resolve();
     await Promise.resolve();
     await Promise.resolve();
 
@@ -208,12 +219,14 @@ describe('useDeepLinking — cold-launch routing', () => {
     });
     expect(chatSessionStore.resetActiveSession).not.toHaveBeenCalled();
 
-    act(() => {
+    await act(async () => {
       runInAction(() => {
         modelStore.engine = {} as any;
         modelStore.isContextLoading = false;
         startupSelectionStore.isRestoring = false;
       });
+      await Promise.resolve();
+      await Promise.resolve();
     });
     expect(chatSessionStore.resetActiveSession).toHaveBeenCalledTimes(1);
     expect(deepLinkStore.pendingVoiceConversationRequestId).not.toBeNull();
@@ -223,6 +236,10 @@ describe('useDeepLinking — cold-launch routing', () => {
     (global as any).__E2E__ = false;
     modelStore.engine = undefined;
     startupSelectionStore.restoreAttempted = false;
+    jest.mocked(prepareVoiceChatSelection).mockResolvedValue({
+      ready: false,
+      replacePal: false,
+    });
     getInitialURLSpy.mockResolvedValue('pocketpal://assistant/new-chat');
 
     renderHook(() => useDeepLinking());
@@ -240,6 +257,10 @@ describe('useDeepLinking — cold-launch routing', () => {
         modelStore.isContextLoading = false;
       });
     });
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
 
     expect(Alert.alert).toHaveBeenCalledWith(
       'Hands-free conversation',
@@ -249,13 +270,21 @@ describe('useDeepLinking — cold-launch routing', () => {
     expect(chatSessionStore.resetActiveSession).not.toHaveBeenCalled();
   });
 
-  it('shows recovery guidance after restoration selects a video Pal', async () => {
+  it('replaces a restored video Pal with a hands-free-compatible Pal', async () => {
     (global as any).__E2E__ = false;
     startupSelectionStore.restoreAttempted = false;
-    (palStore as any).pals = [{id: 'video-pal', capabilities: {video: true}}];
+    (palStore as any).pals = [
+      {id: 'video-pal', capabilities: {video: true}},
+      {id: 'voice-pal', capabilities: {}},
+    ];
     Object.defineProperty(chatSessionStore, 'activePalId', {
       get: jest.fn(() => 'video-pal'),
       configurable: true,
+    });
+    jest.mocked(prepareVoiceChatSelection).mockResolvedValue({
+      ready: true,
+      replacePal: true,
+      palId: 'voice-pal',
     });
     getInitialURLSpy.mockResolvedValue('pocketpal://assistant/new-chat');
 
@@ -278,13 +307,15 @@ describe('useDeepLinking — cold-launch routing', () => {
         modelStore.isContextLoading = false;
       });
     });
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
 
-    expect(Alert.alert).toHaveBeenCalledWith(
-      'Hands-free conversation',
-      'Open PocketPal, select a Pal that supports hands-free conversation, load a model, wait for it to finish loading, then try the PocketPal Voice Chat launcher again.',
-    );
-    expect(deepLinkStore.consumeVoiceConversationRequest).toHaveBeenCalled();
-    expect(chatSessionStore.resetActiveSession).not.toHaveBeenCalled();
+    expect(Alert.alert).not.toHaveBeenCalled();
+    expect(chatSessionStore.resetActiveSession).toHaveBeenCalledTimes(1);
+    expect(chatSessionStore.setActivePal).toHaveBeenCalledWith('voice-pal');
+    expect(deepLinkStore.pendingVoiceConversationRequestId).not.toBeNull();
   });
 
   it('enables the launcher only while a model engine is ready', () => {

@@ -19,8 +19,8 @@ import {
   uiStore,
 } from '../store';
 import {ROUTES} from '../utils/navigationConstants';
-import {hasVideoCapability} from '../utils/pal-capabilities';
 import {setVoiceChatLauncherEnabled} from '../services/voiceChatLauncher';
+import {prepareVoiceChatSelection} from '../services/voiceChatSelection';
 import {
   isBenchmarkRunnerUrl,
   parseBenchmarkAutostart,
@@ -33,6 +33,7 @@ import {
 export const useDeepLinking = () => {
   const navigation = useNavigation();
   const validatedVoiceRequestId = useRef<number | null>(null);
+  const preparingVoiceRequestId = useRef<number | null>(null);
 
   const handleVoiceChatLaunch = useCallback(() => {
     if (
@@ -60,10 +61,6 @@ export const useDeepLinking = () => {
           restoreAttempted: startupSelectionStore.restoreAttempted,
           isRestoring: startupSelectionStore.isRestoring,
           isContextLoading: modelStore.isContextLoading,
-          hasEngine: Boolean(modelStore.engine),
-          activePal: palStore.pals.find(
-            pal => pal.id === chatSessionStore.activePalId,
-          ),
           isBusy:
             modelStore.inferencing ||
             chatSessionStore.isGenerating ||
@@ -76,22 +73,11 @@ export const useDeepLinking = () => {
           }
           if (
             validatedVoiceRequestId.current === state.requestId ||
+            preparingVoiceRequestId.current === state.requestId ||
             !state.restoreAttempted ||
             state.isRestoring ||
             state.isContextLoading
           ) {
-            return;
-          }
-          if (
-            !state.hasEngine ||
-            (state.activePal && hasVideoCapability(state.activePal))
-          ) {
-            Alert.alert(
-              uiStore.l10n.components.chatInput.speechInput
-                .conversationUnavailableTitle,
-              uiStore.l10n.chat.voiceLaunchUnavailableMessage,
-            );
-            deepLinkStore.consumeVoiceConversationRequest(state.requestId);
             return;
           }
           if (state.isBusy) {
@@ -104,8 +90,68 @@ export const useDeepLinking = () => {
             return;
           }
 
-          validatedVoiceRequestId.current = state.requestId;
-          chatSessionStore.resetActiveSession();
+          const requestId = state.requestId;
+          preparingVoiceRequestId.current = requestId;
+          prepareVoiceChatSelection({
+            shouldContinue: () =>
+              deepLinkStore.pendingVoiceConversationRequestId === requestId,
+          })
+            .then(async selection => {
+              if (
+                deepLinkStore.pendingVoiceConversationRequestId !== requestId
+              ) {
+                return;
+              }
+              if (
+                modelStore.inferencing ||
+                chatSessionStore.isGenerating ||
+                chatSessionStore.isStopping
+              ) {
+                Alert.alert(
+                  uiStore.l10n.chat.voiceLaunchBusyTitle,
+                  uiStore.l10n.chat.voiceLaunchBusyMessage,
+                  [{text: uiStore.l10n.common.ok}],
+                );
+                deepLinkStore.consumeVoiceConversationRequest(requestId);
+                return;
+              }
+              if (!selection.ready) {
+                Alert.alert(
+                  uiStore.l10n.components.chatInput.speechInput
+                    .conversationUnavailableTitle,
+                  uiStore.l10n.chat.voiceLaunchUnavailableMessage,
+                );
+                deepLinkStore.consumeVoiceConversationRequest(requestId);
+                return;
+              }
+
+              chatSessionStore.resetActiveSession();
+              if (selection.replacePal) {
+                await chatSessionStore.setActivePal(selection.palId);
+              }
+              validatedVoiceRequestId.current = requestId;
+            })
+            .catch(error => {
+              console.error(
+                '[VoiceChatLauncher] Failed to prepare a compatible selection:',
+                error,
+              );
+              if (
+                deepLinkStore.pendingVoiceConversationRequestId === requestId
+              ) {
+                Alert.alert(
+                  uiStore.l10n.components.chatInput.speechInput
+                    .conversationUnavailableTitle,
+                  uiStore.l10n.chat.voiceLaunchUnavailableMessage,
+                );
+                deepLinkStore.consumeVoiceConversationRequest(requestId);
+              }
+            })
+            .finally(() => {
+              if (preparingVoiceRequestId.current === requestId) {
+                preparingVoiceRequestId.current = null;
+              }
+            });
         },
         {fireImmediately: true},
       ),

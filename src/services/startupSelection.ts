@@ -1,11 +1,11 @@
-import {chatSessionStore} from '../store/ChatSessionStore';
-import {modelStore} from '../store/ModelStore';
-import {palStore} from '../store/PalStore';
-import {serverStore} from '../store/ServerStore';
 import {
+  chatSessionStore,
+  modelStore,
+  palStore,
+  serverStore,
   StartupModelSelection,
   startupSelectionStore,
-} from '../store/StartupSelectionStore';
+} from '../store';
 import {
   credentialRevisionOf,
   normalizeServerUrl,
@@ -42,7 +42,7 @@ const remoteSelectionIsCurrent = (
   );
 };
 
-const restoreRememberedModel = async (
+export const loadValidatedModelSelection = async (
   selection: StartupModelSelection,
   selectModel: typeof modelStore.selectModel,
 ): Promise<void> => {
@@ -66,6 +66,38 @@ const restoreRememberedModel = async (
   await selectModel(model);
 };
 
+const getStartupModelSelection = (): {
+  selection: StartupModelSelection;
+  adoptsLastUsedModel: boolean;
+} | null => {
+  if (startupSelectionStore.modelSelection) {
+    return {
+      selection: startupSelectionStore.modelSelection,
+      adoptsLastUsedModel: false,
+    };
+  }
+
+  if (modelStore.lastUsedModelSelection) {
+    return {
+      selection: modelStore.lastUsedModelSelection,
+      adoptsLastUsedModel: true,
+    };
+  }
+
+  const lastUsedModel = modelStore.lastUsedModel;
+  if (!lastUsedModel) {
+    return null;
+  }
+
+  return {
+    selection: {
+      modelId: lastUsedModel.id,
+      origin: lastUsedModel.origin,
+    },
+    adoptsLastUsedModel: true,
+  };
+};
+
 export const restoreStartupSelection = async (
   options: {
     selectModel?: typeof modelStore.selectModel;
@@ -81,13 +113,28 @@ export const restoreStartupSelection = async (
       return;
     }
 
-    if (startupSelectionStore.modelSelection) {
+    const startupModel = getStartupModelSelection();
+    if (startupModel) {
       try {
-        await restoreRememberedModel(
-          startupSelectionStore.modelSelection,
+        await loadValidatedModelSelection(
+          startupModel.selection,
           options.selectModel ?? modelStore.selectModel,
         );
+        if (startupModel.adoptsLastUsedModel) {
+          const model = modelStore.displayModels.find(
+            candidate => candidate.id === startupModel.selection.modelId,
+          );
+          if (model) {
+            const server = model.serverId
+              ? serverStore.servers.find(
+                  candidate => candidate.id === model.serverId,
+                )
+              : undefined;
+            startupSelectionStore.rememberModel(model, server);
+          }
+        }
       } catch (error) {
+        modelStore.clearLastUsedModelSelection(startupModel.selection.modelId);
         startupSelectionStore.markModelRestoreFailed();
         console.warn('[StartupSelection] Failed to restore model:', error);
       }
