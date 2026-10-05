@@ -1,11 +1,11 @@
-import {modelStore} from '../store/ModelStore';
-import {palStore} from '../store/PalStore';
-import {chatSessionStore} from '../store/ChatSessionStore';
 import {
+  chatSessionStore,
   createStartupModelSelection,
+  modelStore,
+  palStore,
+  serverStore,
   type StartupModelSelection,
-} from '../store/StartupSelectionStore';
-import {serverStore} from '../store/ServerStore';
+} from '../store';
 import {loadValidatedModelSelection} from './startupSelection';
 import {hasVideoCapability} from '../utils/pal-capabilities';
 import {Model, ModelOrigin} from '../utils/types';

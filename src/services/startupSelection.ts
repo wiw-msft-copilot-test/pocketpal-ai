@@ -1,11 +1,11 @@
-import {chatSessionStore} from '../store/ChatSessionStore';
-import {modelStore} from '../store/ModelStore';
-import {palStore} from '../store/PalStore';
-import {serverStore} from '../store/ServerStore';
 import {
+  chatSessionStore,
+  modelStore,
+  palStore,
+  serverStore,
   StartupModelSelection,
   startupSelectionStore,
-} from '../store/StartupSelectionStore';
+} from '../store';
 import {
   credentialRevisionOf,
   normalizeServerUrl,
