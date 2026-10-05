@@ -2081,6 +2081,27 @@ describe('ModelStore', () => {
       expect(modelStore.activeModelId).toBeUndefined();
     });
 
+    it('reports pending work until a deferred release settles', async () => {
+      let finishRelease!: () => void;
+      const release = jest.fn(
+        () =>
+          new Promise<void>(resolve => {
+            finishRelease = resolve;
+          }),
+      );
+      modelStore.context = {release} as any;
+
+      const releasing = modelStore.releaseContext();
+      expect(modelStore.hasPendingModelOperations).toBe(true);
+      await Promise.resolve();
+      expect(release).toHaveBeenCalledTimes(1);
+
+      finishRelease();
+      await releasing;
+
+      expect(modelStore.hasPendingModelOperations).toBe(false);
+    });
+
     it('exitBenchmarkMode flips benchmarkActive back to false', () => {
       modelStore.benchmarkActive = true;
       modelStore.exitBenchmarkMode();
@@ -4407,6 +4428,7 @@ describe('ModelStore', () => {
 
       // Start second init immediately (should be guarded)
       const secondCall = modelStore.initContext(model);
+      expect(modelStore.hasPendingModelOperations).toBe(true);
 
       // The second call should resolve to null quickly (guarded)
       const secondResult = await secondCall;
@@ -4415,6 +4437,7 @@ describe('ModelStore', () => {
       // Wait for first to complete
       const firstResult = await firstCall;
       expect(firstResult).toBeTruthy(); // First call should succeed
+      expect(modelStore.hasPendingModelOperations).toBe(false);
 
       // initLlama should only be called once (first call only)
       expect(initLlamaMock).toHaveBeenCalledTimes(1);
@@ -4444,6 +4467,7 @@ describe('ModelStore', () => {
 
       // Flag should still be cleared
       expect(modelStore.isContextLoading).toBe(false);
+      expect(modelStore.hasPendingModelOperations).toBe(false);
     });
 
     it('should return existing context when same model is already loaded', async () => {
@@ -4490,12 +4514,15 @@ describe('ModelStore', () => {
       const loadA = modelStore.initContext(modelA);
       const loadB = modelStore.initContext(modelB);
 
-      // Wait for both to complete
-      const [resultA, resultB] = await Promise.all([loadA, loadB]);
+      expect(modelStore.hasPendingModelOperations).toBe(true);
+      const resultA = await loadA;
+      expect(resultA).toBeNull();
+      expect(modelStore.hasPendingModelOperations).toBe(true);
+      const resultB = await loadB;
 
       // A should be skipped (null), B should succeed
-      expect(resultA).toBeNull();
       expect(resultB).toBeTruthy();
+      expect(modelStore.hasPendingModelOperations).toBe(false);
 
       // Should log that A was skipped (either during confirmation or in mutex)
       expect(consoleLogSpy).toHaveBeenCalledWith(
@@ -5220,6 +5247,24 @@ describe('ModelStore', () => {
       getApiKey.mockRestore();
     });
 
+    it('reports pending work while remote credentials are loading', async () => {
+      let resolveKey!: (key: string | undefined) => void;
+      const getApiKey = jest.spyOn(serverStore, 'getApiKey').mockReturnValue(
+        new Promise(resolve => {
+          resolveKey = resolve;
+        }),
+      );
+
+      const selecting = modelStore.setRemoteModel(remoteModel);
+      expect(modelStore.hasPendingModelOperations).toBe(true);
+
+      resolveKey(undefined);
+      await selecting;
+
+      expect(modelStore.hasPendingModelOperations).toBe(false);
+      getApiKey.mockRestore();
+    });
+
     it('resolves without waiting on a probe that never settles', async () => {
       let release: () => void = () => {};
       const probe = jest
@@ -5236,6 +5281,7 @@ describe('ModelStore', () => {
       // a lazily-starting server can never delay a send.
       expect(modelStore.activeModelId).toBe('srv-1/llama-7b');
       expect(modelStore.engine).toBeTruthy();
+      expect(modelStore.hasPendingModelOperations).toBe(false);
       release();
       probe.mockRestore();
     });

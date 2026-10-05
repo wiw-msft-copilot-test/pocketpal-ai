@@ -35,6 +35,9 @@ import {
 // `useNavigation()` once per render, so capturing the function from a
 // module-level mock keeps the spy alive across re-renders.
 const mockNavigate = jest.fn();
+const setPendingModelOperations = (pending: boolean) => {
+  Object.assign(modelStore, {hasPendingModelOperations: pending});
+};
 
 jest.mock('../../services/voiceChatLauncher', () => ({
   setVoiceChatLauncherEnabled: jest.fn(),
@@ -75,13 +78,27 @@ describe('useDeepLinking — cold-launch routing', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     modelStore.inferencing = false;
+    modelStore.models = [
+      {
+        id: 'test-model-id',
+        name: 'Test model',
+        modelType: 'llm',
+        origin: 'LOCAL',
+        isDownloaded: true,
+      },
+    ] as any;
+    modelStore.activeModelId = 'test-model-id';
     modelStore.engine = {} as any;
     modelStore.isContextLoading = false;
+    setPendingModelOperations(false);
+    modelStore.benchmarkActive = false;
     startupSelectionStore.restoreAttempted = true;
     startupSelectionStore.isRestoring = false;
     chatSessionStore.isGenerating = false;
     chatSessionStore.isStopping = false;
+    (chatSessionStore.setActivePal as jest.Mock).mockResolvedValue(undefined);
     deepLinkStore.pendingVoiceConversationRequestId = null;
+    deepLinkStore.preparedVoiceConversationRequestId = null;
     (palStore as any).pals = [];
     Object.defineProperty(chatSessionStore, 'activePalId', {
       get: jest.fn(() => null),
@@ -102,6 +119,7 @@ describe('useDeepLinking — cold-launch routing', () => {
   });
 
   afterEach(() => {
+    jest.useRealTimers();
     getInitialURLSpy.mockRestore();
     alertSpy.mockRestore();
   });
@@ -233,6 +251,7 @@ describe('useDeepLinking — cold-launch routing', () => {
   });
 
   it('shows recovery guidance when model restoration fails', async () => {
+    jest.useFakeTimers();
     (global as any).__E2E__ = false;
     modelStore.engine = undefined;
     startupSelectionStore.restoreAttempted = false;
@@ -243,21 +262,38 @@ describe('useDeepLinking — cold-launch routing', () => {
     getInitialURLSpy.mockResolvedValue('pocketpal://assistant/new-chat');
 
     renderHook(() => useDeepLinking());
-    await Promise.resolve();
-    await Promise.resolve();
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(deepLinkStore.requestVoiceConversation).toHaveBeenCalledTimes(1);
 
     act(() => {
       runInAction(() => {
         modelStore.isContextLoading = true;
+        setPendingModelOperations(true);
         startupSelectionStore.restoreAttempted = true;
       });
     });
     act(() => {
       runInAction(() => {
         modelStore.isContextLoading = false;
+        setPendingModelOperations(false);
       });
     });
     await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(prepareVoiceChatSelection).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      jest.advanceTimersByTime(5000);
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
       await Promise.resolve();
       await Promise.resolve();
     });
@@ -270,6 +306,135 @@ describe('useDeepLinking — cold-launch routing', () => {
     expect(chatSessionStore.resetActiveSession).not.toHaveBeenCalled();
   });
 
+  it('recovers without an alert when a model becomes ready during the grace period', async () => {
+    jest.useFakeTimers();
+    (global as any).__E2E__ = false;
+    modelStore.engine = undefined;
+    jest
+      .mocked(prepareVoiceChatSelection)
+      .mockResolvedValueOnce({ready: false, replacePal: false})
+      .mockResolvedValue({ready: true, replacePal: false});
+    getInitialURLSpy.mockResolvedValue('pocketpal://assistant/new-chat');
+
+    renderHook(() => useDeepLinking());
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(prepareVoiceChatSelection).toHaveBeenCalledTimes(1);
+    expect(Alert.alert).not.toHaveBeenCalled();
+    expect(chatSessionStore.resetActiveSession).not.toHaveBeenCalled();
+
+    await act(async () => {
+      runInAction(() => {
+        modelStore.engine = {} as any;
+      });
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(Alert.alert).not.toHaveBeenCalled();
+    expect(chatSessionStore.resetActiveSession).toHaveBeenCalledTimes(1);
+    expect(deepLinkStore.markVoiceConversationPrepared).toHaveBeenCalledWith(
+      deepLinkStore.pendingVoiceConversationRequestId,
+    );
+  });
+
+  it('does not fail at the deadline while tracked model work remains active', async () => {
+    jest.useFakeTimers();
+    (global as any).__E2E__ = false;
+    modelStore.engine = undefined;
+    jest
+      .mocked(prepareVoiceChatSelection)
+      .mockResolvedValueOnce({ready: false, replacePal: false})
+      .mockResolvedValue({ready: true, replacePal: false});
+    getInitialURLSpy.mockResolvedValue('pocketpal://assistant/new-chat');
+
+    renderHook(() => useDeepLinking());
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    act(() => {
+      runInAction(() => {
+        setPendingModelOperations(true);
+      });
+    });
+    act(() => {
+      jest.advanceTimersByTime(5000);
+    });
+    expect(Alert.alert).not.toHaveBeenCalled();
+
+    await act(async () => {
+      runInAction(() => {
+        modelStore.engine = {} as any;
+        setPendingModelOperations(false);
+      });
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(Alert.alert).not.toHaveBeenCalled();
+    expect(chatSessionStore.resetActiveSession).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not overlap preparation when a newer voice request replaces one in flight', async () => {
+    (global as any).__E2E__ = false;
+    let resolveFirst!: (selection: {
+      ready: boolean;
+      replacePal: boolean;
+    }) => void;
+    jest
+      .mocked(prepareVoiceChatSelection)
+      .mockImplementationOnce(
+        () =>
+          new Promise(resolve => {
+            resolveFirst = resolve;
+          }),
+      )
+      .mockResolvedValue({ready: true, replacePal: false});
+    getInitialURLSpy.mockResolvedValue('pocketpal://assistant/new-chat');
+
+    renderHook(() => useDeepLinking());
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(prepareVoiceChatSelection).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      runInAction(() => {
+        deepLinkStore.requestVoiceConversation();
+      });
+    });
+    expect(prepareVoiceChatSelection).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      resolveFirst({ready: false, replacePal: false});
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(prepareVoiceChatSelection).toHaveBeenCalledTimes(2);
+    expect(chatSessionStore.resetActiveSession).toHaveBeenCalledTimes(1);
+    expect(deepLinkStore.markVoiceConversationPrepared).toHaveBeenCalledWith(
+      deepLinkStore.pendingVoiceConversationRequestId,
+    );
+  });
+
   it('replaces a restored video Pal with a hands-free-compatible Pal', async () => {
     (global as any).__E2E__ = false;
     startupSelectionStore.restoreAttempted = false;
@@ -277,10 +442,16 @@ describe('useDeepLinking — cold-launch routing', () => {
       {id: 'video-pal', capabilities: {video: true}},
       {id: 'voice-pal', capabilities: {}},
     ];
+    let activePalId = 'video-pal';
     Object.defineProperty(chatSessionStore, 'activePalId', {
-      get: jest.fn(() => 'video-pal'),
+      get: jest.fn(() => activePalId),
       configurable: true,
     });
+    (chatSessionStore.setActivePal as jest.Mock).mockImplementation(
+      async (palId: string) => {
+        activePalId = palId;
+      },
+    );
     jest.mocked(prepareVoiceChatSelection).mockResolvedValue({
       ready: true,
       replacePal: true,
@@ -290,8 +461,12 @@ describe('useDeepLinking — cold-launch routing', () => {
 
     renderHook(() => useDeepLinking());
 
-    await Promise.resolve();
-    await Promise.resolve();
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
 
     expect(deepLinkStore.requestVoiceConversation).toHaveBeenCalledTimes(1);
     expect(mockNavigate).toHaveBeenCalledWith(ROUTES.CHAT);
@@ -299,15 +474,21 @@ describe('useDeepLinking — cold-launch routing', () => {
     act(() => {
       runInAction(() => {
         modelStore.isContextLoading = true;
+        setPendingModelOperations(true);
         startupSelectionStore.restoreAttempted = true;
       });
     });
     act(() => {
       runInAction(() => {
         modelStore.isContextLoading = false;
+        setPendingModelOperations(false);
       });
     });
     await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
       await Promise.resolve();
       await Promise.resolve();
     });
@@ -315,6 +496,9 @@ describe('useDeepLinking — cold-launch routing', () => {
     expect(Alert.alert).not.toHaveBeenCalled();
     expect(chatSessionStore.resetActiveSession).toHaveBeenCalledTimes(1);
     expect(chatSessionStore.setActivePal).toHaveBeenCalledWith('voice-pal');
+    expect(deepLinkStore.markVoiceConversationPrepared).toHaveBeenCalledWith(
+      deepLinkStore.pendingVoiceConversationRequestId,
+    );
     expect(deepLinkStore.pendingVoiceConversationRequestId).not.toBeNull();
   });
 
@@ -331,6 +515,54 @@ describe('useDeepLinking — cold-launch routing', () => {
 
     expect(setVoiceChatLauncherEnabled).toHaveBeenLastCalledWith(false);
     unmount();
+  });
+
+  it('disables the launcher while a model transition is pending', () => {
+    const {unmount} = renderHook(() => useDeepLinking());
+    expect(setVoiceChatLauncherEnabled).toHaveBeenLastCalledWith(true);
+
+    act(() => {
+      runInAction(() => {
+        setPendingModelOperations(true);
+      });
+    });
+    expect(setVoiceChatLauncherEnabled).toHaveBeenLastCalledWith(false);
+
+    act(() => {
+      runInAction(() => {
+        setPendingModelOperations(false);
+      });
+    });
+    expect(setVoiceChatLauncherEnabled).toHaveBeenLastCalledWith(true);
+    unmount();
+  });
+
+  it('cancels recovery guidance when the hook unmounts', async () => {
+    jest.useFakeTimers();
+    (global as any).__E2E__ = false;
+    modelStore.engine = undefined;
+    jest.mocked(prepareVoiceChatSelection).mockResolvedValue({
+      ready: false,
+      replacePal: false,
+    });
+    getInitialURLSpy.mockResolvedValue('pocketpal://assistant/new-chat');
+
+    const {unmount} = renderHook(() => useDeepLinking());
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(prepareVoiceChatSelection).toHaveBeenCalledTimes(1);
+    expect(Alert.alert).not.toHaveBeenCalled();
+
+    unmount();
+    act(() => {
+      jest.advanceTimersByTime(5000);
+    });
+
+    expect(Alert.alert).not.toHaveBeenCalled();
   });
 
   it('clears a pending request when the app leaves the foreground', () => {

@@ -22,6 +22,9 @@ jest.mock('../../../hooks/useVoiceConversation', () => ({
 }));
 
 const mockUseVoiceConversation = useVoiceConversation as jest.Mock;
+const setPendingModelOperations = (pending: boolean) => {
+  Object.assign(modelStore, {hasPendingModelOperations: pending});
+};
 
 const dictationResult = {
   phase: 'idle',
@@ -58,8 +61,19 @@ describe('ChatInput dictation', () => {
     mockUseVoiceConversation.mockReturnValue(conversationResult);
     runInAction(() => {
       modelStore.activeModelId = 'test-model-id';
+      modelStore.models = [
+        {
+          id: 'test-model-id',
+          name: 'Test model',
+          modelType: 'llm',
+          origin: 'LOCAL',
+          isDownloaded: true,
+        },
+      ] as any;
       modelStore.engine = undefined;
+      setPendingModelOperations(false);
       deepLinkStore.pendingVoiceConversationRequestId = null;
+      deepLinkStore.preparedVoiceConversationRequestId = null;
       startupSelectionStore.restoreAttempted = true;
       startupSelectionStore.isRestoring = false;
       chatSessionStore.activeSessionId = null;
@@ -92,6 +106,7 @@ describe('ChatInput dictation', () => {
     runInAction(() => {
       modelStore.engine = {} as any;
       deepLinkStore.pendingVoiceConversationRequestId = 42;
+      deepLinkStore.preparedVoiceConversationRequestId = 42;
     });
 
     render(
@@ -123,10 +138,58 @@ describe('ChatInput dictation', () => {
     ).not.toHaveBeenCalled();
   });
 
+  it('does not start before the launcher prepares the fresh chat', () => {
+    runInAction(() => {
+      modelStore.engine = {} as any;
+      deepLinkStore.pendingVoiceConversationRequestId = 48;
+      deepLinkStore.preparedVoiceConversationRequestId = null;
+    });
+
+    render(
+      <UserContext.Provider value={user}>
+        <ChatInput onSendPress={jest.fn()} />
+      </UserContext.Provider>,
+    );
+
+    expect(conversationResult.start).not.toHaveBeenCalled();
+    expect(
+      deepLinkStore.consumeVoiceConversationRequest,
+    ).not.toHaveBeenCalled();
+  });
+
+  it('waits for tracked model work after the fresh chat is prepared', async () => {
+    runInAction(() => {
+      modelStore.engine = {} as any;
+      setPendingModelOperations(true);
+      deepLinkStore.pendingVoiceConversationRequestId = 49;
+      deepLinkStore.preparedVoiceConversationRequestId = 49;
+    });
+
+    render(
+      <UserContext.Provider value={user}>
+        <ChatInput onSendPress={jest.fn()} />
+      </UserContext.Provider>,
+    );
+    expect(conversationResult.start).not.toHaveBeenCalled();
+
+    await act(async () => {
+      runInAction(() => {
+        setPendingModelOperations(false);
+      });
+      await Promise.resolve();
+    });
+
+    expect(conversationResult.start).toHaveBeenCalledTimes(1);
+    expect(deepLinkStore.consumeVoiceConversationRequest).toHaveBeenCalledWith(
+      49,
+    );
+  });
+
   it('waits for startup selection and model restoration before starting', async () => {
     runInAction(() => {
       startupSelectionStore.isRestoring = true;
       deepLinkStore.pendingVoiceConversationRequestId = 44;
+      deepLinkStore.preparedVoiceConversationRequestId = 44;
     });
 
     const renderInput = () => (

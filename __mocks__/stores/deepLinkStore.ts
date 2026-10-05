@@ -9,6 +9,7 @@ export class DeepLinkStore {
   pendingMessage: string | null = null;
   pendingHubRun: HubRunRequest | null = null;
   pendingVoiceConversationRequestId: number | null = null;
+  preparedVoiceConversationRequestId: number | null = null;
   private nextVoiceConversationRequestId = 1;
 
   constructor() {
@@ -19,6 +20,7 @@ export class DeepLinkStore {
       clearPendingHubRun: false,
       requestVoiceConversation: false,
       clearVoiceConversationRequest: false,
+      markVoiceConversationPrepared: false,
       consumeVoiceConversationRequest: false,
     });
   }
@@ -42,15 +44,24 @@ export class DeepLinkStore {
   requestVoiceConversation = jest.fn(() => {
     this.pendingVoiceConversationRequestId = this
       .nextVoiceConversationRequestId++;
+    this.preparedVoiceConversationRequestId = null;
   });
 
   clearVoiceConversationRequest = jest.fn(() => {
     this.pendingVoiceConversationRequestId = null;
+    this.preparedVoiceConversationRequestId = null;
+  });
+
+  markVoiceConversationPrepared = jest.fn((requestId: number) => {
+    if (this.pendingVoiceConversationRequestId === requestId) {
+      this.preparedVoiceConversationRequestId = requestId;
+    }
   });
 
   consumeVoiceConversationRequest = jest.fn((requestId: number) => {
     if (this.pendingVoiceConversationRequestId === requestId) {
       this.pendingVoiceConversationRequestId = null;
+      this.preparedVoiceConversationRequestId = null;
     }
   });
 }
