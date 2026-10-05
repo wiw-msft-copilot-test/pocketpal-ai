@@ -97,6 +97,7 @@ class MockModelStore {
   setReasoningOverride: jest.Mock;
   benchmarkActive: boolean = false;
   isContextLoading: boolean = false;
+  hasPendingModelOperations: boolean = false;
   loadingModel: Model | undefined;
 
   constructor() {

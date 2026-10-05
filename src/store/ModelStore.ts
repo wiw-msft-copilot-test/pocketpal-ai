@@ -196,6 +196,19 @@ class ModelStore {
   // UI loading state - true during model load/release transitions
   isContextLoading: boolean = false;
   loadingModel: Model | undefined = undefined;
+  private pendingModelOperationCount = 0;
+
+  get hasPendingModelOperations(): boolean {
+    return this.pendingModelOperationCount > 0;
+  }
+
+  private beginModelOperation() {
+    this.pendingModelOperationCount += 1;
+  }
+
+  private endModelOperation() {
+    this.pendingModelOperationCount -= 1;
+  }
 
   // Unified context initialization parameters
   contextInitParams: ContextInitParams = createDefaultContextInitParams();
@@ -2208,6 +2221,8 @@ class ModelStore {
       );
     }
 
+    this.beginModelOperation();
+
     // === Phase 1: Pre-flight checks OUTSIDE mutex ===
 
     // Mark intent immediately - this is the "last-one-wins" tracking
@@ -2305,6 +2320,7 @@ class ModelStore {
       runInAction(() => {
         this.isContextLoading = false;
         this.loadingModel = undefined;
+        this.endModelOperation();
       });
     }
   };
@@ -2590,6 +2606,7 @@ class ModelStore {
 
   /** Acquires mutex before releasing context. */
   releaseContext = async (clearActiveModel: boolean = false) => {
+    this.beginModelOperation();
     const operationPromise = this.contextOperationMutex.then(async () => {
       return this._releaseContextInternal(clearActiveModel);
     });
@@ -2599,7 +2616,13 @@ class ModelStore {
       .then(() => {})
       .catch(() => {});
 
-    return operationPromise;
+    try {
+      return await operationPromise;
+    } finally {
+      runInAction(() => {
+        this.endModelOperation();
+      });
+    }
   };
 
   manualReleaseContext = async () => {
@@ -2714,94 +2737,104 @@ class ModelStore {
    * Releases any active local context first.
    */
   setRemoteModel = async (model: Model): Promise<void> => {
-    if (!model.serverId || !model.remoteModelId) {
-      throw new Error('Model is missing remote configuration');
-    }
+    this.beginModelOperation();
+    try {
+      if (!model.serverId || !model.remoteModelId) {
+        throw new Error('Model is missing remote configuration');
+      }
 
-    const server = serverStore.servers.find(s => s.id === model.serverId);
-    if (!server) {
-      throw new Error('Server not found');
-    }
-    const catalog = serverStore.getRemoteCatalogModel(model.id);
-    const protocol = serverStore.resolveRemoteModelProtocol(model.id);
-    if (!protocol.supported || !protocol.wireApi) {
-      throw new Error(
-        `Model "${model.remoteModelId}" does not advertise a supported API endpoint. Set a manual model or server API override to continue.`,
+      const server = serverStore.servers.find(s => s.id === model.serverId);
+      if (!server) {
+        throw new Error('Server not found');
+      }
+      const catalog = serverStore.getRemoteCatalogModel(model.id);
+      const protocol = serverStore.resolveRemoteModelProtocol(model.id);
+      if (!protocol.supported || !protocol.wireApi) {
+        throw new Error(
+          `Model "${model.remoteModelId}" does not advertise a supported API endpoint. Set a manual model or server API override to continue.`,
+        );
+      }
+      const bindingSnapshot = {
+        url: server.url,
+        serverType: server.serverType,
+        requestTimeoutMs: server.requestTimeoutMs,
+        credentialRevision:
+          Number.isSafeInteger(server.credentialRevision) &&
+          (server.credentialRevision ?? -1) >= 0
+            ? server.credentialRevision!
+            : 0,
+        wireApi: protocol.wireApi,
+        generationSettings: serverStore.getRemoteModelGenerationSettings(
+          model.id,
+        ),
+        protocolCapabilities: catalog
+          ? {
+              ...catalog.capabilities,
+              advertisedEndpoints: catalog.capabilities.advertisedEndpoints
+                ? [...catalog.capabilities.advertisedEndpoints]
+                : undefined,
+              reasoningEffortValues: catalog.capabilities.reasoningEffortValues
+                ? [...catalog.capabilities.reasoningEffortValues]
+                : undefined,
+            }
+          : undefined,
+      };
+      const apiKey = await serverStore.getApiKey(model.serverId);
+      const currentServer = serverStore.servers.find(
+        candidate => candidate.id === model.serverId,
       );
+      if (
+        !currentServer ||
+        currentServer.url !== bindingSnapshot.url ||
+        currentServer.serverType !== bindingSnapshot.serverType ||
+        (currentServer.credentialRevision ?? 0) !==
+          bindingSnapshot.credentialRevision
+      ) {
+        throw new Error('Server configuration changed while selecting model');
+      }
+
+      // Release only after validation, so a rejected catalog-only model does not
+      // tear down the currently active session.
+      await this.releaseContext();
+
+      const activeBinding = {
+        modelId: model.id,
+        serverId: model.serverId!,
+        remoteModelId: model.remoteModelId!,
+        url: bindingSnapshot.url,
+        serverType: bindingSnapshot.serverType,
+        wireApi: bindingSnapshot.wireApi,
+        protocolCapabilities: bindingSnapshot.protocolCapabilities,
+        credentialRevision: bindingSnapshot.credentialRevision,
+        generationSettings: bindingSnapshot.generationSettings,
+      };
+
+      runInAction(() => {
+        this.engine = new OpenAICompletionEngine(
+          bindingSnapshot.url,
+          model.remoteModelId!,
+          apiKey,
+          bindingSnapshot.requestTimeoutMs,
+          bindingSnapshot.serverType,
+          activeBinding,
+        );
+        this.activeRemoteBinding = activeBinding;
+        this.setActiveModel(model.id);
+        this.lastUsedModelId = model.id;
+        this.lastUsedModelSelection = createStartupModelSelection(
+          model,
+          server,
+        );
+      });
+
+      serverStore
+        .fetchRemoteModelCaps(model.serverId, model.remoteModelId, apiKey)
+        .catch(() => {});
+    } finally {
+      runInAction(() => {
+        this.endModelOperation();
+      });
     }
-    const bindingSnapshot = {
-      url: server.url,
-      serverType: server.serverType,
-      requestTimeoutMs: server.requestTimeoutMs,
-      credentialRevision:
-        Number.isSafeInteger(server.credentialRevision) &&
-        (server.credentialRevision ?? -1) >= 0
-          ? server.credentialRevision!
-          : 0,
-      wireApi: protocol.wireApi,
-      generationSettings: serverStore.getRemoteModelGenerationSettings(
-        model.id,
-      ),
-      protocolCapabilities: catalog
-        ? {
-            ...catalog.capabilities,
-            advertisedEndpoints: catalog.capabilities.advertisedEndpoints
-              ? [...catalog.capabilities.advertisedEndpoints]
-              : undefined,
-            reasoningEffortValues: catalog.capabilities.reasoningEffortValues
-              ? [...catalog.capabilities.reasoningEffortValues]
-              : undefined,
-          }
-        : undefined,
-    };
-    const apiKey = await serverStore.getApiKey(model.serverId);
-    const currentServer = serverStore.servers.find(
-      candidate => candidate.id === model.serverId,
-    );
-    if (
-      !currentServer ||
-      currentServer.url !== bindingSnapshot.url ||
-      currentServer.serverType !== bindingSnapshot.serverType ||
-      (currentServer.credentialRevision ?? 0) !==
-        bindingSnapshot.credentialRevision
-    ) {
-      throw new Error('Server configuration changed while selecting model');
-    }
-
-    // Release only after validation, so a rejected catalog-only model does not
-    // tear down the currently active session.
-    await this.releaseContext();
-
-    const activeBinding = {
-      modelId: model.id,
-      serverId: model.serverId!,
-      remoteModelId: model.remoteModelId!,
-      url: bindingSnapshot.url,
-      serverType: bindingSnapshot.serverType,
-      wireApi: bindingSnapshot.wireApi,
-      protocolCapabilities: bindingSnapshot.protocolCapabilities,
-      credentialRevision: bindingSnapshot.credentialRevision,
-      generationSettings: bindingSnapshot.generationSettings,
-    };
-
-    runInAction(() => {
-      this.engine = new OpenAICompletionEngine(
-        bindingSnapshot.url,
-        model.remoteModelId!,
-        apiKey,
-        bindingSnapshot.requestTimeoutMs,
-        bindingSnapshot.serverType,
-        activeBinding,
-      );
-      this.activeRemoteBinding = activeBinding;
-      this.setActiveModel(model.id);
-      this.lastUsedModelId = model.id;
-      this.lastUsedModelSelection = createStartupModelSelection(model, server);
-    });
-
-    serverStore
-      .fetchRemoteModelCaps(model.serverId, model.remoteModelId, apiKey)
-      .catch(() => {});
   };
 
   /**

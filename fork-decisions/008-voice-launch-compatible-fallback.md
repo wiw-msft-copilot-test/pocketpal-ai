@@ -37,8 +37,12 @@ fallback model becomes last-used through the normal model activation path.
 
 Show unavailable guidance and consume the request only when no non-video Pal
 can replace an incompatible active Pal or no available model can create an
-engine. Generation, lifecycle, single-use request, and manual-control guards
-remain unchanged.
+engine after the voice-launch recovery grace and final preparation attempt.
+Do not make that final failure decision while startup restoration, compatible
+Pal application, or a tracked model activation/release remains active. Start
+immediately when those prerequisites settle successfully; optional remote
+capability probes are not activation prerequisites. Generation, lifecycle,
+single-use request, and manual-control guards remain unchanged.
 
 ## Affected paths
 

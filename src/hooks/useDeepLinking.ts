@@ -5,7 +5,7 @@
  * Must be called from a component inside NavigationContainer
  */
 
-import {useEffect, useCallback, useRef} from 'react';
+import {useEffect, useCallback} from 'react';
 import {Alert, AppState, Linking} from 'react-native';
 import {useNavigation} from '@react-navigation/native';
 import {reaction} from 'mobx';
@@ -15,12 +15,14 @@ import {
   deepLinkStore,
   modelStore,
   palStore,
+  serverStore,
   startupSelectionStore,
   uiStore,
 } from '../store';
 import {ROUTES} from '../utils/navigationConstants';
 import {setVoiceChatLauncherEnabled} from '../services/voiceChatLauncher';
 import {prepareVoiceChatSelection} from '../services/voiceChatSelection';
+import {hasVideoCapability} from '../utils/pal-capabilities';
 import {
   isBenchmarkRunnerUrl,
   parseBenchmarkAutostart,
@@ -32,8 +34,6 @@ import {
  */
 export const useDeepLinking = () => {
   const navigation = useNavigation();
-  const validatedVoiceRequestId = useRef<number | null>(null);
-  const preparingVoiceRequestId = useRef<number | null>(null);
 
   const handleVoiceChatLaunch = useCallback(() => {
     if (
@@ -53,115 +53,286 @@ export const useDeepLinking = () => {
     (navigation as any).navigate(ROUTES.CHAT);
   }, [navigation]);
 
-  useEffect(
-    () =>
-      reaction(
-        () => ({
-          requestId: deepLinkStore.pendingVoiceConversationRequestId,
-          restoreAttempted: startupSelectionStore.restoreAttempted,
-          isRestoring: startupSelectionStore.isRestoring,
-          isContextLoading: modelStore.isContextLoading,
-          isBusy:
-            modelStore.inferencing ||
-            chatSessionStore.isGenerating ||
-            chatSessionStore.isStopping,
-        }),
-        state => {
-          if (state.requestId === null) {
-            validatedVoiceRequestId.current = null;
+  useEffect(() => {
+    const recoveryGraceMs = 5000;
+    let activeRequestId: number | null = null;
+    let recoveryTimer: ReturnType<typeof setTimeout> | null = null;
+    let recoveryExpired = false;
+    let preparingRequestId: number | null = null;
+    let recheckRequested = false;
+    let forceRetryWhenIdle = false;
+    let freshChatPrepared = false;
+    let lastFailureSignature: string | null = null;
+    let disposed = false;
+
+    const clearRecoveryTimer = () => {
+      if (recoveryTimer) {
+        clearTimeout(recoveryTimer);
+        recoveryTimer = null;
+      }
+    };
+
+    const resetRequestState = (requestId: number | null) => {
+      clearRecoveryTimer();
+      activeRequestId = requestId;
+      recoveryExpired = false;
+      recheckRequested = false;
+      forceRetryWhenIdle = false;
+      freshChatPrepared = false;
+      lastFailureSignature = null;
+    };
+
+    const isCurrentRequest = (requestId: number) =>
+      !disposed &&
+      deepLinkStore.pendingVoiceConversationRequestId === requestId;
+
+    const isBusy = () =>
+      modelStore.inferencing ||
+      chatSessionStore.isGenerating ||
+      chatSessionStore.isStopping;
+
+    const selectionSignature = () =>
+      JSON.stringify({
+        engine: Boolean(modelStore.engine),
+        activeModelId: modelStore.activeModelId,
+        activePalId: chatSessionStore.activePalId,
+        pals: palStore.pals.map(pal => [
+          pal.id,
+          hasVideoCapability(pal),
+          pal.defaultModel?.id,
+        ]),
+        models: modelStore.availableModels.map(model => [
+          model.id,
+          model.origin,
+          model.serverId,
+        ]),
+        servers: serverStore.servers.map(server => [
+          server.id,
+          server.url,
+          server.serverType,
+          server.credentialRevision,
+        ]),
+        catalogs: Array.from(serverStore.serverModels.entries()).map(
+          ([serverId, models]) => [serverId, models.map(model => model.id)],
+        ),
+      });
+
+    const currentSelectionIsReady = () => {
+      const activePal = palStore.pals.find(
+        pal => pal.id === chatSessionStore.activePalId,
+      );
+      return (
+        !modelStore.benchmarkActive &&
+        !modelStore.hasPendingModelOperations &&
+        Boolean(modelStore.engine) &&
+        Boolean(modelStore.activeModel) &&
+        modelStore.availableModels.some(
+          model => model.id === modelStore.activeModelId,
+        ) &&
+        (!activePal || !hasVideoCapability(activePal))
+      );
+    };
+
+    const showBusy = (requestId: number) => {
+      if (!isCurrentRequest(requestId)) {
+        return;
+      }
+      Alert.alert(
+        uiStore.l10n.chat.voiceLaunchBusyTitle,
+        uiStore.l10n.chat.voiceLaunchBusyMessage,
+        [{text: uiStore.l10n.common.ok}],
+      );
+      deepLinkStore.consumeVoiceConversationRequest(requestId);
+    };
+
+    const showUnavailable = (requestId: number) => {
+      if (!isCurrentRequest(requestId)) {
+        return;
+      }
+      Alert.alert(
+        uiStore.l10n.components.chatInput.speechInput
+          .conversationUnavailableTitle,
+        uiStore.l10n.chat.voiceLaunchUnavailableMessage,
+      );
+      deepLinkStore.consumeVoiceConversationRequest(requestId);
+    };
+
+    let evaluateRequest = () => {};
+
+    const startRecoveryTimer = () => {
+      if (recoveryTimer || recoveryExpired) {
+        return;
+      }
+      recoveryTimer = setTimeout(() => {
+        recoveryTimer = null;
+        recoveryExpired = true;
+        evaluateRequest();
+      }, recoveryGraceMs);
+    };
+
+    const recordPreparationFailure = (requestId: number, signature: string) => {
+      if (!isCurrentRequest(requestId)) {
+        return;
+      }
+      lastFailureSignature = signature;
+      if (recoveryExpired) {
+        showUnavailable(requestId);
+      } else {
+        startRecoveryTimer();
+      }
+    };
+
+    evaluateRequest = () => {
+      const requestId = deepLinkStore.pendingVoiceConversationRequestId;
+      if (requestId === null) {
+        resetRequestState(null);
+        return;
+      }
+      if (activeRequestId !== requestId) {
+        resetRequestState(requestId);
+      }
+      if (deepLinkStore.preparedVoiceConversationRequestId === requestId) {
+        return;
+      }
+      if (isBusy()) {
+        showBusy(requestId);
+        return;
+      }
+      if (
+        !startupSelectionStore.restoreAttempted ||
+        startupSelectionStore.isRestoring ||
+        modelStore.hasPendingModelOperations ||
+        modelStore.benchmarkActive
+      ) {
+        return;
+      }
+      if (freshChatPrepared) {
+        if (currentSelectionIsReady()) {
+          deepLinkStore.markVoiceConversationPrepared(requestId);
+        } else if (recoveryExpired) {
+          showUnavailable(requestId);
+        } else {
+          startRecoveryTimer();
+        }
+        return;
+      }
+      if (preparingRequestId !== null) {
+        recheckRequested = true;
+        return;
+      }
+
+      const signature = selectionSignature();
+      if (
+        !forceRetryWhenIdle &&
+        !recoveryExpired &&
+        lastFailureSignature === signature
+      ) {
+        return;
+      }
+
+      forceRetryWhenIdle = false;
+      preparingRequestId = requestId;
+      recheckRequested = false;
+      let committedFreshChat = false;
+
+      prepareVoiceChatSelection({
+        shouldContinue: () => isCurrentRequest(requestId),
+      })
+        .then(async selection => {
+          if (!isCurrentRequest(requestId)) {
+            return;
+          }
+          if (isBusy()) {
+            showBusy(requestId);
+            return;
+          }
+          if (!selection.ready) {
+            recordPreparationFailure(requestId, signature);
             return;
           }
           if (
-            validatedVoiceRequestId.current === state.requestId ||
-            preparingVoiceRequestId.current === state.requestId ||
-            !state.restoreAttempted ||
-            state.isRestoring ||
-            state.isContextLoading
+            startupSelectionStore.isRestoring ||
+            modelStore.hasPendingModelOperations ||
+            modelStore.benchmarkActive
           ) {
-            return;
-          }
-          if (state.isBusy) {
-            Alert.alert(
-              uiStore.l10n.chat.voiceLaunchBusyTitle,
-              uiStore.l10n.chat.voiceLaunchBusyMessage,
-              [{text: uiStore.l10n.common.ok}],
-            );
-            deepLinkStore.consumeVoiceConversationRequest(state.requestId);
+            forceRetryWhenIdle = true;
             return;
           }
 
-          const requestId = state.requestId;
-          preparingVoiceRequestId.current = requestId;
-          prepareVoiceChatSelection({
-            shouldContinue: () =>
-              deepLinkStore.pendingVoiceConversationRequestId === requestId,
-          })
-            .then(async selection => {
-              if (
-                deepLinkStore.pendingVoiceConversationRequestId !== requestId
-              ) {
-                return;
-              }
-              if (
-                modelStore.inferencing ||
-                chatSessionStore.isGenerating ||
-                chatSessionStore.isStopping
-              ) {
-                Alert.alert(
-                  uiStore.l10n.chat.voiceLaunchBusyTitle,
-                  uiStore.l10n.chat.voiceLaunchBusyMessage,
-                  [{text: uiStore.l10n.common.ok}],
-                );
-                deepLinkStore.consumeVoiceConversationRequest(requestId);
-                return;
-              }
-              if (!selection.ready) {
-                Alert.alert(
-                  uiStore.l10n.components.chatInput.speechInput
-                    .conversationUnavailableTitle,
-                  uiStore.l10n.chat.voiceLaunchUnavailableMessage,
-                );
-                deepLinkStore.consumeVoiceConversationRequest(requestId);
-                return;
-              }
+          chatSessionStore.resetActiveSession();
+          committedFreshChat = true;
+          freshChatPrepared = true;
+          if (selection.replacePal) {
+            await chatSessionStore.setActivePal(selection.palId);
+          }
+          if (!isCurrentRequest(requestId)) {
+            return;
+          }
+          if (isBusy()) {
+            showBusy(requestId);
+            return;
+          }
+          if (currentSelectionIsReady()) {
+            deepLinkStore.markVoiceConversationPrepared(requestId);
+          } else {
+            forceRetryWhenIdle = true;
+            startRecoveryTimer();
+          }
+        })
+        .catch(error => {
+          console.error(
+            '[VoiceChatLauncher] Failed to prepare a compatible selection:',
+            error,
+          );
+          if (committedFreshChat) {
+            showUnavailable(requestId);
+          } else {
+            recordPreparationFailure(requestId, signature);
+          }
+        })
+        .finally(() => {
+          if (preparingRequestId === requestId) {
+            preparingRequestId = null;
+          }
+          if (
+            !disposed &&
+            deepLinkStore.pendingVoiceConversationRequestId !== null &&
+            (recheckRequested || forceRetryWhenIdle || recoveryExpired)
+          ) {
+            Promise.resolve().then(evaluateRequest);
+          }
+        });
+    };
 
-              chatSessionStore.resetActiveSession();
-              if (selection.replacePal) {
-                await chatSessionStore.setActivePal(selection.palId);
-              }
-              validatedVoiceRequestId.current = requestId;
-            })
-            .catch(error => {
-              console.error(
-                '[VoiceChatLauncher] Failed to prepare a compatible selection:',
-                error,
-              );
-              if (
-                deepLinkStore.pendingVoiceConversationRequestId === requestId
-              ) {
-                Alert.alert(
-                  uiStore.l10n.components.chatInput.speechInput
-                    .conversationUnavailableTitle,
-                  uiStore.l10n.chat.voiceLaunchUnavailableMessage,
-                );
-                deepLinkStore.consumeVoiceConversationRequest(requestId);
-              }
-            })
-            .finally(() => {
-              if (preparingVoiceRequestId.current === requestId) {
-                preparingVoiceRequestId.current = null;
-              }
-            });
-        },
-        {fireImmediately: true},
-      ),
-    [],
-  );
+    const disposeReaction = reaction(
+      () => ({
+        requestId: deepLinkStore.pendingVoiceConversationRequestId,
+        preparedRequestId: deepLinkStore.preparedVoiceConversationRequestId,
+        restoreAttempted: startupSelectionStore.restoreAttempted,
+        isRestoring: startupSelectionStore.isRestoring,
+        hasPendingModelOperations: modelStore.hasPendingModelOperations,
+        benchmarkActive: modelStore.benchmarkActive,
+        isBusy: isBusy(),
+        selectionSignature: selectionSignature(),
+      }),
+      () => evaluateRequest(),
+      {fireImmediately: true},
+    );
+
+    return () => {
+      disposed = true;
+      clearRecoveryTimer();
+      disposeReaction();
+    };
+  }, []);
 
   useEffect(
     () =>
       reaction(
-        () => Boolean(modelStore.engine) && !modelStore.isContextLoading,
+        () =>
+          Boolean(modelStore.engine) &&
+          !modelStore.isContextLoading &&
+          !modelStore.hasPendingModelOperations,
         enabled => setVoiceChatLauncherEnabled(enabled),
         {fireImmediately: true},
       ),

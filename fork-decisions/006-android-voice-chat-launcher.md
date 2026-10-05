@@ -43,14 +43,19 @@ Pal or explicit `No Pal` preference.
 
 Treat every launch as a bounded, single-use request:
 
-- wait only while startup restoration or model context loading is actively
+- wait while startup restoration or a tracked model activation/release is
   unresolved, and do not reset the current chat during that wait;
 - after restoration settles, keep a usable model when possible, replace a
   video Pal with a non-video Pal, and load a compatible available model when
   needed;
-- reject the request before resetting the chat only when no usable model and
-  non-video Pal combination can be prepared, and explain how to select one
-  before retrying;
+- start immediately when Pal restoration, compatible fresh-chat preparation,
+  and all tracked model transitions have completed;
+- treat an initial preparation failure as provisional for five seconds and
+  retry when relevant model, Pal, or remote-catalog state changes;
+- after the grace period, reject the request before resetting the chat only
+  when a final preparation still cannot produce a usable model and non-video
+  Pal and no tracked model transition remains active, and explain how to select
+  one before retrying;
 - reject the request when generation is active or stopping, including if that
   state begins while restoration is pending;
 - do not leave rejected requests queued to activate later;
@@ -62,7 +67,11 @@ Treat every launch as a bounded, single-use request:
 
 Clear draft text and selected images before automatic listening begins. A
 launcher request must not interrupt an active generation or a conversation the
-user started manually.
+user started manually. Optional remote capability probes that continue after a
+usable remote engine is active do not block voice activation. The tracked-work
+barrier covers model operations that have started; it does not claim that no
+later user action or component effect can begin another operation, so readiness
+is rechecked immediately before activation.
 
 ## Affected paths
 

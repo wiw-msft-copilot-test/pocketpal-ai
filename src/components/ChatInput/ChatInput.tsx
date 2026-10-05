@@ -279,6 +279,14 @@ export const ChatInput = observer(
     const speechInputL10n = l10n.components.chatInput.speechInput;
     const pendingVoiceRequestId =
       deepLinkStore.pendingVoiceConversationRequestId;
+    const voiceRequestPrepared =
+      pendingVoiceRequestId !== null &&
+      deepLinkStore.preparedVoiceConversationRequestId ===
+        pendingVoiceRequestId;
+    const hasPendingModelOperations = modelStore.hasPendingModelOperations;
+    const voiceModelReady = Boolean(
+      modelStore.engine && modelStore.activeModel,
+    );
     const startupSelectionReady =
       startupSelectionStore.restoreAttempted &&
       !startupSelectionStore.isRestoring;
@@ -297,7 +305,12 @@ export const ChatInput = observer(
       if (!startupSelectionReady || modelStore.isContextLoading) {
         return;
       }
-      if (!modelStore.engine || isVideoCapable) {
+      if (
+        !voiceRequestPrepared ||
+        hasPendingModelOperations ||
+        !voiceModelReady ||
+        isVideoCapable
+      ) {
         return;
       }
       if (isStreaming || isStopVisible || isCameraActive) {
@@ -315,6 +328,7 @@ export const ChatInput = observer(
     }, [
       conversation,
       handleChangeText,
+      hasPendingModelOperations,
       isCameraActive,
       isDictationEligible,
       isStreaming,
@@ -325,6 +339,8 @@ export const ChatInput = observer(
       setSelectedImages,
       startupSelectionReady,
       value,
+      voiceRequestPrepared,
+      voiceModelReady,
     ]);
 
     React.useEffect(() => {

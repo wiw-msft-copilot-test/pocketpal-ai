@@ -258,12 +258,17 @@ and current connection pass validation. If that model cannot be loaded or the
 restored Pal requires video, PocketPal automatically looks for a compatible
 combination. It keeps a working model when possible, otherwise preferring the
 replacement Pal's available default model before trying other available local
-and configured remote models. PocketPal shows recovery guidance only when no
-compatible model and non-video Pal combination can be prepared. Rejected
-requests are not started later. This private-build fallback can be launched by
-name when Google Assistant permits app launches, but it is not a Google Play
-App Action and Android Auto may block it while driving because PocketPal is not
-an Android Auto app.
+and configured remote models. Voice chat starts as soon as Pal restoration,
+fresh-chat preparation, and all active model transitions have finished.
+PocketPal treats an initial preparation failure as provisional for five seconds
+and retries when model or Pal readiness changes. It shows recovery guidance
+only after that grace period, a final preparation attempt, and confirmation
+that no tracked model transition remains active. Rejected requests are not
+started later. Optional remote capability discovery does not delay a usable
+model. This private-build fallback can be launched by name when Google
+Assistant permits app launches, but it is not a Google Play App Action and
+Android Auto may block it while driving because PocketPal is not an Android
+Auto app.
 
 <div style="display: flex; justify-content: center;">
     <img src="../assets/chat_1.webp" alt="Navigate to Models Page" style="width: 33%;">
