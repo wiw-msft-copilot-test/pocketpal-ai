@@ -34,6 +34,7 @@ describe('restoreStartupSelection', () => {
       chatSessionStore.newChatPalId = undefined;
       modelStore.models = [];
       modelStore.activeModelId = undefined;
+      modelStore.lastUsedModelId = undefined;
       palStore.pals = [];
       serverStore.servers = [];
       serverStore.serverModels.clear();
@@ -75,6 +76,44 @@ describe('restoreStartupSelection', () => {
     await restoreStartupSelection();
 
     expect(setActivePal).toHaveBeenCalledWith(undefined);
+  });
+
+  it('adopts an available legacy last-used local model', async () => {
+    modelStore.models = [localModel];
+    modelStore.lastUsedModelId = localModel.id;
+    const selectModel = jest.fn().mockResolvedValue(undefined);
+
+    await restoreStartupSelection({selectModel});
+
+    expect(selectModel).toHaveBeenCalledWith(localModel);
+    expect(startupSelectionStore.modelSelection).toEqual({
+      modelId: localModel.id,
+      origin: ModelOrigin.LOCAL,
+      remoteServer: undefined,
+    });
+  });
+
+  it('does not replace an explicit startup model with the legacy last-used model', async () => {
+    const rememberedModel = {
+      ...localModel,
+      id: 'remembered-model',
+      name: 'Remembered model',
+    };
+    modelStore.models = [localModel, rememberedModel];
+    modelStore.lastUsedModelId = localModel.id;
+    startupSelectionStore.modelSelection = {
+      modelId: rememberedModel.id,
+      origin: ModelOrigin.LOCAL,
+    };
+    const selectModel = jest.fn().mockResolvedValue(undefined);
+
+    await restoreStartupSelection({selectModel});
+
+    expect(selectModel).toHaveBeenCalledWith(rememberedModel);
+    expect(startupSelectionStore.modelSelection).toEqual({
+      modelId: rememberedModel.id,
+      origin: ModelOrigin.LOCAL,
+    });
   });
 
   it('clears an unavailable model and suppresses the Pal default auto-load', async () => {

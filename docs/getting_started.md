@@ -252,13 +252,15 @@ Android builds also expose a separate **PocketPal Voice Chat** launcher entry.
 The entry is available only while a model is loaded. Opening it creates a new
 chat with the currently selected Pal and model, then starts hands-free
 conversation. On a cold start, the request waits for PocketPal to restore the
-remembered Pal and finish loading the model. If restoration fails or the
-restored Pal does not support hands-free conversation, PocketPal explains how
-to select a compatible Pal and model before retrying the launcher. Rejected
-requests are not started later. This private-build fallback can be launched by
-name when Google Assistant permits app launches, but it is not a Google Play
-App Action and Android Auto may block it while driving because PocketPal is not
-an Android Auto app.
+remembered Pal and finish loading the model. On upgraded installations without
+a newer startup-model preference, PocketPal first adopts an available
+last-used local model. If restoration fails or the restored Pal does not
+support hands-free conversation, PocketPal explains how to select a compatible
+Pal and model before retrying the launcher. Rejected requests are not started
+later. This private-build fallback can be launched by name when Google
+Assistant permits app launches, but it is not a Google Play App Action and
+Android Auto may block it while driving because PocketPal is not an Android
+Auto app.
 
 <div style="display: flex; justify-content: center;">
     <img src="../assets/chat_1.webp" alt="Navigate to Models Page" style="width: 33%;">

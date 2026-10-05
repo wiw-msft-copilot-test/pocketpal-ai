@@ -66,6 +66,31 @@ const restoreRememberedModel = async (
   await selectModel(model);
 };
 
+const getStartupModelSelection = (): {
+  selection: StartupModelSelection;
+  adoptsLegacyLastUsedModel: boolean;
+} | null => {
+  if (startupSelectionStore.modelSelection) {
+    return {
+      selection: startupSelectionStore.modelSelection,
+      adoptsLegacyLastUsedModel: false,
+    };
+  }
+
+  const lastUsedModel = modelStore.lastUsedModel;
+  if (!lastUsedModel) {
+    return null;
+  }
+
+  return {
+    selection: {
+      modelId: lastUsedModel.id,
+      origin: lastUsedModel.origin,
+    },
+    adoptsLegacyLastUsedModel: true,
+  };
+};
+
 export const restoreStartupSelection = async (
   options: {
     selectModel?: typeof modelStore.selectModel;
@@ -81,12 +106,21 @@ export const restoreStartupSelection = async (
       return;
     }
 
-    if (startupSelectionStore.modelSelection) {
+    const startupModel = getStartupModelSelection();
+    if (startupModel) {
       try {
         await restoreRememberedModel(
-          startupSelectionStore.modelSelection,
+          startupModel.selection,
           options.selectModel ?? modelStore.selectModel,
         );
+        if (startupModel.adoptsLegacyLastUsedModel) {
+          const model = modelStore.displayModels.find(
+            candidate => candidate.id === startupModel.selection.modelId,
+          );
+          if (model) {
+            startupSelectionStore.rememberModel(model);
+          }
+        }
       } catch (error) {
         startupSelectionStore.markModelRestoreFailed();
         console.warn('[StartupSelection] Failed to restore model:', error);
