@@ -44,7 +44,6 @@ import {
   SearchProviderKeySheet,
   InputSlider,
 } from '../../components';
-
 import {useTheme} from '../../hooks';
 
 import {createStyles} from './styles';
@@ -84,6 +83,19 @@ import {
 const OPENCL_DOCS_URL =
   'https://github.com/ggml-org/llama.cpp/blob/master/docs/backend/OPENCL.md#model-preparation';
 
+const AuthSheet = __ENABLE_PALSHUB__
+  ? require('../../components/PalsHub').AuthSheet
+  : null;
+const PurchasesCard = __ENABLE_PALSHUB__
+  ? require('./PurchasesCard').PurchasesCard
+  : null;
+const authService = __ENABLE_PALSHUB__
+  ? require('../../services').authService
+  : null;
+const purchaseStore = __ENABLE_PALSHUB__
+  ? require('../../store').purchaseStore
+  : null;
+
 export const SettingsScreen: React.FC = observer(() => {
   const l10n = useContext(L10nContext);
   const theme = useTheme();
@@ -101,6 +113,7 @@ export const SettingsScreen: React.FC = observer(() => {
   const draftValueCacheMenu = useMenuAnchor();
   const [showDraftModelMenu, setShowDraftModelMenu] = useState(false);
   const [showHfTokenDialog, setShowHfTokenDialog] = useState(false);
+  const [showAuthSheet, setShowAuthSheet] = useState(false);
   const [showSearchProviderMenu, setShowSearchProviderMenu] = useState(false);
   const [searchProviderAnchor, setSearchProviderAnchor] = useState<{
     x: number;
@@ -1530,6 +1543,10 @@ export const SettingsScreen: React.FC = observer(() => {
             </Card>
           )}
 
+          {__ENABLE_PALSHUB__ && PurchasesCard && (
+            <PurchasesCard onSignInPress={() => setShowAuthSheet(true)} />
+          )}
+
           {/* Export Options */}
           <Card elevation={0} style={styles.card}>
             <Card.Title title={l10n.settings.exportOptions} />
@@ -1585,6 +1602,17 @@ export const SettingsScreen: React.FC = observer(() => {
         providerLabel={activeSearchProvider?.label ?? activeSearchProviderId}
         onDismiss={() => setShowSearchKeySheet(false)}
       />
+      {__ENABLE_PALSHUB__ && showAuthSheet && AuthSheet && (
+        <AuthSheet
+          isVisible={showAuthSheet}
+          onClose={() => {
+            setShowAuthSheet(false);
+            if (authService && purchaseStore && !authService.isAuthenticated) {
+              purchaseStore.cancelLinkRequest();
+            }
+          }}
+        />
+      )}
     </SafeAreaView>
   );
 });

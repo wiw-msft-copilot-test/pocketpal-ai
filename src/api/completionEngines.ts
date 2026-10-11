@@ -4,11 +4,15 @@ import {streamChatCompletion} from './openai';
 import type {StreamChatParams} from './openai';
 import {streamResponses} from './responses';
 import {buildResponsesReplayInput} from '../utils/responsesReplay';
+import type {RemoteEndpoint} from './servers';
+import {profileFor} from './servers';
+import {pickSamplers} from '../utils/samplerParams';
 import {
   ApiCompletionParams,
   CompletionEngine,
   CompletionResult,
   CompletionStreamData,
+  normaliseTimings,
 } from '../utils/completionTypes';
 import type {ChatMessage, RemoteSessionBinding} from '../utils/types';
 import {applyGenerationParameterModes} from '../utils/generationParameterModes';
@@ -50,7 +54,7 @@ export class LocalCompletionEngine implements CompletionEngine {
       content: result.content,
       reasoning_content: result.reasoning_content,
       tool_calls: result.tool_calls,
-      timings: result.timings,
+      timings: normaliseTimings(result.timings),
       tokens_predicted: result.tokens_predicted,
       tokens_evaluated: result.tokens_evaluated,
       draft_tokens: result.draft_tokens,
@@ -74,11 +78,7 @@ export class OpenAICompletionEngine implements CompletionEngine {
   private abortController: AbortController | null = null;
 
   constructor(
-    private serverUrl: string,
-    private modelId: string,
-    private apiKey?: string,
-    private timeoutMs?: number,
-    private serverType?: string,
+    private endpoint: RemoteEndpoint,
     private binding?: RemoteSessionBinding,
   ) {}
 
@@ -89,14 +89,16 @@ export class OpenAICompletionEngine implements CompletionEngine {
     this.abortController = new AbortController();
 
     const messages = (params.messages ?? []) as ChatMessage[];
+    const samplers = pickSamplers(params);
+    const effectiveParams = applyGenerationParameterModes(params);
     const requestParams = {
-      ...explicitRemoteGenerationParams(params),
+      ...explicitRemoteGenerationParams(effectiveParams),
       messages,
-      model: this.modelId,
-      temperature: params.temperature,
-      top_p: params.top_p,
-      max_tokens: params.n_predict,
-      stop: params.stop,
+      model: this.endpoint.remoteModelId,
+      temperature: effectiveParams.temperature,
+      top_p: effectiveParams.top_p,
+      max_tokens: effectiveParams.n_predict,
+      stop: effectiveParams.stop,
       stream: true as const,
       // llama.rn's tool types are wire-compatible with the remote adapters.
       tools: params.tools as StreamChatParams['tools'],
@@ -119,16 +121,17 @@ export class OpenAICompletionEngine implements CompletionEngine {
       const capabilities = this.binding.protocolCapabilities;
       const effortValues = capabilities?.reasoningEffortValues ?? [];
       const supportsEncryptedContent =
-        this.serverType === 'OpenAI' || this.serverType === 'GitHub Copilot';
+        profileFor(this.endpoint.serverType).supportsEncryptedReasoning ===
+        true;
 
       return streamResponses(
         requestParams,
-        this.serverUrl,
-        this.apiKey,
+        this.endpoint.url,
+        this.endpoint.apiKey,
         this.abortController.signal,
         callback,
-        this.timeoutMs,
-        this.serverType,
+        this.endpoint.timeoutMs,
+        this.endpoint.serverType,
         responsesBinding,
         {
           input: buildResponsesReplayInput(messages, {
@@ -139,8 +142,8 @@ export class OpenAICompletionEngine implements CompletionEngine {
           }),
           parameterPolicy: {
             sampling: resolveResponsesSamplingCapabilities({
-              serverType: this.serverType,
-              modelId: this.modelId,
+              serverType: this.endpoint.serverType,
+              modelId: this.endpoint.remoteModelId,
               wireApi: this.binding.wireApi,
               catalogCapabilities: capabilities,
             }),
@@ -160,15 +163,24 @@ export class OpenAICompletionEngine implements CompletionEngine {
 
     return streamChatCompletion(
       {
-        ...requestParams,
         messages: stripResponsesState(messages),
+        model: this.endpoint.remoteModelId,
+        samplers,
+        stop: effectiveParams.stop,
+        stream: true,
+        // llama.rn's `tools` typedef is structurally compatible with OpenAI's
+        // function-tool shape but lives under a different name.
+        tools: params.tools as StreamChatParams['tools'],
+        tool_choice: params.tool_choice as StreamChatParams['tool_choice'],
+        response_format:
+          params.response_format as StreamChatParams['response_format'],
+        // Reasoning intent carried on the params; the server profile owns the wire shape.
+        reasoning: params.reasoning,
+        generationParameterModes: params.generationParameterModes,
       },
-      this.serverUrl,
-      this.apiKey,
+      this.endpoint,
       this.abortController.signal,
       callback,
-      this.timeoutMs,
-      this.serverType,
     );
   }
 

@@ -2,7 +2,6 @@ package com.pocketpal
 
 import com.facebook.react.ReactActivity
 import com.facebook.react.ReactActivityDelegate
-import com.facebook.react.ReactApplication
 import com.facebook.react.defaults.DefaultNewArchitectureEntryPoint.fabricEnabled
 import com.facebook.react.defaults.DefaultReactActivityDelegate
 import com.facebook.react.uimanager.DisplayMetricsHolder
@@ -57,17 +56,10 @@ class MainActivity : ReactActivity() {
    * launchMode="singleTask" the OS reuses this activity instance, so without
    * setIntent(intent) RN's Linking 'url' event never fires for the hub/run
    * deep link.
-   *
-   * The checkout callback under host=checkout is routed to AuthSessionModule
-   * instead: it resolves the in-flight openAuth promise and must not reach
-   * DeepLinkService via the RN Linking 'url' event.
    */
   override fun onNewIntent(intent: Intent) {
       val normalizedIntent = normalizeVoiceChatIntent(intent)
       super.onNewIntent(normalizedIntent)
-      if (forwardCheckoutCallback(normalizedIntent)) {
-          return
-      }
       setIntent(normalizedIntent)
   }
 
@@ -79,13 +71,6 @@ class MainActivity : ReactActivity() {
           action = Intent.ACTION_VIEW
           data = Uri.parse(VOICE_CHAT_URL)
       }
-  }
-
-  private fun forwardCheckoutCallback(intent: Intent): Boolean {
-      val reactContext =
-          (application as ReactApplication).reactHost?.currentReactContext ?: return false
-      val module = reactContext.getNativeModule(AuthSessionModule::class.java) ?: return false
-      return module.handleIntent(intent)
   }
 
   /**

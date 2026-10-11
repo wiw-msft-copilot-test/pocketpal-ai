@@ -29,16 +29,18 @@ import {isLocalHost} from '../../utils/network';
 import {parseTimeoutMs} from '../../utils/timeout';
 import {
   SERVER_TYPE_DROPDOWN_OPTIONS,
+  ServerType,
   seedServerType,
+  toServerType,
 } from '../../utils/serverTypes';
 import {ServerConfig} from '../../utils/types';
 import {
   RemoteModelInfo,
   fetchModels,
   fetchModelsWithHeaders,
-  detectServerType,
 } from '../../api/openai';
-import {deriveListCaps} from '../../utils/listCaps';
+import {detectServerType} from '../../api/servers/detect';
+import {deriveListCaps, profileFor} from '../../api/servers';
 import {
   resolveRemoteProtocol,
   type RemoteApiMode,
@@ -72,7 +74,7 @@ export const RemoteModelSheet: React.FC<RemoteModelSheetProps> = observer(
     const [serverName, setServerName] = useState('');
     const [apiKey, setApiKey] = useState('');
     const [timeoutSeconds, setTimeoutSeconds] = useState('');
-    const [serverType, setServerType] = useState('unknown');
+    const [serverType, setServerType] = useState<ServerType>('unknown');
     const [apiMode, setApiMode] = useState<RemoteApiMode>('auto');
     const [secureTextEntry, setSecureTextEntry] = useState(true);
 
@@ -250,13 +252,14 @@ export const RemoteModelSheet: React.FC<RemoteModelSheetProps> = observer(
 
     const handleServerTypeChange = useCallback(
       (value: string) => {
+        const normalized = toServerType(value);
         serverTypeManuallySelectedRef.current = true;
-        serverTypeRef.current = value;
-        setServerType(value);
+        serverTypeRef.current = normalized;
+        setServerType(normalized);
         debouncedProbe.cancel();
         invalidateProbe();
         if (url.trim()) {
-          debouncedProbe(url, value);
+          debouncedProbe(url, normalized);
         }
       },
       [url, debouncedProbe, invalidateProbe],
@@ -775,7 +778,8 @@ export const RemoteModelSheet: React.FC<RemoteModelSheetProps> = observer(
                         {l10n.settings.alreadyAdded}
                       </Text>
                     )}
-                    {serverTypeInEffect === 'llama.cpp' && (
+                    {profileFor(serverTypeInEffect).readListRow !==
+                      undefined && (
                       <View
                         style={styles.modelVisionSlot}
                         testID={`remote-model-row-vision-${model.id}`}

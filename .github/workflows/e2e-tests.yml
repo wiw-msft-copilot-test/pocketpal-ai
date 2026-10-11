@@ -63,9 +63,12 @@ jobs:
           node - <<'NODE'
           const config = require('./react-native-config.json');
           const disabled = [
+            '@invertase/react-native-apple-authentication',
             '@react-native-firebase/app',
             '@react-native-firebase/app-check',
             '@react-native-google-signin/google-signin',
+            'react-native-iap',
+            'react-native-nitro-modules',
           ];
           const linked = disabled.filter(name => config.dependencies[name]);
           if (linked.length > 0) {

@@ -1,11 +1,12 @@
 import React from 'react';
-import {View} from 'react-native';
+import {TouchableOpacity, View} from 'react-native';
 import {SegmentedButtons, Switch, Text} from 'react-native-paper';
 
 import {TextInput} from '..';
 import {InputSlider} from '../InputSlider';
 import {useTheme} from '../../hooks';
 import {L10nContext} from '../../utils';
+import {t} from '../../locales';
 import {
   COMPLETION_PARAMS_METADATA,
   validateNumericField,
@@ -16,12 +17,18 @@ import {
   OptionalGenerationParameter,
 } from '../../utils/completionTypes';
 import {createStyles} from './styles';
+import {SamplerParam, Samplers} from '../../utils/samplerParams';
+import {serverDefaultState, stepOf} from './serverDefaultState';
+
+const displayNameOf = (name: string): string =>
+  name.toUpperCase().replace(/_/g, ' ');
 
 interface Props {
   settings: CompletionParams;
   onChange: (name: string, value: any) => void;
   disabled?: boolean;
   allowInherit?: boolean;
+  serverDefaults?: Samplers;
 }
 
 const DISPLAY_NAMES: Partial<Record<OptionalGenerationParameter, string>> = {
@@ -34,6 +41,7 @@ export const CompletionSettings: React.FC<Props> = ({
   onChange,
   disabled = false,
   allowInherit = false,
+  serverDefaults,
 }) => {
   const theme = useTheme();
   const styles = createStyles(theme);
@@ -56,6 +64,62 @@ export const CompletionSettings: React.FC<Props> = ({
       [name]: mode,
       ...(name === 'reasoning' ? {enable_thinking: mode} : {}),
     });
+  };
+
+  const renderServerDefault = (name: SamplerParam) => {
+    if (!serverDefaults) {
+      return null;
+    }
+    const row = serverDefaultState(
+      name,
+      Number(settings[name]),
+      serverDefaults[name],
+    );
+    const copy = l10n.components.completionSettings;
+    const caption = (text: string) => (
+      <Text
+        variant="labelSmall"
+        style={styles.serverDefault}
+        testID={`${name}-server-default`}>
+        {text}
+      </Text>
+    );
+    switch (row.kind) {
+      case 'none':
+        return null;
+      case 'omitted':
+        return caption(
+          row.shown === undefined
+            ? copy.usingServerDefaultUnreported
+            : t(copy.usingServerDefault, {value: String(row.shown)}),
+        );
+      case 'matches':
+        return caption(copy.serverDefault);
+      case 'reset':
+        return (
+          <TouchableOpacity
+            onPress={() => onChange(name, row.resetTo)}
+            disabled={disabled}
+            accessibilityRole="button"
+            accessibilityLabel={t(copy.resetToServerDefaultAccessibilityLabel, {
+              name: displayNameOf(name),
+              value: String(row.shown),
+            })}
+            hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}
+            style={styles.serverDefaultResetTarget}
+            testID={`${name}-server-default-reset`}>
+            <Text
+              variant="labelSmall"
+              style={
+                disabled
+                  ? styles.serverDefaultResetDisabled
+                  : styles.serverDefaultReset
+              }>
+              {t(copy.resetToServerDefault, {value: String(row.shown)})}
+            </Text>
+          </TouchableOpacity>
+        );
+    }
   };
 
   const renderMode = (
@@ -129,7 +193,7 @@ export const CompletionSettings: React.FC<Props> = ({
 
   const renderSlider = ({
     name,
-    step = 0.01,
+    step = stepOf(name),
     dependentDisabled = false,
   }: {
     name: OptionalGenerationParameter;
@@ -157,6 +221,7 @@ export const CompletionSettings: React.FC<Props> = ({
           debounceMs={300}
           disabled={disabled || dependentDisabled || !custom}
         />
+        {renderServerDefault(name as SamplerParam)}
       </View>
     );
   };
@@ -268,6 +333,7 @@ export const CompletionSettings: React.FC<Props> = ({
           ]}
           style={styles.segmentedButtons}
         />
+        {renderServerDefault('mirostat')}
       </View>
     );
   };
@@ -319,6 +385,7 @@ export const CompletionSettings: React.FC<Props> = ({
             testID="n_predict-input"
           />
         )}
+        {renderServerDefault('n_predict')}
       </View>
     );
   };
@@ -403,13 +470,13 @@ export const CompletionSettings: React.FC<Props> = ({
       {renderThinking()}
       {renderSwitch('include_thinking_in_context')}
       {renderSlider({name: 'temperature'})}
-      {renderSlider({name: 'top_k', step: 1})}
+      {renderSlider({name: 'top_k'})}
       {renderSlider({name: 'top_p'})}
       {renderSlider({name: 'min_p'})}
       {renderSlider({name: 'xtc_threshold'})}
       {renderSlider({name: 'xtc_probability'})}
       {renderSlider({name: 'typical_p'})}
-      {renderSlider({name: 'penalty_last_n', step: 1})}
+      {renderSlider({name: 'penalty_last_n'})}
       {renderSlider({name: 'penalty_repeat'})}
       {renderSlider({name: 'penalty_freq'})}
       {renderSlider({name: 'penalty_present'})}

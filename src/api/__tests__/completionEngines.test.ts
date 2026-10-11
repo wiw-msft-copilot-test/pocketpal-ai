@@ -6,6 +6,7 @@ import {
 } from '../completionEngines';
 import * as openaiModule from '../openai';
 import * as responsesModule from '../responses';
+import type {RemoteEndpoint} from '../servers';
 
 jest.mock('../openai', () => ({
   streamChatCompletion: jest.fn(),
@@ -59,6 +60,25 @@ describe('LocalCompletionEngine', () => {
     expect(result.stopped_eos).toBe(true);
     expect(result.tokens_predicted).toBe(2);
     expect(result.timings).toEqual({predicted_per_second: 50});
+  });
+
+  it('drops native timings fields that are not finite numbers', async () => {
+    (mockContext.completion as jest.Mock).mockResolvedValueOnce({
+      text: 'hi',
+      content: 'hi',
+      timings: {
+        prompt_n: 1,
+        predicted_per_second: NaN,
+        predicted_ms: 35.222,
+        cache_n: '15',
+      },
+      tokens_predicted: 2,
+      tokens_evaluated: 5,
+    });
+
+    const result = await engine.completion({messages: []} as any);
+
+    expect(result.timings).toEqual({prompt_n: 1, predicted_ms: 35.222});
   });
 
   it('carries speculative draft_tokens counters from the native result', async () => {
@@ -178,15 +198,17 @@ describe('LocalCompletionEngine', () => {
 });
 
 describe('OpenAICompletionEngine', () => {
+  const ENDPOINT: RemoteEndpoint = {
+    url: 'http://localhost:1234',
+    remoteModelId: 'test-model',
+    apiKey: 'sk-key',
+    serverType: 'unknown',
+  };
   let engine: OpenAICompletionEngine;
 
   beforeEach(() => {
     jest.clearAllMocks();
-    engine = new OpenAICompletionEngine(
-      'http://localhost:1234',
-      'test-model',
-      'sk-key',
-    );
+    engine = new OpenAICompletionEngine(ENDPOINT);
   });
 
   it('calls streamChatCompletion with correct parameters', async () => {
@@ -212,19 +234,14 @@ describe('OpenAICompletionEngine', () => {
       {
         messages: [{role: 'user', content: 'Hi'}],
         model: 'test-model',
-        temperature: 0.8,
-        top_p: 0.95,
-        max_tokens: 200,
+        samplers: {temperature: 0.8, top_p: 0.95, n_predict: 200},
         stop: ['</s>'],
         stream: true,
         reasoning: undefined,
       },
-      'http://localhost:1234',
-      'sk-key',
+      ENDPOINT,
       expect.any(Object), // AbortSignal
       onToken,
-      undefined, // timeoutMs
-      undefined, // serverType
     );
 
     expect(result).toEqual(mockResult);
@@ -262,11 +279,8 @@ describe('OpenAICompletionEngine', () => {
         tools: [calculateTool],
         tool_choice: 'auto',
       }),
-      'http://localhost:1234',
-      'sk-key',
+      ENDPOINT,
       expect.any(Object),
-      undefined,
-      undefined,
       undefined,
     );
   });
@@ -299,11 +313,8 @@ describe('OpenAICompletionEngine', () => {
         tools: scoutTools,
         tool_choice: 'auto',
       }),
-      'http://localhost:1234',
-      'sk-key',
-      expect.any(Object),
-      undefined,
-      undefined,
+      ENDPOINT,
+      expect.any(AbortSignal),
       undefined,
     );
   });
@@ -330,11 +341,40 @@ describe('OpenAICompletionEngine', () => {
 
     expect(mockedStreamChat).toHaveBeenCalledWith(
       expect.objectContaining({response_format: responseFormat}),
-      'http://localhost:1234',
-      'sk-key',
+      ENDPOINT,
       expect.any(Object),
       undefined,
-      undefined,
+    );
+  });
+
+  it('forwards every sampler to streamChatCompletion unaltered', async () => {
+    mockedStreamChat.mockResolvedValueOnce({text: '', content: ''});
+
+    const samplers = {
+      top_k: 11,
+      min_p: 0.11,
+      typical_p: 0.91,
+      xtc_threshold: 0.31,
+      xtc_probability: 0.21,
+      penalty_last_n: 41,
+      penalty_repeat: 1.11,
+      penalty_freq: 0.41,
+      penalty_present: 0.51,
+      mirostat: 2,
+      mirostat_tau: 4.1,
+      mirostat_eta: 0.21,
+      seed: 12345,
+    };
+
+    await engine.completion({
+      messages: [{role: 'user', content: 'Hi'}],
+      ...samplers,
+    } as any);
+
+    expect(mockedStreamChat).toHaveBeenCalledWith(
+      expect.objectContaining({samplers}),
+      ENDPOINT,
+      expect.any(Object),
       undefined,
     );
   });
@@ -355,17 +395,12 @@ describe('OpenAICompletionEngine', () => {
       expect.objectContaining({
         messages: [{role: 'user', content: 'Hi'}],
         model: 'test-model',
-        temperature: undefined,
-        top_p: undefined,
-        max_tokens: undefined,
+        samplers: {},
         stop: undefined,
         stream: true,
       }),
-      'http://localhost:1234',
-      'sk-key',
+      ENDPOINT,
       expect.any(Object),
-      undefined,
-      undefined,
       undefined,
     );
   });
@@ -374,7 +409,7 @@ describe('OpenAICompletionEngine', () => {
     // Start a completion that will be aborted
     let capturedSignal: AbortSignal | undefined;
     mockedStreamChat.mockImplementation(
-      async (_p: any, _u: any, _k: any, signal: AbortSignal) => {
+      async (_p: any, _endpoint: any, signal: AbortSignal) => {
         capturedSignal = signal;
         return {text: '', content: ''};
       },
@@ -399,12 +434,8 @@ describe('OpenAICompletionEngine', () => {
   // raw (no normalization here) to streamChatCompletion. A rebuilt engine (on
   // the next setRemoteModel) therefore applies an edited value.
   it('forwards the constructed timeoutMs to streamChatCompletion', async () => {
-    const timedEngine = new OpenAICompletionEngine(
-      'http://localhost:1234',
-      'test-model',
-      'sk-key',
-      600000,
-    );
+    const timedEndpoint = {...ENDPOINT, timeoutMs: 600000};
+    const timedEngine = new OpenAICompletionEngine(timedEndpoint);
     mockedStreamChat.mockResolvedValueOnce({text: '', content: ''});
 
     await timedEngine.completion({
@@ -413,20 +444,19 @@ describe('OpenAICompletionEngine', () => {
 
     expect(mockedStreamChat).toHaveBeenCalledWith(
       expect.any(Object),
-      'http://localhost:1234',
-      'sk-key',
+      timedEndpoint, // raw timeoutMs forwarded, not normalized
       expect.any(Object), // AbortSignal
       undefined, // callback
-      600000, // raw timeoutMs forwarded, not normalized
-      undefined, // serverType
     );
   });
 
   it('creates engine without api key', () => {
-    const noKeyEngine = new OpenAICompletionEngine(
-      'http://localhost:1234',
-      'model-id',
-    );
+    const noKeyEndpoint: RemoteEndpoint = {
+      url: 'http://localhost:1234',
+      remoteModelId: 'model-id',
+      serverType: 'unknown',
+    };
+    const noKeyEngine = new OpenAICompletionEngine(noKeyEndpoint);
 
     mockedStreamChat.mockResolvedValueOnce({text: '', content: ''});
 
@@ -434,23 +464,15 @@ describe('OpenAICompletionEngine', () => {
 
     expect(mockedStreamChat).toHaveBeenCalledWith(
       expect.any(Object),
-      'http://localhost:1234',
-      undefined,
+      noKeyEndpoint,
       expect.any(Object),
-      undefined,
-      undefined,
       undefined,
     );
   });
 
-  it('forwards params.reasoning and the constructed GitHub Copilot serverType', async () => {
-    const typedEngine = new OpenAICompletionEngine(
-      'http://localhost:1234',
-      'test-model',
-      'sk-key',
-      undefined,
-      'GitHub Copilot',
-    );
+  it('forwards params.reasoning and the constructed serverType', async () => {
+    const typedEndpoint: RemoteEndpoint = {...ENDPOINT, serverType: 'Ollama'};
+    const typedEngine = new OpenAICompletionEngine(typedEndpoint);
     mockedStreamChat.mockResolvedValueOnce({text: '', content: ''});
 
     await typedEngine.completion({
@@ -460,12 +482,9 @@ describe('OpenAICompletionEngine', () => {
 
     expect(mockedStreamChat).toHaveBeenCalledWith(
       expect.objectContaining({reasoning: {enabled: false}}),
-      'http://localhost:1234',
-      'sk-key',
+      typedEndpoint,
       expect.any(Object),
       undefined,
-      undefined,
-      'GitHub Copilot',
     );
   });
 
@@ -512,39 +531,38 @@ describe('OpenAICompletionEngine', () => {
 
     expect(mockedStreamChat).toHaveBeenCalledWith(
       expect.objectContaining({
-        top_k: 0,
-        min_p: 0,
-        xtc_threshold: 0,
-        xtc_probability: 0,
-        typical_p: 0,
-        penalty_last_n: -1,
-        penalty_repeat: 0,
-        penalty_freq: 0,
-        penalty_present: 0,
-        mirostat: 0,
-        mirostat_tau: 0,
-        mirostat_eta: 0,
-        seed: -1,
-        n_probs: 0,
-        jinja: false,
-        enable_thinking: false,
+        samplers: expect.objectContaining({
+          top_k: 0,
+          min_p: 0,
+          xtc_threshold: 0,
+          xtc_probability: 0,
+          typical_p: 0,
+          penalty_last_n: -1,
+          penalty_repeat: 0,
+          penalty_freq: 0,
+          penalty_present: 0,
+          mirostat: 0,
+          mirostat_tau: 0,
+          mirostat_eta: 0,
+          seed: -1,
+          n_probs: 0,
+        }),
       }),
       expect.anything(),
-      expect.anything(),
       expect.any(AbortSignal),
-      undefined,
-      undefined,
       undefined,
     );
   });
 
   it('dispatches Responses with replay input and immutable binding', async () => {
     const responsesEngine = new OpenAICompletionEngine(
-      'https://api.githubcopilot.com',
-      'gpt-5.6-terra',
-      'test-key',
-      45000,
-      'GitHub Copilot',
+      {
+        url: 'https://api.githubcopilot.com',
+        remoteModelId: 'gpt-5.6-terra',
+        apiKey: 'test-key',
+        timeoutMs: 45000,
+        serverType: 'GitHub Copilot',
+      },
       {
         modelId: 'server-1/gpt-5.6-terra',
         serverId: 'server-1',
@@ -612,13 +630,12 @@ describe('OpenAICompletionEngine', () => {
   });
 
   it('does not apply provider evidence to Chat Completions', async () => {
-    const chatEngine = new OpenAICompletionEngine(
-      'https://api.githubcopilot.com',
-      'gpt-5.6-terra',
-      'test-key',
-      undefined,
-      'GitHub Copilot',
-    );
+    const chatEngine = new OpenAICompletionEngine({
+      url: 'https://api.githubcopilot.com',
+      remoteModelId: 'gpt-5.6-terra',
+      apiKey: 'test-key',
+      serverType: 'GitHub Copilot',
+    });
     mockedStreamChat.mockResolvedValueOnce({text: 'ok', content: 'ok'});
 
     await chatEngine.completion({
@@ -628,13 +645,12 @@ describe('OpenAICompletionEngine', () => {
     } as any);
 
     expect(mockedStreamChat).toHaveBeenCalledWith(
-      expect.objectContaining({temperature: 0.7, top_p: 0.9}),
+      expect.objectContaining({
+        samplers: expect.objectContaining({temperature: 0.7, top_p: 0.9}),
+      }),
       expect.anything(),
-      expect.anything(),
-      expect.anything(),
+      expect.any(AbortSignal),
       undefined,
-      undefined,
-      'GitHub Copilot',
     );
     expect(mockedStreamResponses).not.toHaveBeenCalled();
   });
@@ -665,10 +681,7 @@ describe('OpenAICompletionEngine', () => {
         messages: [{role: 'assistant', content: 'prior'}],
       }),
       expect.anything(),
-      expect.anything(),
-      expect.anything(),
-      undefined,
-      undefined,
+      expect.any(AbortSignal),
       undefined,
     );
   });

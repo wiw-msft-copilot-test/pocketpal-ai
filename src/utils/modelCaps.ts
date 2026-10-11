@@ -1,12 +1,13 @@
 import {resolveRemoteCaps} from './remoteCaps';
 import {ModelOrigin} from './types';
-import type {ListDerivedCaps} from './listCaps';
+import type {ListDerivedCaps} from './types';
 import type {
   ContextInitParams,
   Model,
   RemoteModelCaps,
   RemoteSessionBinding,
 } from './types';
+import {profileFor} from '../api/servers';
 
 /**
  * Effective capabilities of a model, kept as two independent axes.
@@ -36,7 +37,10 @@ export interface CapabilityEnv {
   activeModelId: string | undefined;
 }
 
-const UNKNOWN: ModelCapabilityView = {vision: 'unknown', visionActive: false};
+const UNKNOWN: ModelCapabilityView = {
+  vision: 'unknown',
+  visionActive: false,
+};
 
 const positive = (value: number | undefined): number | undefined =>
   value !== undefined && value > 0 ? value : undefined;
@@ -88,7 +92,7 @@ export function resolveModelCaps(
       positive(boundCatalog?.contextLength) ??
       positive(listed?.contextLength);
     const catalogCanActivateVision =
-      env.binding?.serverType !== 'llama.cpp' &&
+      !profileFor(env.binding?.serverType).hasProps &&
       boundCatalog?.supportsVision === true;
     return {
       vision: triState(declaredVision),
