@@ -1,5 +1,6 @@
 import {
   TalentEngine,
+  TalentExecuteContext,
   TalentResult,
   ToolDefinition,
   SystemPromptContext,
@@ -45,7 +46,10 @@ export class WebSearchEngine implements TalentEngine {
 
   constructor(private access: SearchAccess) {}
 
-  async execute(args: Record<string, any>): Promise<TalentResult> {
+  async execute(
+    args: Record<string, any>,
+    ctx?: TalentExecuteContext,
+  ): Promise<TalentResult> {
     const query = typeof args.query === 'string' ? args.query.trim() : '';
     if (!query) {
       return {
@@ -67,7 +71,7 @@ export class WebSearchEngine implements TalentEngine {
 
     const provider = this.access.getActiveProvider();
     const maxResults = this.access.getResultCount();
-    const fullResults = this.access.getFullSearchResults();
+    const fullResults = this.access.getFullSearchResults?.() ?? false;
 
     let preparedHits: SearchHit[];
     try {
@@ -75,7 +79,7 @@ export class WebSearchEngine implements TalentEngine {
       if (cached) {
         preparedHits = cached;
       } else {
-        const hits = await provider.search(query, {maxResults});
+        const hits = await provider.search(query, {maxResults}, ctx?.signal);
         preparedHits = fullResults
           ? prepareFullHits(hits, maxResults)
           : budgetHits(

@@ -23,7 +23,6 @@ import {deepLinkService} from '../../services/DeepLinkService';
 import {setVoiceChatLauncherEnabled} from '../../services/voiceChatLauncher';
 import {prepareVoiceChatSelection} from '../../services/voiceChatSelection';
 import {
-  checkoutFlowStore,
   chatSessionStore,
   deepLinkStore,
   modelStore,
@@ -769,7 +768,7 @@ describe('useDeepLinking — deep-link routing', () => {
     jest.spyOn(Linking, 'getInitialURL').mockResolvedValue(null);
   });
 
-  it('does not route checkout for the chat host link (no regression)', async () => {
+  it('routes the chat host link to the Pal', async () => {
     (palStore as any).pals = [{id: 'p1'}];
     renderHook(() => useDeepLinking());
     await getHandler()({
@@ -778,7 +777,6 @@ describe('useDeepLinking — deep-link routing', () => {
       host: 'chat',
       queryParams: {palId: 'p1'},
     });
-    expect(checkoutFlowStore.onReturn).not.toHaveBeenCalled();
     expect(chatSessionStore.setActivePal).toHaveBeenCalledWith('p1');
   });
 });

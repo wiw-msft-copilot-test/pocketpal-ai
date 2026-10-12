@@ -128,12 +128,15 @@ async function executeOne(
   call: AgentToolCall,
   handler: NonNullable<ReturnType<AgentRunOptions['talentLookup']>>,
   parsedArgs: Record<string, unknown>,
+  signal?: AbortSignal,
 ): Promise<AgentToolOutcome> {
   const fnName = call.function?.name ?? '';
   const callId = call.id;
 
   try {
-    const toolResult = await handler.execute(parsedArgs);
+    const toolResult = await (signal
+      ? handler.execute(parsedArgs, {signal})
+      : handler.execute(parsedArgs));
     return {
       callId,
       toolName: fnName,
@@ -526,24 +529,36 @@ export async function* runAgent(
       for (const validated of validatedCalls) {
         // Abort/terminal eligibility is rechecked immediately before
         // every sequential call, including between calls.
-        if (signal?.aborted || !mayExecuteTools(finishedResult)) {
+        if (!mayExecuteTools(finishedResult)) {
           break;
         }
         const {call} = validated;
+        const previousResult = outcomes.at(-1)?.result;
+        if (
+          signal?.aborted &&
+          !(
+            previousResult?.type === 'error' &&
+            previousResult.errorMessage === 'cancelled'
+          )
+        ) {
+          break;
+        }
         yield {type: 'tool_call_started', call};
-        const outcome =
-          'error' in validated
+        const outcome = signal?.aborted
+          ? invalidToolOutcome(call, 'cancelled')
+          : 'error' in validated
             ? validated.error
-            : await executeOne(call, validated.handler, validated.parsedArgs);
+            : await executeOne(
+                call,
+                validated.handler,
+                validated.parsedArgs,
+                signal,
+              );
         outcomes.push(outcome);
         yield {type: 'tool_call_finished', outcome};
       }
 
-      // Stop-mid-tool: if the abort fired during execution, the
-      // outcomes for in-flight calls have been emitted (we don't
-      // cancel synchronous-ish talents). Bail out at this turn
-      // boundary; the next turn would just be a follow-up the user
-      // doesn't want.
+      // Tools cancel themselves via ctx.signal; the runner only stops at the turn boundary.
       if (signal?.aborted) {
         break;
       }

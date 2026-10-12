@@ -16,6 +16,14 @@ jest.mock('@react-native-google-signin/google-signin', () => {
   throw new Error('Google Sign-In must not load in a disabled build');
 });
 
+jest.mock('@invertase/react-native-apple-authentication', () => {
+  throw new Error('Apple Sign-In must not load in a disabled build');
+});
+
+jest.mock('react-native-iap', () => {
+  throw new Error('Native purchases must not load in a disabled build');
+});
+
 const describeDisabledBuild = __ENABLE_PALSHUB__ ? describe.skip : describe;
 
 describeDisabledBuild('disabled centralized integrations build', () => {
@@ -23,6 +31,10 @@ describeDisabledBuild('disabled centralized integrations build', () => {
     expect(() => require('../AuthService')).not.toThrow();
     expect(() => require('../supabase')).not.toThrow();
     expect(mockCreateClient).not.toHaveBeenCalled();
+  });
+
+  it('does not initialize the native purchase dependency', () => {
+    expect(() => require('../../../store/PurchaseStore')).not.toThrow();
   });
 
   it('rejects Firebase App Check without loading its native modules', async () => {

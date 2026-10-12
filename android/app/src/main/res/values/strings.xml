@@ -1,4 +1,5 @@
 <resources>
     <string name="app_name">PocketPal</string>
     <string name="voice_chat_app_name">PocketPal Voice Chat</string>
+    <string name="download_channel_name">Model downloads</string>
 </resources>

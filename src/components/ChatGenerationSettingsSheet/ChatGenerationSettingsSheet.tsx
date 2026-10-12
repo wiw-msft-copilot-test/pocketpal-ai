@@ -5,6 +5,7 @@ import {CompletionParams} from '../../utils/completionTypes';
 import {
   chatSessionStore,
   defaultCompletionSettings,
+  modelStore,
   palStore,
 } from '../../store';
 import {styles} from './styles';
@@ -14,6 +15,7 @@ import {Button, SegmentedButtons, Text} from 'react-native-paper';
 import {L10nContext} from '../../utils';
 import {ChevronDownIcon} from '../../assets/icons';
 import {Menu} from '../Menu';
+import {observer} from 'mobx-react';
 interface ResetButtonProps {
   session: any;
   resetMenuVisible: boolean;
@@ -79,7 +81,7 @@ const ResetButton = ({
   );
 };
 
-export const ChatGenerationSettingsSheet = ({
+const ChatGenerationSettingsSheetImpl = ({
   isVisible,
   onClose,
 }: {
@@ -311,6 +313,11 @@ export const ChatGenerationSettingsSheet = ({
           onChange={updateSettings}
           disabled={isUsingPalSettings}
           allowInherit={!isEditingPresetSettings}
+          serverDefaults={
+            isEditingPresetSettings
+              ? undefined
+              : modelStore.activeSamplerDefaults
+          }
         />
       </Sheet.ScrollView>
       <Sheet.Actions>
@@ -342,3 +349,7 @@ export const ChatGenerationSettingsSheet = ({
     </Sheet>
   );
 };
+
+export const ChatGenerationSettingsSheet = observer(
+  ChatGenerationSettingsSheetImpl,
+);

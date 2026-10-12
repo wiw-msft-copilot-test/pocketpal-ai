@@ -10,6 +10,8 @@ import {
   ContextInitParams,
   RemoteSessionBinding,
 } from '../../src/utils/types';
+import type {Samplers} from '../../src/utils/samplerParams';
+import type {ErrorState} from '../../src/utils/errors';
 import {LlamaContext} from 'llama.rn';
 import {CompletionEngine} from '../../src/utils/completionTypes';
 import {createDefaultContextInitParams} from '../../src/utils/contextInitParamsVersions';
@@ -18,6 +20,7 @@ import {
   effectiveDraftModeOf,
 } from '../../src/store/draftResolution';
 import {resolveModelCaps} from '../../src/utils/modelCaps';
+import {samplerDefaultsFor} from '../../src/utils/remoteCaps';
 import type {
   CapabilityEnv,
   ModelCapabilityView,
@@ -44,6 +47,9 @@ class MockModelStore {
   largestSuccessfulLoad: number | undefined = 4 * 1e9; // 4GB largest successful load
 
   refreshDownloadStatuses: jest.Mock;
+  retryDownload: jest.Mock;
+  clearDownloadError: jest.Mock;
+  downloadError: ErrorState | null = null;
   addLocalModel: jest.Mock;
   removeModelByFullPath: jest.Mock;
   setNContext: jest.Mock;
@@ -94,6 +100,7 @@ class MockModelStore {
   enterBenchmarkMode: jest.Mock;
   exitBenchmarkMode: jest.Mock;
   recordReasoningObserved: jest.Mock;
+  reprobeRemoteCapsAfterCompletion: jest.Mock;
   setReasoningOverride: jest.Mock;
   benchmarkActive: boolean = false;
   isContextLoading: boolean = false;
@@ -104,6 +111,8 @@ class MockModelStore {
     makeAutoObservable(this, {
       engine: observable.ref,
       refreshDownloadStatuses: false,
+      retryDownload: false,
+      clearDownloadError: false,
       addLocalModel: false,
       removeModelByFullPath: false,
       setNContext: false,
@@ -115,6 +124,7 @@ class MockModelStore {
       selectModel: false,
       setRemoteModel: false,
       clearLastUsedModelSelection: false,
+      reprobeRemoteCapsAfterCompletion: false,
       checkSpaceAndDownload: false,
       getDownloadProgress: false,
       manualReleaseContext: false,
@@ -160,9 +170,11 @@ class MockModelStore {
       effectiveDraftMode: computed,
       effectiveDraftCacheDefaults: computed,
       isDownloading: computed,
-      activeDownloads: computed,
+      activeDownloads: false,
     });
     this.refreshDownloadStatuses = jest.fn();
+    this.retryDownload = jest.fn();
+    this.clearDownloadError = jest.fn();
     this.addLocalModel = jest.fn();
     this.removeModelByFullPath = jest.fn();
     this.setNContext = jest.fn();
@@ -176,6 +188,7 @@ class MockModelStore {
     this.selectModel = jest.fn().mockResolvedValue(Promise.resolve());
     this.setRemoteModel = jest.fn().mockResolvedValue(Promise.resolve());
     this.clearLastUsedModelSelection = jest.fn();
+    this.reprobeRemoteCapsAfterCompletion = jest.fn();
     this.checkSpaceAndDownload = jest.fn().mockResolvedValue(undefined);
     this.getDownloadProgress = jest.fn();
     this.manualReleaseContext = jest.fn();
@@ -304,6 +317,14 @@ class MockModelStore {
 
   get activeModelCaps(): ModelCapabilityView {
     return this.capsFor(this.activeModel);
+  }
+
+  get activeSamplerDefaults(): Samplers | undefined {
+    return samplerDefaultsFor(
+      this.activeModel,
+      mockServerStore.remoteCaps,
+      this.activeRemoteBinding,
+    );
   }
 
   get displayModels(): Model[] {

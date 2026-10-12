@@ -142,7 +142,7 @@ export const getCachedHits = (
   providerId: SearchProviderId,
   query: string,
   maxResults: number,
-  fullResults: boolean,
+  fullResults = false,
 ): SearchHit[] | undefined =>
   searchCache.get(cacheKey(providerId, query, maxResults, fullResults));
 
@@ -150,9 +150,15 @@ export const setCachedHits = (
   providerId: SearchProviderId,
   query: string,
   maxResults: number,
-  fullResults: boolean,
-  hits: SearchHit[],
+  fullResultsOrHits: boolean | SearchHit[],
+  maybeHits?: SearchHit[],
 ): void => {
+  const fullResults =
+    typeof fullResultsOrHits === 'boolean' ? fullResultsOrHits : false;
+  const hits =
+    typeof fullResultsOrHits === 'boolean'
+      ? (maybeHits ?? [])
+      : fullResultsOrHits;
   const key = cacheKey(providerId, query, maxResults, fullResults);
   // Re-insert moves the key to newest so eviction stays LRU-ish on overwrite.
   searchCache.delete(key);

@@ -33,7 +33,11 @@ import {
   DownloadOverlay,
 } from './src/components';
 import {MarkdownProvider} from './src/components/MarkdownView';
-import {AutomationBridge, BenchmarkRunnerScreen} from './src/__automation__';
+import {
+  AutomationBridge,
+  BenchmarkRunnerScreen,
+  fakeStore,
+} from './src/__automation__';
 import {
   ChatScreen,
   ModelsScreen,
@@ -58,9 +62,16 @@ const PalHeaderRight = __ENABLE_PALSHUB__
 const HubRunSheetHost = __ENABLE_PALSHUB__
   ? require('./src/components/HubRunSheetHost').HubRunSheetHost
   : null;
+const purchaseStore = __ENABLE_PALSHUB__
+  ? require('./src/store').purchaseStore
+  : null;
 
 // Check if app is in debug mode
 const isDebugMode = __DEV__;
+
+if (__E2E__) {
+  fakeStore.restore();
+}
 
 const Drawer = createDrawerNavigator();
 
@@ -107,6 +118,16 @@ const App = observer(() => {
     ttsStore.init().catch(() => {
       // init() swallows its own errors; catch to satisfy no-floating-promises.
     });
+  }, []);
+
+  React.useEffect(() => {
+    if (__ENABLE_PALSHUB__ && purchaseStore) {
+      purchaseStore
+        .start(__E2E__ ? {store: fakeStore, beforeInit: fakeStore.restore} : {})
+        .catch((error: unknown) =>
+          console.warn('Purchase recovery failed:', error),
+        );
+    }
   }, []);
 
   return (

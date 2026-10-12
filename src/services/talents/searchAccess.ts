@@ -12,6 +12,9 @@ export interface SearchAccess {
    */
   canSearch(): boolean;
   getResultCount(): number;
-  getFullSearchResults(): boolean;
-  readWithDefaultReader(url: string): Promise<PageContent>;
+  getFullSearchResults?(): boolean;
+  readWithDefaultReader(
+    url: string,
+    signal?: AbortSignal,
+  ): Promise<PageContent>;
 }
