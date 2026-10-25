@@ -183,6 +183,47 @@ describe('remote responses fixture', () => {
     assert.equal(server.state.scoutCalculateValidated, true);
   });
 
+  it('validates the exact unconfigured Scout search outcome and replayed arguments', async () => {
+    const server = await start();
+    const expected =
+      "web_search: Internet search isn't set up yet. Finish setup in Settings → Internet Search.";
+    for (const [argumentsText, output, valid] of [
+      [
+        '{"query":"PocketPal latest news"}',
+        'web_search: provider not enabled',
+        false,
+      ],
+      ['{"query":"different query"}', expected, false],
+      ['{"query":"PocketPal latest news"}', 'unrelated error', false],
+      ['{"query":"PocketPal latest news"}', expected, true],
+    ] as const) {
+      const response = await fetch(`${server.url}/responses`, {
+        method: 'POST',
+        headers: {'content-type': 'application/json'},
+        body: JSON.stringify({
+          model: RESPONSES_MODEL_ID,
+          input: [
+            {role: 'user', content: 'fixture:scout-search'},
+            {
+              type: 'function_call',
+              call_id: 'call-scout-search',
+              name: 'web_search',
+              arguments: argumentsText,
+            },
+            {
+              type: 'function_call_output',
+              call_id: 'call-scout-search',
+              output,
+            },
+          ],
+          stream: true,
+        }),
+      });
+      assert.match(await readSse(response), /Scout search failure replayed/);
+      assert.equal(server.state.scoutSearchValidated, valid);
+    }
+  });
+
   it('records chat routing and marks a cancelled slow stream aborted', async () => {
     const server = await start();
     const chat = await fetch(`${server.url}/chat/completions`, {

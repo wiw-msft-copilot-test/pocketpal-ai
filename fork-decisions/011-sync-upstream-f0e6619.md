@@ -154,6 +154,15 @@ selector regression checks and failure accessibility-tree capture; no product
 assertions or smoke scenarios were removed. Any artifact-reuse run is diagnostic
 only; final acceptance still requires a fresh source build for the changed SHA.
 
+Diagnostic reuse run `40243884913` verified the selector correction: six
+scenarios passed, and the remaining Scout scenario reached its search replay
+assertion. Its fixture still required the pre-sync provider-specific error
+summary, while the screenshot/tree showed upstream's accepted actionable
+search-setup message. Update the fixture to require that exact new summary and
+the exact original query; add negative tests for obsolete summaries, unrelated
+errors and changed arguments. The search gate and all seven Appium scenarios
+remain mandatory.
+
 ## Superseded when
 
 A later approved sync supplies equivalent or stronger router, lifecycle,

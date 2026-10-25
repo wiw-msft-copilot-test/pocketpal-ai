@@ -508,7 +508,8 @@ function streamResponsesScenario(
     if (output) {
       state.scoutSearchValidated =
         call?.arguments === '{"query":"PocketPal latest news"}' &&
-        /^web_search: .+ not enabled$/.test(output.output);
+        output.output ===
+          "web_search: Internet search isn't set up yet. Finish setup in Settings → Internet Search.";
       complete(response, [message('Scout search failure replayed.')]);
       return;
     }
