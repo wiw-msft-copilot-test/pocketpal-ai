@@ -15,6 +15,7 @@
     "test:analyze-tts-audio": "npx tsx scripts/__tests__/analyze-tts-audio.test.ts",
     "fixture:remote-responses": "node -r ts-node/register fixtures/remote-responses-server.ts",
     "test:remote-responses-fixture": "node --test -r ts-node/register fixtures/__tests__/remote-responses-server.test.ts",
+    "test:selectors": "node --test -r ts-node/register helpers/__tests__/selectors.test.ts",
     "e2e:remote-responses:android": "node -r ts-node/register scripts/run-remote-responses.ts",
     "typecheck:remote-responses": "tsc -p tsconfig.remote-responses.json",
     "typecheck": "tsc --noEmit"

@@ -144,6 +144,16 @@ workflow run IDs and any blockers. Android acceptance requires a fresh full
 protocol smoke run for that exact final pushed SHA, with no artifact reuse.
 No upstream PR, release or deployment is part of this sync.
 
+The first exact-SHA run, `40237980084` at `027a3ee7`, built the APK and passed
+native exclusions and payload checks. Smoke setup failed because the broad
+URL-field test-ID prefix selector matched Paper's newly exposed label instead
+of its native editor; subsequent protocol failures cascaded from the missing
+server. Remote/server-details input selectors now constrain Android matches
+to `android.widget.EditText`, preserving the iOS identifier strategy. Added
+selector regression checks and failure accessibility-tree capture; no product
+assertions or smoke scenarios were removed. Any artifact-reuse run is diagnostic
+only; final acceptance still requires a fresh source build for the changed SHA.
+
 ## Superseded when
 
 A later approved sync supplies equivalent or stronger router, lifecycle,
