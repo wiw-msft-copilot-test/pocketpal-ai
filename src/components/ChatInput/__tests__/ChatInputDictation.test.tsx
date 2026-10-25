@@ -7,6 +7,7 @@ import {IconButton} from 'react-native-paper';
 import {user} from '../../../../jest/fixtures';
 import {render} from '../../../../jest/test-utils';
 import {
+  asrStore,
   chatSessionStore,
   deepLinkStore,
   modelStore,
@@ -71,6 +72,7 @@ describe('ChatInput dictation', () => {
         },
       ] as any;
       modelStore.engine = undefined;
+      asrStore.captureState = 'idle';
       setPendingModelOperations(false);
       deepLinkStore.pendingVoiceConversationRequestId = null;
       deepLinkStore.preparedVoiceConversationRequestId = null;
@@ -137,6 +139,42 @@ describe('ChatInput dictation', () => {
       deepLinkStore.consumeVoiceConversationRequest,
     ).not.toHaveBeenCalled();
   });
+
+  it.each(['recording', 'transcribing'] as const)(
+    'waits for Whisper %s to finish before starting a launcher conversation',
+    async captureState => {
+      runInAction(() => {
+        modelStore.engine = {} as any;
+        asrStore.captureState = captureState;
+        deepLinkStore.pendingVoiceConversationRequestId = 52;
+        deepLinkStore.preparedVoiceConversationRequestId = 52;
+      });
+      render(
+        <UserContext.Provider value={user}>
+          <ChatInput onSendPress={jest.fn()} />
+        </UserContext.Provider>,
+      );
+
+      expect(mockUseVoiceConversation).toHaveBeenLastCalledWith(
+        expect.objectContaining({recognitionEnabled: false}),
+      );
+      expect(conversationResult.start).not.toHaveBeenCalled();
+      expect(
+        deepLinkStore.consumeVoiceConversationRequest,
+      ).not.toHaveBeenCalled();
+
+      await act(async () => {
+        runInAction(() => {
+          asrStore.captureState = 'idle';
+        });
+      });
+
+      expect(conversationResult.start).toHaveBeenCalledTimes(1);
+      expect(
+        deepLinkStore.consumeVoiceConversationRequest,
+      ).toHaveBeenCalledWith(52);
+    },
+  );
 
   it('does not start before the launcher prepares the fresh chat', () => {
     runInAction(() => {

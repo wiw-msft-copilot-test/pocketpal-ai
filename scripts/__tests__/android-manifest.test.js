@@ -61,6 +61,27 @@ const findTag = (name, attributes) =>
   tags(name).find(tag => hasAttributes(tag, attributes));
 
 describe('Android hardware declarations', () => {
+  it('registers upstream navigation appearance alongside fork voice packages', () => {
+    const application = fs.readFileSync(
+      path.join(
+        __dirname,
+        '../../android/app/src/main/java/com/pocketpalai/MainApplication.kt',
+      ),
+      'utf8',
+    );
+    for (const name of [
+      'NavigationBar',
+      'KeepAwake',
+      'HardwareInfo',
+      'Download',
+      'SpeechRecognition',
+      'VoiceChatLauncher',
+    ]) {
+      expect(application).toMatch(new RegExp(`add\\(${name}Package\\(\\)\\)`));
+    }
+    expect(application).not.toMatch(/FirebaseApp\.initializeApp/);
+  });
+
   it('keeps on-device speech discovery and microphone access', () => {
     expect(
       findTag('action', {

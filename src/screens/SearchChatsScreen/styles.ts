@@ -118,7 +118,7 @@ export const createStyles = (theme: Theme) =>
       fontSize: 11,
     },
     openingOverlay: {
-      ...StyleSheet.absoluteFillObject,
+      ...StyleSheet.absoluteFill,
       alignItems: 'center',
       justifyContent: 'center',
       backgroundColor: theme.colors.backdrop,

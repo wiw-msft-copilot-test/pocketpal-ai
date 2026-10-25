@@ -1,4 +1,5 @@
 import UIKit
+import Metal
 import React
 import React_RCTAppDelegate
 import ReactAppDependencyProvider
@@ -14,6 +15,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
   ) -> Bool {
+    configureGgmlMetal()
     let delegate = ReactNativeDelegate()
     let factory = RCTReactNativeFactory(delegate: delegate)
     delegate.dependencyProvider = RCTAppDependencyProvider()
@@ -30,6 +32,19 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     )
 
     return true
+  }
+
+  private func configureGgmlMetal() {
+    setenv("WSP_GGML_METAL_TENSOR_DISABLE", "1", 1)
+    var iOS18OrLater = false
+    if #available(iOS 18.0, *) {
+      iOS18OrLater = true
+    }
+    let supportsApple6 = iOS18OrLater && (MTLCreateSystemDefaultDevice()?.supportsFamily(.apple6) ?? false)
+    if disablesLlamaMetal(iOS18OrLater: iOS18OrLater, supportsApple6: supportsApple6) {
+      setenv("GGML_METAL_DEVICES", "0", 1)
+      setenv("WSP_GGML_METAL_DEVICES", "0", 1)
+    }
   }
 
   // MARK: - Deep Linking Support

@@ -1,6 +1,7 @@
 import * as React from 'react';
 import {
   TextInput,
+  type TextInputInstance,
   TextInputProps,
   View,
   Animated,
@@ -27,13 +28,14 @@ import {
   AtomIcon,
 } from '../../assets/icons';
 
-import {useTheme} from '../../hooks';
+import {useTheme, useVoiceCapture} from '../../hooks';
 import {useVoiceConversation} from '../../hooks/useVoiceConversation';
 import {chatRunControl} from '../../services/chatRunControl';
 
 import {createStyles} from './styles';
 
 import {
+  asrStore,
   chatSessionStore,
   deepLinkStore,
   modelStore,
@@ -41,6 +43,7 @@ import {
   startupSelectionStore,
   ttsStore,
   uiStore,
+  voiceModeStore,
 } from '../../store';
 
 import {MessageType} from '../../utils/types';
@@ -49,7 +52,15 @@ import {isLightColor, withOpacity} from '../../utils/colorUtils';
 import {t} from '../../locales';
 import {GenerationParameterMode} from '../../utils/completionTypes';
 
-import {SendButton, StopButton, Menu, VoiceChip} from '..';
+import {
+  SendButton,
+  StopButton,
+  Menu,
+  VoiceChip,
+  MicButton,
+  VoiceRecordingBar,
+  VoiceModeButton,
+} from '..';
 
 export interface ChatInputTopLevelProps {
   /** Whether the AI is currently streaming tokens */
@@ -97,6 +108,13 @@ export interface ChatInputTopLevelProps {
     mode: GenerationParameterMode,
     enabled?: boolean,
   ) => void;
+  /** Append a voice transcript to the composer (never auto-sent). */
+  appendTranscript?: (text: string) => void;
+  /**
+   * Opens voice mode; the empty composer then shows the voice button.
+   * `focusInput` puts the cursor back in this composer.
+   */
+  onVoicePress?: (focusInput: () => void) => void;
   /** Whether the model supports graded reasoning effort (axis 2) */
   supportsEffort?: boolean;
   /** The graded effort value set, e.g. ['low','medium','high'] */
@@ -185,6 +203,8 @@ export const ChatInput = observer(
     onThinkingToggle,
     thinkingMode,
     onThinkingModeChange,
+    appendTranscript,
+    onVoicePress,
     supportsEffort = false,
     effortValues = [],
     reasoningEffort,
@@ -195,11 +215,19 @@ export const ChatInput = observer(
     const l10n = React.useContext(L10nContext);
     const theme = useTheme();
     const user = React.useContext(UserContext);
-    const inputRef = React.useRef<TextInput>(null);
+    const inputRef = React.useRef<TextInputInstance>(null);
+    const focusInput = React.useCallback(() => inputRef.current?.focus(), []);
     const editBarHeight = React.useRef(new Animated.Value(0)).current;
     const iconRotation = React.useRef(new Animated.Value(0)).current;
     const activePalId = chatSessionStore.activePalId;
     const currentActivePal = palStore.pals.find(pal => pal.id === activePalId);
+
+    const voiceCapture = useVoiceCapture({
+      onTranscript: appendTranscript ?? (() => {}),
+    });
+    const isVoiceCaptureActive =
+      asrStore.captureState === 'recording' ||
+      asrStore.captureState === 'transcribing';
 
     // Camera permission hook from react-native-vision-camera
     const {hasPermission, requestPermission} = useCameraPermission();
@@ -220,6 +248,7 @@ export const ChatInput = observer(
     // State for showing "model not loaded" helper text
     const [showModelWarning, setShowModelWarning] = React.useState(false);
     const isEditMode = chatSessionStore.isEditMode;
+    const isStopping = chatSessionStore.isStopping;
 
     const styles = createStyles({theme, isEditMode});
 
@@ -262,6 +291,7 @@ export const ChatInput = observer(
         !isStreaming &&
         !isStopVisible &&
         !isCameraActive &&
+        !isVoiceCaptureActive &&
         !isVideoCapable,
       onSendTranscript: handleConversationSend,
       onStopGeneration: handleStopConversationGeneration,
@@ -309,6 +339,7 @@ export const ChatInput = observer(
         !voiceRequestPrepared ||
         hasPendingModelOperations ||
         !voiceModelReady ||
+        isVoiceCaptureActive ||
         isVideoCapable
       ) {
         return;
@@ -333,6 +364,7 @@ export const ChatInput = observer(
       isDictationEligible,
       isStreaming,
       isStopVisible,
+      isVoiceCaptureActive,
       isVideoCapable,
       pendingVoiceRequestId,
       selectedImages,
@@ -608,7 +640,17 @@ export const ChatInput = observer(
       user &&
       !isVideoCapable && // Hide send button for video-capable pals
       (sendButtonVisibilityMode === 'always' || value.trim());
-    const isSendButtonEnabled = value.trim().length > 0 && hasActiveModel;
+    const isSendButtonEnabled =
+      value.trim().length > 0 && hasActiveModel && !isStopping;
+    const isVoiceModeButtonVisible =
+      !!onVoicePress &&
+      voiceModeStore.supported &&
+      !value.trim() &&
+      selectedImages.length === 0 &&
+      !isEditMode &&
+      !isVideoCapable &&
+      !isStopVisible &&
+      !isVoiceCaptureActive;
     const sendButtonOpacity = isSendButtonEnabled ? 1 : 0.4;
 
     const rotateInterpolate = iconRotation.interpolate({
@@ -791,265 +833,294 @@ export const ChatInput = observer(
           </View>
 
           {/* Control Bar (Bottom Row) */}
-          <View style={styles.controlBar}>
-            {/* Left Controls */}
-            <View style={styles.leftControls}>
-              {/* Plus Button for Image Upload (only for regular chat) */}
-              {showImageUpload && !isVideoCapable && (
-                <Menu
-                  visible={showImageUploadMenu}
-                  onDismiss={() => setShowImageUploadMenu(false)}
-                  anchorPosition="top"
-                  anchor={
-                    <TouchableOpacity
-                      style={styles.plusButton}
-                      disabled={!isPlusButtonEnabled}
-                      onPress={
-                        isPlusButtonEnabled ? handlePlusButtonPress : () => {}
-                      }
-                      accessibilityLabel="Add image"
-                      accessibilityRole="button">
-                      <PlusIcon width={20} height={20} stroke={plusColor} />
-                    </TouchableOpacity>
-                  }>
-                  <Menu.Item
-                    label={l10n.camera?.takePhoto || 'Camera'}
-                    icon="camera"
-                    onPress={handleTakePhoto}
-                  />
-                  <Menu.Item
-                    label={l10n.common?.gallery || 'Gallery'}
-                    icon="image"
-                    onPress={handleSelectImages}
-                  />
-                </Menu>
-              )}
+          {isVoiceCaptureActive ? (
+            <VoiceRecordingBar
+              onCancel={voiceCapture.cancel}
+              onStop={voiceCapture.stop}
+            />
+          ) : (
+            <View style={styles.controlBar}>
+              {/* Left Controls */}
+              <View style={styles.leftControls}>
+                {/* Plus Button for Image Upload (only for regular chat) */}
+                {showImageUpload && !isVideoCapable && (
+                  <Menu
+                    visible={showImageUploadMenu}
+                    onDismiss={() => setShowImageUploadMenu(false)}
+                    anchorPosition="top"
+                    anchor={
+                      <TouchableOpacity
+                        style={styles.plusButton}
+                        disabled={!isPlusButtonEnabled}
+                        onPress={
+                          isPlusButtonEnabled ? handlePlusButtonPress : () => {}
+                        }
+                        accessibilityLabel="Add image"
+                        accessibilityRole="button">
+                        <PlusIcon width={20} height={20} stroke={plusColor} />
+                      </TouchableOpacity>
+                    }>
+                    <Menu.Item
+                      label={l10n.camera?.takePhoto || 'Camera'}
+                      icon="camera"
+                      onPress={handleTakePhoto}
+                    />
+                    <Menu.Item
+                      label={l10n.common?.gallery || 'Gallery'}
+                      icon="image"
+                      onPress={handleSelectImages}
+                    />
+                  </Menu>
+                )}
 
-              {/* Pal Selector */}
-              <View style={styles.palSelector}>
-                <TouchableOpacity
-                  style={[
-                    styles.palBtn,
-                    {
-                      backgroundColor:
-                        uiStore.colorScheme === 'dark'
-                          ? theme.colors.inverseOnSurface
-                          : theme.colors.inverseSurface,
-                    },
-                    currentActivePal?.color && {
-                      backgroundColor: currentActivePal?.color?.[0],
-                    },
-                  ]}
-                  onPress={onPalBtnPress}
-                  accessibilityLabel="Select Pal"
-                  accessibilityRole="button">
-                  <Animated.View
-                    style={{
-                      transform: [{rotate: rotateInterpolate}],
-                    }}>
-                    <ChevronUpIcon stroke={inputBackgroundColor} />
-                  </Animated.View>
-                </TouchableOpacity>
-
-                {/* Pal Name Display */}
-                {currentActivePal?.name && hasActiveModel && (
-                  <Text
+                {/* Pal Selector */}
+                <View testID="pal-selector" style={styles.palSelector}>
+                  <TouchableOpacity
                     style={[
-                      styles.palNameCompact,
+                      styles.palBtn,
                       {
-                        color: onSurfaceColor,
+                        backgroundColor:
+                          uiStore.colorScheme === 'dark'
+                            ? theme.colors.inverseOnSurface
+                            : theme.colors.inverseSurface,
                       },
-                    ]}>
-                    Pal:{' '}
+                      currentActivePal?.color && {
+                        backgroundColor: currentActivePal?.color?.[0],
+                      },
+                    ]}
+                    onPress={onPalBtnPress}
+                    accessibilityLabel="Select Pal"
+                    accessibilityRole="button">
+                    <Animated.View
+                      style={{
+                        transform: [{rotate: rotateInterpolate}],
+                      }}>
+                      <ChevronUpIcon stroke={inputBackgroundColor} />
+                    </Animated.View>
+                  </TouchableOpacity>
+
+                  {/* Pal Name Display */}
+                  {currentActivePal?.name && hasActiveModel && (
                     <Text
+                      testID="active-pal-name"
+                      numberOfLines={1}
                       style={[
-                        styles.palNameValueCompact,
+                        styles.palNameCompact,
                         {
                           color: onSurfaceColor,
                         },
                       ]}>
-                      {currentActivePal?.name}
-                    </Text>
-                  </Text>
-                )}
-              </View>
-
-              {/* Thinking Toggle Button. Graded models (axis-2) cycle
-                  off -> low -> medium -> high; effortless models toggle
-                  on/off. The label shows the current effort when graded. */}
-              {showThinkingToggle && !isCameraActive && (
-                <TouchableOpacity
-                  testID="thinking-toggle"
-                  style={[
-                    styles.thinkingToggleLeft,
-                    isThinkingEnabled && {backgroundColor: onSurfaceColor},
-                    {borderColor: onSurfaceColorVariant},
-                  ]}
-                  onPress={handleThinkingPress}
-                  accessibilityLabel={
-                    thinkingUsesProviderDefault
-                      ? l10n.components.chatInput.thinkingToggle
-                          .useExplicitThinking
-                      : thinkingIsInherited
-                        ? l10n.components.chatInput.thinkingToggle
-                            .useExplicitThinking
-                        : supportsEffort && effortValues.length > 0
-                          ? t(
-                              l10n.components.chatInput.thinkingToggle
-                                .cycleEffort,
-                              {
-                                level: localizedEffort ?? '',
-                              },
-                            )
-                          : isThinkingEnabled
-                            ? l10n.components.chatInput.thinkingToggle
-                                .disableThinking
-                            : l10n.components.chatInput.thinkingToggle
-                                .enableThinking
-                  }
-                  accessibilityRole="button">
-                  <AtomIcon
-                    width={14}
-                    height={14}
-                    stroke={
-                      isThinkingEnabled
-                        ? inputBackgroundColor
-                        : onSurfaceColorVariant
-                    }
-                    strokeWidth={2}
-                  />
-                  <Text
-                    style={[
-                      styles.thinkingToggleText,
-                      isThinkingEnabled
-                        ? {color: inputBackgroundColor}
-                        : {color: onSurfaceColorVariant},
-                    ]}>
-                    {thinkingMode || reasoningEffortMode
-                      ? thinkingLabel
-                      : supportsEffort && isThinkingEnabled && reasoningEffort
-                        ? localizedEffort
-                        : l10n.components.chatInput.thinkingToggle.thinkText}
-                  </Text>
-                </TouchableOpacity>
-              )}
-            </View>
-
-            {/* Right Controls */}
-            <View style={styles.rightControls}>
-              {Platform.OS === 'android' && !isVideoCapable && (
-                <View style={styles.dictationControls}>
-                  <IconButton
-                    icon={
-                      conversation.phase === 'finishing'
-                        ? 'progress-clock'
-                        : conversation.active
-                          ? 'stop-circle'
-                          : 'microphone'
-                    }
-                    size={20}
-                    iconColor={hasDarkPalSurface ? onSurfaceColor : undefined}
-                    disabled={
-                      !conversation.active &&
-                      (!isDictationEligible ||
-                        !hasActiveModel ||
-                        isStreaming ||
-                        !!isStopVisible ||
-                        isCameraActive)
-                    }
-                    onPress={handleConversationPress}
-                    accessibilityLabel={
-                      conversation.active
-                        ? speechInputL10n.stopConversation
-                        : speechInputL10n.startConversation
-                    }
-                    accessibilityState={{
-                      selected: conversation.active,
-                      busy:
-                        conversation.phase === 'starting' ||
-                        conversation.phase === 'finishing' ||
-                        conversation.phase === 'responding',
-                    }}
-                    testID="dictation-button"
-                  />
-                  {dictationActive && (
-                    <Text
-                      numberOfLines={1}
-                      style={[
-                        styles.dictationStatus,
-                        hasDarkPalSurface && {
-                          color: onSurfaceColorVariant,
-                        },
-                      ]}
-                      testID="dictation-status">
-                      {dictation.partialText ||
-                        (conversation.phase === 'finishing'
-                          ? speechInputL10n.finishing
-                          : conversation.phase === 'responding'
-                            ? speechInputL10n.responding
-                            : conversation.phase === 'starting'
-                              ? speechInputL10n.starting
-                              : speechInputL10n.listening)}
+                      Pal:{' '}
+                      <Text
+                        style={[
+                          styles.palNameValueCompact,
+                          {
+                            color: onSurfaceColor,
+                          },
+                        ]}>
+                        {currentActivePal?.name}
+                      </Text>
                     </Text>
                   )}
                 </View>
-              )}
-              {/* Helper text for model not loaded */}
-              {showModelWarning && !hasActiveModel && (
-                <View style={styles.helperTextContainer}>
-                  <Text variant="bodySmall" style={styles.helperText}>
-                    {l10n.chat.cannotSendWithoutModel}
-                  </Text>
-                </View>
-              )}
 
-              {/* Voice chip (TTS) — always present so users can stop
+                {/* Thinking Toggle Button. Graded models (axis-2) cycle
+                  off -> low -> medium -> high; effortless models toggle
+                  on/off. The label shows the current effort when graded. */}
+                {showThinkingToggle && !isCameraActive && (
+                  <TouchableOpacity
+                    testID="thinking-toggle"
+                    style={[
+                      styles.thinkingToggleLeft,
+                      isThinkingEnabled && {backgroundColor: onSurfaceColor},
+                      {borderColor: onSurfaceColorVariant},
+                    ]}
+                    onPress={handleThinkingPress}
+                    accessibilityLabel={
+                      thinkingUsesProviderDefault
+                        ? l10n.components.chatInput.thinkingToggle
+                            .useExplicitThinking
+                        : thinkingIsInherited
+                          ? l10n.components.chatInput.thinkingToggle
+                              .useExplicitThinking
+                          : supportsEffort && effortValues.length > 0
+                            ? t(
+                                l10n.components.chatInput.thinkingToggle
+                                  .cycleEffort,
+                                {
+                                  level: localizedEffort ?? '',
+                                },
+                              )
+                            : isThinkingEnabled
+                              ? l10n.components.chatInput.thinkingToggle
+                                  .disableThinking
+                              : l10n.components.chatInput.thinkingToggle
+                                  .enableThinking
+                    }
+                    accessibilityRole="button">
+                    <AtomIcon
+                      width={14}
+                      height={14}
+                      stroke={
+                        isThinkingEnabled
+                          ? inputBackgroundColor
+                          : onSurfaceColorVariant
+                      }
+                      strokeWidth={2}
+                    />
+                    <Text
+                      testID="thinking-toggle-label"
+                      numberOfLines={1}
+                      style={[
+                        styles.thinkingToggleText,
+                        isThinkingEnabled
+                          ? {color: inputBackgroundColor}
+                          : {color: onSurfaceColorVariant},
+                      ]}>
+                      {thinkingMode || reasoningEffortMode
+                        ? thinkingLabel
+                        : supportsEffort && isThinkingEnabled && reasoningEffort
+                          ? localizedEffort
+                          : l10n.components.chatInput.thinkingToggle.thinkText}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+
+              {/* Right Controls */}
+              <View style={styles.rightControls}>
+                {Platform.OS === 'android' && !isVideoCapable && (
+                  <View style={styles.dictationControls}>
+                    <IconButton
+                      icon={
+                        conversation.phase === 'finishing'
+                          ? 'progress-clock'
+                          : conversation.active
+                            ? 'stop-circle'
+                            : 'microphone'
+                      }
+                      size={20}
+                      iconColor={hasDarkPalSurface ? onSurfaceColor : undefined}
+                      disabled={
+                        !conversation.active &&
+                        (!isDictationEligible ||
+                          !hasActiveModel ||
+                          isStreaming ||
+                          !!isStopVisible ||
+                          isCameraActive)
+                      }
+                      onPress={handleConversationPress}
+                      accessibilityLabel={
+                        conversation.active
+                          ? speechInputL10n.stopConversation
+                          : speechInputL10n.startConversation
+                      }
+                      accessibilityState={{
+                        selected: conversation.active,
+                        busy:
+                          conversation.phase === 'starting' ||
+                          conversation.phase === 'finishing' ||
+                          conversation.phase === 'responding',
+                      }}
+                      testID="dictation-button"
+                    />
+                    {dictationActive && (
+                      <Text
+                        numberOfLines={1}
+                        style={[
+                          styles.dictationStatus,
+                          hasDarkPalSurface && {
+                            color: onSurfaceColorVariant,
+                          },
+                        ]}
+                        testID="dictation-status">
+                        {dictation.partialText ||
+                          (conversation.phase === 'finishing'
+                            ? speechInputL10n.finishing
+                            : conversation.phase === 'responding'
+                              ? speechInputL10n.responding
+                              : conversation.phase === 'starting'
+                                ? speechInputL10n.starting
+                                : speechInputL10n.listening)}
+                      </Text>
+                    )}
+                  </View>
+                )}
+                {/* Helper text for model not loaded */}
+                {showModelWarning && !hasActiveModel && (
+                  <View style={styles.helperTextContainer}>
+                    <Text variant="bodySmall" style={styles.helperText}>
+                      {l10n.chat.cannotSendWithoutModel}
+                    </Text>
+                  </View>
+                )}
+
+                {/* Voice chip (TTS) — always present so users can stop
                   audio independently of text generation. Self-gates:
                   returns null when TTS is unavailable. */}
-              <VoiceChip
-                collapsedForegroundColor={
-                  hasDarkPalSurface ? onSurfaceColorVariant : undefined
-                }
-              />
-
-              {/* Send/Stop Button */}
-              {isStopVisible ? (
-                <StopButton
-                  color={onSurfaceColor}
-                  onPress={handleGenerationStop}
+                <VoiceChip
+                  collapsedForegroundColor={
+                    hasDarkPalSurface ? onSurfaceColorVariant : undefined
+                  }
                 />
-              ) : isVideoCapable && !isCameraActive ? (
-                /* Compact Start Video Button for Video Pals */
-                <TouchableOpacity
-                  style={[
-                    styles.compactVideoButton,
-                    {
-                      backgroundColor: onSurfaceColor,
-                    },
-                  ]}
-                  onPress={onStartCamera}
-                  accessibilityLabel="Start video analysis"
-                  accessibilityRole="button">
-                  <VideoRecorderIcon
-                    width={16}
-                    height={16}
-                    stroke="white"
-                    strokeWidth={2}
+
+                {appendTranscript && !conversation.active && (
+                  <MicButton
+                    onStart={voiceCapture.start}
+                    style={styles.micBeforeSend}
                   />
-                  <Text style={styles.compactButtonText}>
-                    {l10n.video.startCamera}
-                  </Text>
-                </TouchableOpacity>
-              ) : (
-                isSendButtonVisible &&
-                !conversation.active && (
-                  <View style={{opacity: sendButtonOpacity}}>
-                    <SendButton color={onSurfaceColor} onPress={handleSend} />
-                  </View>
-                )
-              )}
+                )}
+
+                {/* Send/Stop Button */}
+                {isStopVisible ? (
+                  <StopButton
+                    color={onSurfaceColor}
+                    onPress={handleGenerationStop}
+                  />
+                ) : isVideoCapable && !isCameraActive ? (
+                  /* Compact Start Video Button for Video Pals */
+                  <TouchableOpacity
+                    style={[
+                      styles.compactVideoButton,
+                      {
+                        backgroundColor: onSurfaceColor,
+                      },
+                    ]}
+                    onPress={onStartCamera}
+                    accessibilityLabel="Start video analysis"
+                    accessibilityRole="button">
+                    <VideoRecorderIcon
+                      width={16}
+                      height={16}
+                      stroke="white"
+                      strokeWidth={2}
+                    />
+                    <Text style={styles.compactButtonText}>
+                      {l10n.video.startCamera}
+                    </Text>
+                  </TouchableOpacity>
+                ) : isVoiceModeButtonVisible ? (
+                  <VoiceModeButton onPress={() => onVoicePress?.(focusInput)} />
+                ) : (
+                  isSendButtonVisible &&
+                  !conversation.active && (
+                    <View
+                      style={{opacity: sendButtonOpacity}}
+                      pointerEvents="box-none">
+                      <SendButton
+                        color={onSurfaceColor}
+                        onPress={handleSend}
+                        touchableOpacityProps={{
+                          disabled: isStopping,
+                          accessibilityState: {disabled: isStopping},
+                        }}
+                      />
+                    </View>
+                  )
+                )}
+              </View>
             </View>
-          </View>
+          )}
         </View>
       </View>
     );

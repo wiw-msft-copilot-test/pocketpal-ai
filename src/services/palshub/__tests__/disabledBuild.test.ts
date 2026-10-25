@@ -1,5 +1,9 @@
 const mockCreateClient = jest.fn();
 
+jest.mock('../../../store/ModelStore', () => ({
+  modelStore: require('../../../store').modelStore,
+}));
+
 jest.mock('@supabase/supabase-js', () => ({
   createClient: mockCreateClient,
 }));
@@ -35,6 +39,34 @@ describeDisabledBuild('disabled centralized integrations build', () => {
 
   it('does not initialize the native purchase dependency', () => {
     expect(() => require('../../../store/PurchaseStore')).not.toThrow();
+  });
+
+  it('does not offer Plus or unlock voice through persisted or E2E overrides', () => {
+    const {VoiceModeStore} = require('../../../store/VoiceModeStore');
+    const {purchaseStore} = require('../../../store');
+    const {
+      openPlus,
+      isPlusAvailable,
+      isPlusUnlocked,
+      plusGate,
+    } = require('../../plus/gate');
+    const {
+      shippedPlusFeatures,
+      plusFeatureRows,
+    } = require('../../plus/shipped');
+    const voice = new VoiceModeStore();
+    voice.setUserVoiceModeOverride(true);
+    voice.setUnlockOverride(true);
+    expect(voice.supported).toBe(false);
+    expect(voice.isUnlocked).toBe(false);
+    expect(shippedPlusFeatures()).toEqual([]);
+    expect(plusFeatureRows()).toEqual([]);
+    expect(isPlusAvailable()).toBe(false);
+    expect(isPlusUnlocked()).toBe(false);
+    openPlus({onUnlocked: jest.fn()});
+    expect(plusGate.request).toBeNull();
+    expect(purchaseStore.retryPlusProducts).not.toHaveBeenCalled();
+    expect(purchaseStore.start).not.toHaveBeenCalled();
   });
 
   it('rejects Firebase App Check without loading its native modules', async () => {

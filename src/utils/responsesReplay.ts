@@ -87,9 +87,11 @@ export function normalizeResponsesServerUrl(url: string): string {
   const trimmed = url.trim();
   try {
     const parsed = new URL(trimmed);
-    parsed.hash = '';
-    parsed.pathname = parsed.pathname.replace(/\/+$/, '') || '/';
-    return parsed.toString().replace(/\/$/, '');
+    const normalized = new URL(
+      `${parsed.pathname.replace(/\/+$/, '') || '/'}${parsed.search}`,
+      parsed.origin,
+    );
+    return normalized.toString().replace(/\/$/, '');
   } catch {
     return trimmed.replace(/\/+$/, '');
   }

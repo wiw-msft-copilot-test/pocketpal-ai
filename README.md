@@ -187,6 +187,9 @@ PocketPal is a standard React Native app. If you can build a React Native projec
 - **Node.js** — version is pinned in [`.nvmrc`](.nvmrc) (currently `22.21.0`); run `nvm use` to match it. Older Node will fail the `engines` check.
 - **Yarn 1 (Classic)** — `packageManager` is pinned to `yarn@1.22.22`.
 - **Xcode** + **CocoaPods**, and **Ruby + Bundler** (for iOS / Fastlane tooling).
+  - Xcode 26.6 or later, with the Metal Toolchain: `xcodebuild -downloadComponent MetalToolchain`.
+  - The iOS simulator build needs an Apple silicon Mac.
+  - After a change to `patches/llama.rn+*.patch`, remove `node_modules/llama.rn` and run `yarn --check-files` so the patch applies to fresh sources.
 - **Android Studio** + Android SDK/NDK.
 
 See the [React Native environment setup](https://reactnative.dev/docs/set-up-your-environment) for platform details.
@@ -224,9 +227,11 @@ yarn lint           # ESLint
 yarn typecheck      # tsc --noEmit
 yarn test           # Jest
 yarn l10n:validate  # validate locale JSON (placeholders, integrity)
+yarn test:perf      # render-performance tests (Reassure)
+yarn test:perf:compare [base]  # render counts of HEAD vs. base (default: merge-base with origin/main)
 ```
 
-Run `yarn lint && yarn typecheck && yarn test` before opening a PR. Commits are validated by Commitlint ([Conventional Commits](https://www.conventionalcommits.org/)) via a Husky hook.
+Run `yarn lint && yarn typecheck && yarn test` before opening a PR. Pull requests also run the render-count comparison; see [render-performance tests](docs/render-perf-tests.md). Commits are validated by Commitlint ([Conventional Commits](https://www.conventionalcommits.org/)) via a Husky hook.
 
 <details>
 <summary><strong>Repository layout</strong></summary>
@@ -266,7 +271,7 @@ Versions are pinned in [`package.json`](package.json); the highlights:
 | UI          | React Native Paper `5.14.5`, React Navigation                              |
 | State       | MobX `6` (`mobx`, `mobx-react`, `mobx-persist-store`)                      |
 | Persistence | WatermelonDB (chat history), AsyncStorage (settings), Keychain (secrets)   |
-| LLM         | `llama.rn` `0.13.0-rc.5` → llama.cpp b11118 · GGUF                         |
+| LLM         | `llama.rn` `0.13.0-rc.7` → llama.cpp b11385 · GGUF                         |
 | TTS         | `react-native-speech` `2.3.1` + `onnxruntime-react-native` `1.23.2` · ONNX |
 | Tooling     | Yarn 1 (Classic), ESLint, Prettier, Jest, Husky + Commitlint               |
 

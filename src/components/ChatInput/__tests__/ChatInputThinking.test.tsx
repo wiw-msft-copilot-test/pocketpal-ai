@@ -26,6 +26,11 @@ jest.mock('../../../hooks', () => ({
       },
     },
   }),
+  useVoiceCapture: () => ({
+    start: jest.fn(),
+    stop: jest.fn(),
+    cancel: jest.fn(),
+  }),
 }));
 
 // Mock the stores
@@ -49,6 +54,9 @@ jest.mock('../../../store', () => ({
   },
   uiStore: {
     colorScheme: 'light',
+  },
+  asrStore: {
+    captureState: 'idle',
   },
   ttsStore: {
     isTTSAvailable: false,

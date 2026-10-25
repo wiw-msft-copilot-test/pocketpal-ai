@@ -1,5 +1,12 @@
-import React, {useState, useContext} from 'react';
-import {View, ScrollView, TouchableOpacity, Alert, Linking} from 'react-native';
+import React, {useContext, useMemo, useState} from 'react';
+import {
+  View,
+  ScrollView,
+  TouchableOpacity,
+  Alert,
+  Linking,
+  Pressable,
+} from 'react-native';
 
 import DeviceInfo from 'react-native-device-info';
 import Clipboard from '@react-native-clipboard/clipboard';
@@ -7,6 +14,8 @@ import {Text, Button, SegmentedButtons} from 'react-native-paper';
 import {SafeAreaView, useSafeAreaInsets} from 'react-native-safe-area-context';
 import {BuildInfo} from 'llama.rn';
 
+import phononNotices from '../../assets/licenses/phononThirdPartyNotices.json';
+import {REPO_URL} from '../../config/urls';
 import {CopyIcon, GithubIcon, ChevronRightIcon} from '../../assets/icons';
 
 import {Sheet} from '../../components/Sheet';
@@ -15,6 +24,7 @@ import {useTheme} from '../../hooks';
 import {createStyles} from './styles';
 import {L10nContext} from '../../utils';
 import {uiStore} from '../../store';
+import {reflowNotice} from './reflowNotice';
 
 const GithubButtonIcon = ({color}: {color: string}) => (
   <GithubIcon stroke={color} />
@@ -30,6 +40,39 @@ export const AboutScreen: React.FC = () => {
   const styles = createStyles(theme, insets);
   const l10n = useContext(L10nContext);
   const [showFeedback, setShowFeedback] = useState(false);
+  const [showNotices, setShowNotices] = useState(false);
+  const noticeSections = useMemo(() => phononNotices.map(reflowNotice), []);
+  const [legalItemTops, setLegalItemTops] = useState<Record<number, number>>(
+    {},
+  );
+
+  const legalLinks: {
+    id: 'privacy' | 'terms' | 'notices';
+    label: string;
+    role: 'link' | 'button';
+    onPress: () => void;
+    testID?: string;
+  }[] = [
+    {
+      id: 'privacy',
+      label: l10n.about.privacyPolicy,
+      role: 'link',
+      onPress: () => Linking.openURL('https://pocketpal.dev/privacy-policy'),
+    },
+    {
+      id: 'terms',
+      label: l10n.about.termsOfService,
+      role: 'link',
+      onPress: () => Linking.openURL('https://pocketpal.dev/terms'),
+    },
+    {
+      id: 'notices',
+      label: l10n.about.openSourceNotices,
+      role: 'button',
+      onPress: () => setShowNotices(true),
+      testID: 'about-open-source-notices',
+    },
+  ];
 
   const [appInfo, setAppInfo] = React.useState({
     version: '',
@@ -134,9 +177,7 @@ export const AboutScreen: React.FC = () => {
             </Text>
             <Button
               mode="outlined"
-              onPress={() =>
-                Linking.openURL('https://github.com/a-ghorbani/pocketpal-ai')
-              }
+              onPress={() => Linking.openURL(REPO_URL)}
               style={styles.actionButton}
               icon={GithubButtonIcon}>
               {l10n.about.githubButton}
@@ -171,19 +212,38 @@ export const AboutScreen: React.FC = () => {
           </View>
 
           <View style={styles.legalRow}>
-            <Text
-              style={styles.legalLink}
-              onPress={() =>
-                Linking.openURL('https://pocketpal.dev/privacy-policy')
-              }>
-              {l10n.about.privacyPolicy}
-            </Text>
-            <Text style={styles.legalSeparator}>·</Text>
-            <Text
-              style={styles.legalLink}
-              onPress={() => Linking.openURL('https://pocketpal.dev/terms')}>
-              {l10n.about.termsOfService}
-            </Text>
+            {legalLinks.map((link, i) => (
+              <View
+                key={link.id}
+                style={styles.legalItem}
+                testID={`about-legal-item-${i}`}
+                onLayout={e => {
+                  const {y} = e.nativeEvent.layout;
+                  setLegalItemTops(tops =>
+                    tops[i] === y ? tops : {...tops, [i]: y},
+                  );
+                }}>
+                <Pressable
+                  accessibilityRole={link.role}
+                  onPress={link.onPress}
+                  style={styles.legalHit}
+                  testID={link.testID}>
+                  <Text style={styles.legalLink}>{link.label}</Text>
+                </Pressable>
+                {i < legalLinks.length - 1 ? (
+                  <Text
+                    style={[
+                      styles.legalSeparator,
+                      legalItemTops[i] !== legalItemTops[i + 1] &&
+                        styles.legalSeparatorHidden,
+                    ]}
+                    importantForAccessibility="no"
+                    accessibilityElementsHidden>
+                    ·
+                  </Text>
+                ) : null}
+              </View>
+            ))}
           </View>
         </View>
       </ScrollView>
@@ -277,6 +337,25 @@ export const AboutScreen: React.FC = () => {
           </Sheet.Actions>
         </Sheet>
       ) : null}
+
+      <Sheet
+        title={l10n.about.openSourceNotices}
+        isVisible={showNotices}
+        displayFullHeight
+        onClose={() => setShowNotices(false)}>
+        <Sheet.ScrollView
+          contentContainerStyle={styles.noticesContent}
+          testID="about-open-source-notices-sheet">
+          <Text style={styles.noticesCredit}>
+            {l10n.about.phononNoticesCredit}
+          </Text>
+          {noticeSections.map((section, i) => (
+            <Text key={i} selectable style={styles.noticesText}>
+              {section}
+            </Text>
+          ))}
+        </Sheet.ScrollView>
+      </Sheet>
     </SafeAreaView>
   );
 };

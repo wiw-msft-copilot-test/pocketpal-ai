@@ -6,7 +6,7 @@ import React, {
   useMemo,
   useRef,
 } from 'react';
-import {View, TouchableOpacity} from 'react-native';
+import {Alert, Keyboard, TouchableOpacity, View} from 'react-native';
 import {
   Text,
   Button,
@@ -18,12 +18,12 @@ import {
 } from 'react-native-paper';
 import {Dropdown} from '../ui';
 import {observer} from 'mobx-react';
-import {runInAction} from 'mobx';
 import debounce from 'lodash/debounce';
+import {useCameraPermission} from 'react-native-vision-camera';
 
-import {Sheet, TextInput} from '..';
+import {ServerQRScanner, Sheet, TextInput} from '..';
 import {useTheme} from '../../hooks';
-import {serverStore} from '../../store';
+import {routerStore, serverStore} from '../../store';
 import {L10nContext} from '../../utils';
 import {isLocalHost} from '../../utils/network';
 import {parseTimeoutMs} from '../../utils/timeout';
@@ -33,12 +33,8 @@ import {
   seedServerType,
   toServerType,
 } from '../../utils/serverTypes';
-import {ServerConfig} from '../../utils/types';
-import {
-  RemoteModelInfo,
-  fetchModels,
-  fetchModelsWithHeaders,
-} from '../../api/openai';
+import {RemoteModelInfo, ServerConfig} from '../../utils/types';
+import {fetchModelsWithHeaders} from '../../api/openai';
 import {detectServerType} from '../../api/servers/detect';
 import {deriveListCaps, profileFor} from '../../api/servers';
 import {
@@ -49,6 +45,7 @@ import {normalizeRemoteCatalogModel} from '../../utils/remoteCatalog';
 import {t} from '../../locales';
 
 import {createStyles} from './styles';
+import {RouterModelRows} from './RouterModelRows';
 import {ChatIcon, EyeIcon, EyeOffIcon} from '../../assets/icons';
 import {
   API_MODE_VALUES,
@@ -102,6 +99,9 @@ export const RemoteModelSheet: React.FC<RemoteModelSheetProps> = observer(
     // Errors
     const [urlError, setUrlError] = useState('');
 
+    const [isScannerOpen, setIsScannerOpen] = useState(false);
+    const {hasPermission, requestPermission} = useCameraPermission();
+
     // Keep apiKey in a ref so debounced function reads current value
     const apiKeyRef = useRef(apiKey);
     useEffect(() => {
@@ -146,6 +146,7 @@ export const RemoteModelSheet: React.FC<RemoteModelSheetProps> = observer(
         setSelectedServerId(null);
         setIsSaving(false);
         setUrlError('');
+        setIsScannerOpen(false);
       } else {
         probeGenerationRef.current += 1;
       }
@@ -243,6 +244,37 @@ export const RemoteModelSheet: React.FC<RemoteModelSheetProps> = observer(
       };
     }, [url, debouncedProbe, selectedServerId]);
 
+    const handleDismiss = useCallback(() => {
+      setIsScannerOpen(false);
+      onDismiss();
+    }, [onDismiss]);
+
+    const handleScanPress = useCallback(async () => {
+      let granted = hasPermission;
+      if (!granted) {
+        try {
+          granted = await requestPermission();
+        } catch {
+          granted = false;
+        }
+      }
+      if (!granted) {
+        Alert.alert(
+          l10n.camera.permissionTitle,
+          l10n.settings.scanQrPermissionMessage,
+        );
+        return;
+      }
+      Keyboard.dismiss();
+      setIsScannerOpen(true);
+    }, [hasPermission, requestPermission, l10n]);
+
+    const handleScanned = useCallback((value: string) => {
+      setUrl(value);
+      setUrlError('');
+      setIsScannerOpen(false);
+    }, []);
+
     // Re-probe on apiKey blur
     const handleApiKeyBlur = useCallback(() => {
       if (url.trim() && !selectedServerId) {
@@ -296,22 +328,17 @@ export const RemoteModelSheet: React.FC<RemoteModelSheetProps> = observer(
       setAvailableModels([]);
       setSelectedModelId(null);
       setUrlError('');
+      setIsScannerOpen(false);
       try {
         const key = await serverStore.getApiKey(server.id);
         apiKeyRef.current = key || '';
         setApiKey(key || '');
-        const models = await fetchModels(
-          server.url,
-          key || undefined,
-          server.requestTimeoutMs,
-          server.serverType,
-        );
-        if (probeGeneration !== probeGenerationRef.current) {
+        const result = await serverStore.fetchModelsForServer(server.id);
+        if (!result.ok) {
+          setProbeResult({ok: false, error: result.error});
           return;
         }
-        runInAction(() => {
-          serverStore.serverModels.set(server.id, models);
-        });
+        const models = serverStore.serverModels.get(server.id) ?? [];
         const notYetAdded = serverStore.getModelsNotYetAdded(server.id);
         setAvailableModels(models);
         if (notYetAdded.length === 1) {
@@ -372,7 +399,7 @@ export const RemoteModelSheet: React.FC<RemoteModelSheetProps> = observer(
         // Fetch models for this server so serverModels is populated
         await serverStore.fetchModelsForServer(serverId);
         onModelAdded?.();
-        onDismiss();
+        handleDismiss();
       } finally {
         setIsSaving(false);
       }
@@ -386,7 +413,7 @@ export const RemoteModelSheet: React.FC<RemoteModelSheetProps> = observer(
       serverType,
       apiMode,
       onModelAdded,
-      onDismiss,
+      handleDismiss,
     ]);
 
     const selectedServer = selectedServerId
@@ -426,10 +453,57 @@ export const RemoteModelSheet: React.FC<RemoteModelSheetProps> = observer(
       compatibilityDefault: l10n.settings.apiProtocolSourceCompatibility,
     };
 
+    const isRouter =
+      !!selectedServerId && routerStore.isRouter(selectedServerId);
+
+    useEffect(() => {
+      if (!isVisible || !isRouter || !selectedServerId) {
+        return undefined;
+      }
+      routerStore.setPickerServer(selectedServerId);
+      return () => routerStore.setPickerServer(null);
+    }, [isVisible, isRouter, selectedServerId]);
+
+    const renderVisionSlot = (model: RemoteModelInfo) => {
+      if (profileFor(serverTypeInEffect).readListRow === undefined) {
+        return null;
+      }
+      const listCaps = deriveListCaps(model, serverTypeInEffect);
+      return (
+        <View
+          style={styles.modelVisionSlot}
+          testID={`remote-model-row-vision-${model.id}`}
+          accessible={true}
+          accessibilityLabel={`${l10n.models.modelCard.labels.vision}: ${
+            listCaps.supportsVision === true
+              ? l10n.models.modelCard.labels.visionSupported
+              : listCaps.supportsVision === false
+                ? l10n.models.modelCard.labels.visionNotSupported
+                : l10n.models.modelCard.labels.visionUnknown
+          }`}>
+          {listCaps.supportsVision === true ? (
+            <EyeIcon
+              width={16}
+              height={16}
+              stroke={theme.colors.iconModelTypeVision}
+            />
+          ) : listCaps.supportsVision === false ? (
+            <ChatIcon
+              width={16}
+              height={16}
+              stroke={theme.colors.iconModelTypeText}
+            />
+          ) : (
+            <Text style={styles.modelVisionUnknown}>—</Text>
+          )}
+        </View>
+      );
+    };
+
     return (
       <Sheet
         isVisible={isVisible}
-        onClose={onDismiss}
+        onClose={handleDismiss}
         title={l10n.settings.addRemoteModel}
         snapPoints={['80%']}>
         <Sheet.ScrollView contentContainerStyle={styles.container}>
@@ -529,11 +603,17 @@ export const RemoteModelSheet: React.FC<RemoteModelSheetProps> = observer(
           {/* URL Input - only show when not using a known server chip */}
           {!selectedServerId && (
             <>
+              {isScannerOpen && (
+                <ServerQRScanner
+                  onScanned={handleScanned}
+                  onClose={() => setIsScannerOpen(false)}
+                />
+              )}
               <View style={styles.inputSpacing}>
                 <TextInput
                   testID="remote-url-input"
                   label={l10n.settings.serverUrl}
-                  defaultValue={url}
+                  value={url}
                   onChangeText={text => {
                     debouncedProbe.cancel();
                     invalidateProbe();
@@ -547,6 +627,15 @@ export const RemoteModelSheet: React.FC<RemoteModelSheetProps> = observer(
                   autoCorrect={false}
                   keyboardType="url"
                   error={!!urlError}
+                  right={
+                    <PaperTextInput.Icon
+                      testID="remote-url-scan"
+                      icon="qrcode-scan"
+                      accessibilityLabel={l10n.settings.scanServerQr}
+                      forceTextInputFocus={false}
+                      onPress={handleScanPress}
+                    />
+                  }
                 />
                 {urlError ? (
                   <Text style={styles.errorText}>{urlError}</Text>
@@ -694,8 +783,23 @@ export const RemoteModelSheet: React.FC<RemoteModelSheetProps> = observer(
             </>
           )}
 
+          {showPostConnection && isRouter && selectedServerId && (
+            <RouterModelRows
+              serverId={selectedServerId}
+              selectedModelId={selectedModelId}
+              onSelect={setSelectedModelId}
+              isAlreadyAdded={modelId =>
+                isModelAlreadyAdded(selectedServerId, modelId)
+              }
+              supportsVision={model =>
+                deriveListCaps(model, serverTypeInEffect).supportsVision ===
+                true
+              }
+            />
+          )}
+
           {/* Model Selection */}
-          {showPostConnection && availableModels.length >= 1 && (
+          {showPostConnection && !isRouter && availableModels.length >= 1 && (
             <View style={styles.modelListSection}>
               <Text style={styles.modelListLabel}>
                 {l10n.settings.selectModel}
@@ -704,7 +808,6 @@ export const RemoteModelSheet: React.FC<RemoteModelSheetProps> = observer(
                 const servId = selectedServerId || '';
                 const alreadyAdded =
                   !!selectedServerId && isModelAlreadyAdded(servId, model.id);
-                const listCaps = deriveListCaps(model, serverTypeInEffect);
                 const protocol = resolveRemoteProtocol({
                   modelPreference: selectedServerId
                     ? serverStore.getRemoteModelPreference?.(
@@ -746,7 +849,12 @@ export const RemoteModelSheet: React.FC<RemoteModelSheetProps> = observer(
                       uncheckedColor={theme.colors.onSurfaceVariant}
                     />
                     <View style={styles.modelDetails}>
-                      <Text style={styles.modelName}>{model.id}</Text>
+                      <Text
+                        style={styles.modelName}
+                        numberOfLines={1}
+                        ellipsizeMode="middle">
+                        {model.id}
+                      </Text>
                       <Text
                         testID={`remote-model-row-protocol-${model.id}`}
                         style={styles.protocolText}>
@@ -778,36 +886,7 @@ export const RemoteModelSheet: React.FC<RemoteModelSheetProps> = observer(
                         {l10n.settings.alreadyAdded}
                       </Text>
                     )}
-                    {profileFor(serverTypeInEffect).readListRow !==
-                      undefined && (
-                      <View
-                        style={styles.modelVisionSlot}
-                        testID={`remote-model-row-vision-${model.id}`}
-                        accessible={true}
-                        accessibilityLabel={`${l10n.models.modelCard.labels.vision}: ${
-                          listCaps.supportsVision === true
-                            ? l10n.models.modelCard.labels.visionSupported
-                            : listCaps.supportsVision === false
-                              ? l10n.models.modelCard.labels.visionNotSupported
-                              : l10n.models.modelCard.labels.visionUnknown
-                        }`}>
-                        {listCaps.supportsVision === true ? (
-                          <EyeIcon
-                            width={16}
-                            height={16}
-                            stroke={theme.colors.iconModelTypeVision}
-                          />
-                        ) : listCaps.supportsVision === false ? (
-                          <ChatIcon
-                            width={16}
-                            height={16}
-                            stroke={theme.colors.iconModelTypeText}
-                          />
-                        ) : (
-                          <Text style={styles.modelVisionUnknown}>—</Text>
-                        )}
-                      </View>
-                    )}
+                    {renderVisionSlot(model)}
                   </TouchableOpacity>
                 );
               })}
@@ -815,7 +894,7 @@ export const RemoteModelSheet: React.FC<RemoteModelSheetProps> = observer(
           )}
 
           {/* No models available */}
-          {showPostConnection && availableModels.length === 0 && (
+          {showPostConnection && !isRouter && availableModels.length === 0 && (
             <Text style={styles.noModelsText}>
               {l10n.settings.noModelsAvailable}
             </Text>

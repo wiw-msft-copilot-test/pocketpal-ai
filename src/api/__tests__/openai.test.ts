@@ -15,6 +15,8 @@ import {
 import {mergeCompletionParameterLayers} from '../../utils/generationParameterModes';
 import {cacheReuseTimings} from '../../../jest/fixtures/llamaServerTimings';
 import {runInAction} from 'mobx';
+import {routerWireText} from '../../../jest/fixtures/routerWire';
+import {isModelNotLoaded} from '../llamaServer/routerWire';
 
 import {serverStore} from '../../store';
 
@@ -1505,6 +1507,26 @@ describe('streamChatCompletion', () => {
     await expect(resultPromise).rejects.toThrow(
       'Server error: 500 — Internal Server Error',
     );
+  });
+
+  it("reads a router's not-loaded refusal as such, from the captured body", async () => {
+    const resultPromise = streamChatCompletion(
+      {
+        samplers: {},
+        messages: [{role: 'user', content: 'Hi'}],
+        model: 'test-model',
+      },
+      endpointFor(),
+    );
+
+    MockXHR.instances[0].simulateErrorResponse(
+      400,
+      routerWireText('completion-not-loaded-400.json'),
+    );
+
+    const error = await resultPromise.catch(e => e);
+    expect(isModelNotLoaded(error)).toBe(true);
+    expect(error.message).toBe('Server error: 400 — model is not loaded');
   });
 
   it('handles abort via AbortController', async () => {

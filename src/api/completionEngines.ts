@@ -24,6 +24,8 @@ function stripResponsesState(messages: readonly ChatMessage[]): ChatMessage[] {
     ({responsesState: _responsesState, ...message}) => message,
   );
 }
+import {RemoteModelRequestWithdrawnError} from '../utils/errors';
+import {isModelNotLoaded} from './llamaServer/routerWire';
 
 export class LocalCompletionEngine implements CompletionEngine {
   constructor(private context: LlamaContext) {}
@@ -74,20 +76,79 @@ export class LocalCompletionEngine implements CompletionEngine {
   }
 }
 
+export interface RemoteEngineOptions {
+  /**
+   * Awaited before the request, with the signal Stop aborts. The engine
+   * applies no timeout of its own: whoever supplies this bounds it. With
+   * `reread`, the cached list is not trusted; resolves true only when a
+   * router made the model ready.
+   */
+  ensureReady?: (
+    signal: AbortSignal,
+    options?: {reread: boolean},
+  ) => Promise<boolean | void>;
+}
+
 export class OpenAICompletionEngine implements CompletionEngine {
   private abortController: AbortController | null = null;
+  private binding?: RemoteSessionBinding;
+  private options: RemoteEngineOptions;
 
   constructor(
     private endpoint: RemoteEndpoint,
-    private binding?: RemoteSessionBinding,
-  ) {}
+    bindingOrOptions?: RemoteSessionBinding | RemoteEngineOptions,
+    options: RemoteEngineOptions = {},
+  ) {
+    if (bindingOrOptions && 'serverId' in bindingOrOptions) {
+      this.binding = bindingOrOptions;
+      this.options = options;
+    } else {
+      this.options = bindingOrOptions ?? options;
+    }
+  }
 
   async completion(
     params: ApiCompletionParams,
     callback?: (data: CompletionStreamData) => void,
   ): Promise<CompletionResult> {
-    this.abortController = new AbortController();
+    const controller = new AbortController();
+    this.abortController = controller;
 
+    const {ensureReady} = this.options;
+    if (!ensureReady) {
+      return this.send(params, controller.signal, callback);
+    }
+    await ensureReady(controller.signal);
+    if (controller.signal.aborted) {
+      throw new RemoteModelRequestWithdrawnError();
+    }
+
+    let streamed = false;
+    try {
+      return await this.send(params, controller.signal, data => {
+        streamed = true;
+        callback?.(data);
+      });
+    } catch (error) {
+      if (streamed || !isModelNotLoaded(error)) {
+        throw error;
+      }
+      const ready = await ensureReady(controller.signal, {reread: true});
+      if (controller.signal.aborted) {
+        throw new RemoteModelRequestWithdrawnError();
+      }
+      if (ready !== true) {
+        throw error;
+      }
+      return this.send(params, controller.signal, callback);
+    }
+  }
+
+  private send(
+    params: ApiCompletionParams,
+    signal: AbortSignal,
+    callback?: (data: CompletionStreamData) => void,
+  ): Promise<CompletionResult> {
     const messages = (params.messages ?? []) as ChatMessage[];
     const samplers = pickSamplers(params);
     const effectiveParams = applyGenerationParameterModes(params);
@@ -128,7 +189,7 @@ export class OpenAICompletionEngine implements CompletionEngine {
         requestParams,
         this.endpoint.url,
         this.endpoint.apiKey,
-        this.abortController.signal,
+        signal,
         callback,
         this.endpoint.timeoutMs,
         this.endpoint.serverType,
@@ -179,7 +240,7 @@ export class OpenAICompletionEngine implements CompletionEngine {
         generationParameterModes: params.generationParameterModes,
       },
       this.endpoint,
-      this.abortController.signal,
+      signal,
       callback,
     );
   }

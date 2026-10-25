@@ -188,7 +188,8 @@
       "consentRequired": "برای تنظیم کلید و فعال‌سازی جستجو، توضیحات بالا را بپذیرید.",
       "consentGivenTitle": "جستجوی وب فعال است",
       "consentGivenDescription": "همان‌طور که در بالا توضیح داده شد، درخواست‌ها و خواندن صفحات ممکن است از دستگاه شما خارج شوند.",
-      "consentRevoke": "لغو دسترسی"
+      "consentRevoke": "لغو دسترسی",
+      "keyOptional": "برای {{provider}} نیازی به کلید نیست. برای سقف درخواست بالاتر می‌توانید کلید اضافه کنید."
     },
     "languageSheetTitle": "زبان",
     "languageSearchPlaceholder": "جستجوی زبان‌ها",
@@ -205,7 +206,47 @@
     "speculativeDraftValueCacheType": "نوع کش Value پیش‌نویس",
     "speculativeDraftNGpuLayers": "لایه‌های GPU پیش‌نویس",
     "speculativeDraftNGpuLayersDescription": "تعداد لایه‌های مدل پیش‌نویس که روی GPU بارگذاری می‌شوند.",
-    "speculativeDraftCacheTypeInactiveDescription": "به‌محض اجرای رمزگشایی گمانه‌زنانه اعمال می‌شود."
+    "speculativeDraftCacheTypeInactiveDescription": "به‌محض اجرای رمزگشایی گمانه‌زنانه اعمال می‌شود.",
+    "purchases": {
+      "title": "خریدها",
+      "statusOwned": "خریداری‌شده",
+      "statusUnlocking": "در حال فعال‌سازی",
+      "link": "برای استفاده در دستگاه‌های دیگر وارد شوید"
+    },
+    "scanServerQr": "اسکن کد QR سرور",
+    "scanQrPermissionMessage": "برای اسکن کد QR سرور، به دوربین دسترسی بدهید. آدرس را هم می‌توانید دستی وارد کنید.",
+    "scanQrNotServer": "آدرس سرور نیست",
+    "scanQrUnavailable": "اینجا نمی‌شود اسکن کرد. آدرس سرور را دستی وارد کنید.",
+    "scanQrNotReady": "اسکنر در حال آماده‌شدن است. آدرس را هم می‌توانید دستی وارد کنید.",
+    "routerModels": {
+      "cancel": "لغو",
+      "unloading": "در حال تخلیه…",
+      "stateLoading": "در حال بارگذاری",
+      "stateLoaded": "بارگذاری‌شده",
+      "loadingPercent": "در حال بارگذاری، {{percent}} درصد",
+      "unloadModel": "تخلیه {{model}}",
+      "cancelLoadingModel": "لغو بارگذاری {{model}}",
+      "loadFailed": "این مدل بارگذاری نشد.",
+      "unloadNotReleased": "سرور این مدل را آزاد نکرد.",
+      "serverUnreachable": "دسترسی به این سرور ممکن نشد.",
+      "waitStopped": "انتظار برای این مدل متوقف شد.",
+      "failureWithServerWords": "{{label}}\n\n“{{message}}”",
+      "dismiss": "بستن",
+      "unloadBoundTitle": "این مدل تخلیه شود؟",
+      "unloadBoundBody": "این چت از آن استفاده می‌کند. با ارسال پیام بعدی دوباره بارگذاری می‌شود.",
+      "unloadBoundConfirm": "تخلیه"
+    },
+    "account": {
+      "title": "حساب کاربری",
+      "deleteAccount": "حذف حساب کاربری",
+      "confirmTitle": "حساب کاربری حذف شود؟",
+      "confirmMessage": "این کار حساب PalsHub شما و کتابخانه‌اش را برای همیشه حذف می‌کند. پَل‌هایی که از App Store یا Google Play خریده‌اید، با حساب فروشگاهتان روی این دستگاه قابل بازیابی می‌مانند. سوابق خرید به دلایل قانونی به‌صورت ناشناس نگه داشته می‌شوند.",
+      "confirmWithoutApple": "تأیید با Apple ممکن نشد. باز هم حساب کاربری شما حذف شود؟",
+      "deleted": "حساب کاربری شما حذف شد.",
+      "signInAgain": "لطفاً دوباره وارد شوید",
+      "creatorSupport": "حساب‌های سازنده را تیم پشتیبانی ما حذف می‌کند: {{contact}}",
+      "failed": "حذف ممکن نشد، دوباره تلاش کنید"
+    }
   },
   "memory": {
     "shortWarning": "هشدار حافظه",
@@ -947,7 +988,8 @@
       },
       "warnings": {
         "promptChanged": "پرامپت سیستم به صورت دستی تغییر کرده است"
-      }
+      },
+      "generationBusy": "پاسخ هنوز در حال تولید است. وقتی تمام شد دوباره تلاش کنید."
     },
     "sidebarContent": {
       "menuItems": {
@@ -1022,7 +1064,9 @@
       "ttft": "{{value}}ms TTFT",
       "interrupted": "متوقف شد",
       "truncated": "قطع شد — احتمالاً context پر شده",
-      "draftAccepted": "پیش‌نویس: {{accepted}}/{{total}} ({{pct}}%)"
+      "draftAccepted": "پیش‌نویس: {{accepted}}/{{total}} ({{pct}}%)",
+      "promptTokensPerSec": "{{value}} توکن پرامپت/ثانیه",
+      "cachedTokens": "{{value}} کش‌شده"
     },
     "pendingIndicator": {
       "preparingTool": "در حال آماده‌سازی ابزار",
@@ -1034,6 +1078,13 @@
     "toolMetrics": {
       "tokens": "{{count}} توکن",
       "elapsed": "{{seconds}} ثانیه"
+    },
+    "completionSettings": {
+      "serverDefault": "پیش‌فرض سرور",
+      "usingServerDefault": "استفاده از پیش‌فرض سرور: {{value}}",
+      "usingServerDefaultUnreported": "استفاده از پیش‌فرض سرور (گزارش نشده)",
+      "resetToServerDefault": "پیش‌فرض سرور: {{value}} · بازنشانی",
+      "resetToServerDefaultAccessibilityLabel": "بازنشانی {{name}} به پیش‌فرض سرور، {{value}}"
     }
   },
   "palsScreen": {
@@ -1087,8 +1138,6 @@
       "download": "دانلود",
       "getFree": "دریافت رایگان"
     },
-    "premiumPalDescription": "پَل ویژه از جامعه palshub.ai",
-    "premiumInfoText": "برای کشف پَل‌های بیشتر به palshub.ai سر بزنید",
     "sortOptions": {
       "newest": "جدیدترین",
       "oldest": "قدیمی‌ترین",
@@ -1112,15 +1161,48 @@
       "error": "خطا",
       "failedToLoadDetails": "بارگذاری جزئیات پَل با مشکل مواجه شد",
       "failedToDownload": "دانلود پَل با مشکل مواجه شد",
-      "premiumPalMessage": "این یک پَل ویژه است.\n• اگر قبلاً با حساب Palshub خود آن را فعال کرده‌اید، کافی است وارد شوید تا به جزئیات کامل دسترسی پیدا کنید.\n• هنوز فعال نکرده‌اید؟ برای اطلاعات بیشتر به برنامه palshub.ai مراجعه کنید.",
-      "notAvailable": "ندارد",
-      "buyOnPalshub": "خرید در Palshub",
-      "finalizingPurchase": "در حال نهایی‌سازی خرید شما…",
-      "processingPurchase": "در حال پردازش — به‌زودی فعال می‌شود.",
-      "checkoutSessionExpired": "نشست شما منقضی شد. برای ادامه دوباره وارد شوید.",
-      "signInAgain": "ورود مجدد",
-      "palNotAvailable": "این پَل در حال حاضر برای خرید در دسترس نیست.",
-      "checkoutFailed": "مشکلی پیش آمد. لطفاً دوباره تلاش کنید."
+      "notAvailable": "ندارد"
+    },
+    "purchase": {
+      "buy": "{{price}}",
+      "open": "باز کردن",
+      "install": "نصب",
+      "pending": "در انتظار",
+      "unlocking": "در حال فعال‌سازی",
+      "retry": "تلاش مجدد",
+      "supportCode": "کد پشتیبانی: {{code}}",
+      "noLongerAvailable": "این پَل دیگر در دسترس نیست. می‌توانید {{refundLink}}.",
+      "refundLink": "از Apple بازگشت وجه بخواهید",
+      "notCompleted": "این خرید کامل نشد. Google مبلغ را به شما بازمی‌گرداند.",
+      "withdrawnRefunding": "این پَل از عرضه خارج شد. برای بازگشت وجه با پشتیبانی تماس بگیرید.",
+      "invalid": "تأیید این خرید ممکن نشد.",
+      "heldInvalid": "فعال‌سازی این خرید ممکن نشد. با همین کد با پشتیبانی تماس بگیرید.",
+      "recommendedModel": "مدل پیشنهادی",
+      "sampleExchange": "نمونه گفتگو",
+      "signInLine": "قبلاً خریده‌اید؟ وارد شوید",
+      "licenseNotice": "در حال خرید مجوز استفاده از این پَل هستید.",
+      "termsOfSale": "شرایط فروش",
+      "appleMediaTerms": "شرایط خدمات رسانه‌ای Apple",
+      "linkPrompt": "وارد شوید تا در دستگاه‌های دیگرتان هم از آن استفاده کنید",
+      "linkSignIn": "ورود",
+      "dismiss": "فعلاً نه",
+      "linkConflict": "این خریدها به حساب کاربری دیگری متصل‌اند.",
+      "restorePurchases": "بازیابی خریدها",
+      "badgePending": "در انتظار",
+      "badgeUnlocking": "در حال فعال‌سازی",
+      "badgeUpdate": "به‌روزرسانی در دسترس",
+      "updatePrompt": "نسخه جدیدی از سازنده در دسترس است.",
+      "updatePromptWithNote": "نسخه جدیدی از سازنده در دسترس است: {{note}}.",
+      "updateButton": "به‌روزرسانی",
+      "updateConfirmText": "این کار ویرایش‌های شما را در بخش‌هایی که سازنده تغییر داده جایگزین می‌کند.",
+      "updateConfirm": "به‌روزرسانی",
+      "updateCancel": "لغو",
+      "modelStep": {
+        "download": "دانلود · {{size}}",
+        "startChat": "شروع چت",
+        "needsMemory": "این پَل برای کوچک‌ترین مدلش به دستگاهی با حداقل {{size}} حافظه نیاز دارد.",
+        "noModelFits": "این دستگاه حافظه کافی برای این پَل ندارد."
+      }
     }
   },
   "validation": {
@@ -1246,7 +1328,9 @@
       "openLinkError": "باز کردن این لینک ممکن نشد."
     },
     "contextFullRemote": "گنجایش گفتگو پر شد. یک چت جدید شروع کنید.",
-    "speculativeInitFailed": "این دستگاه نتوانست رمزگشایی گمانه‌زنانه را برای این مدل شروع کند — به‌احتمال زیاد حافظه کافی برای context پیش‌نویس وجود ندارد. رمزگشایی گمانه‌زنانه را از مسیر تنظیمات → تنظیمات پیشرفته خاموش کنید و دوباره تلاش کنید."
+    "speculativeInitFailed": "این دستگاه نتوانست رمزگشایی گمانه‌زنانه را برای این مدل شروع کند — به‌احتمال زیاد حافظه کافی برای context پیش‌نویس وجود ندارد. رمزگشایی گمانه‌زنانه را از مسیر تنظیمات → تنظیمات پیشرفته خاموش کنید و دوباره تلاش کنید.",
+    "routerLoading": "در حال بارگذاری مدل…",
+    "routerLoadingPercent": "در حال بارگذاری مدل · {{percent}}%"
   },
   "benchmark": {
     "title": "بنچمارک",
@@ -1272,7 +1356,8 @@
       "testWarning": "توجه: تست ممکن است برای مدل‌های بزرگ‌تر ۲ تا ۵ دقیقه طول بکشد و بعد از شروع قابل توقف نیست.",
       "keepScreenOpen": "لطفاً این صفحه را باز نگه دارید.",
       "initializingModel": "در حال راه‌اندازی مدل...",
-      "modelMaxValue": "(حداکثر: {{maxValue}})"
+      "modelMaxValue": "(حداکثر: {{maxValue}})",
+      "testFailed": "اجرای تست ممکن نشد. صبر کنید تا پاسخ‌دهی مدل تمام شود، بعد دوباره تلاش کنید."
     },
     "dialogs": {
       "advancedSettings": {
@@ -1584,6 +1669,83 @@
   "downloadBanner": {
     "titleByPal": "{{name}} در حال دانلود است",
     "titleByModel": "{{name}} در حال دانلود است",
-    "extraInProgress": "+{{count}} مورد دیگر در حال انجام"
+    "extraInProgress": "+{{count}} مورد دیگر در حال انجام",
+    "failedTitle": "دانلود کامل نشد",
+    "retry": "تلاش مجدد"
+  },
+  "voiceInput": {
+    "micLabel": "دیکته کردن",
+    "recordingLabel": "در حال ضبط",
+    "stopLabel": "توقف و تبدیل به متن",
+    "cancelLabel": "لغو ورودی صوتی",
+    "transcribingLabel": "در حال تبدیل به متن…",
+    "setupLabel": "راه‌اندازی ورودی صوتی",
+    "settingTitle": "ورودی صوتی",
+    "settingDescription": "در چت روی میکروفون بزنید و دیکته کنید؛ گفتار شما روی خود دستگاه به متن تبدیل می‌شود.",
+    "unsupportedDeviceHelper": "مشخصات این دستگاه کمتر از حد پیشنهادی است. ورودی صوتی احتمالاً کند خواهد بود یا ممکن است کار نکند.",
+    "spokenLanguageLabel": "زبان گفتار",
+    "spokenLanguageAuto": "تشخیص خودکار",
+    "spokenLanguageDetected": "تشخیص خودکار: {{language}}",
+    "resetLanguageCta": "بازنشانی",
+    "recordingLanguageAuto": "زبان: خودکار",
+    "recordingLanguage": "زبان: {{code}} (برای بازنشانی ضربه بزنید)",
+    "waitingForChatLabel": "پس از پایان پاسخ، به متن تبدیل می‌شود…",
+    "tierSizeLabel": "{{sizeMb}} MB",
+    "installCta": "دانلود",
+    "downloadingLabel": "در حال دانلود…",
+    "retryCta": "تلاش مجدد",
+    "removeCta": "حذف",
+    "errorPermissionDenied": "برای ورودی صوتی به دسترسی میکروفون نیاز است.",
+    "errorPermissionBlocked": "دسترسی به میکروفون مسدود است. آن را در تنظیمات فعال کنید.",
+    "errorTranscribeFailed": "تبدیل به متن ممکن نشد — لطفاً دوباره تلاش کنید.",
+    "errorNotInstalled": "برای استفاده از ورودی صوتی، یک مدل صوتی دانلود کنید.",
+    "errorInsufficientMemory": "حافظه برای ورودی صوتی با این مدل چت کافی نیست. مدل کوچک‌تری را امتحان کنید.",
+    "errorMicUnavailable": "میکروفون پاسخ نمی‌دهد. دوباره تلاش کنید یا به یک مدل چت کوچک‌تر تغییر دهید.",
+    "errorTranscriptPartial": "بخشی از گفتار شما به متن تبدیل نشد.",
+    "openSettingsLabel": "باز کردن تنظیمات",
+    "insufficientStorage": "فضای کافی نیست — برای نصب این مدل {{requiredMb}} MB فضا آزاد کنید ({{freeMb}} MB در دسترس است)."
+  },
+  "plus": {
+    "eyebrow": "PocketPal Plus",
+    "headline": "هوش مصنوعی محلی را یک قدم جلوتر ببرید.",
+    "subline": "Plus، PocketPal را رایگان و متن‌باز نگه می‌دارد. قابلیت‌های اضافه، تشکر ما از شماست.",
+    "unsupportedSubline": "قابلیت‌های Plus هنوز روی این گوشی اجرا نمی‌شوند. باز هم می‌توانید از PocketPal حمایت کنید.",
+    "thanksHeadline": "ممنون که PocketPal را زنده نگه می‌دارید.",
+    "thanksSubline": "Plus روی این دستگاه فعال است.",
+    "features": {
+      "handsFreeVoice": "گفتگوی صوتی هندزفری",
+      "localApiServer": "سرور API محلی"
+    },
+    "ready": "آماده",
+    "needsRam": "نیاز به {{gb}} GB RAM",
+    "comingSoon": "به‌زودی",
+    "speedLine": "سرعت به گوشی و مدل شما بستگی دارد.",
+    "inDevelopment": "قابلیت‌های در حال توسعه ممکن است تغییر کنند یا هرگز منتشر نشوند.",
+    "priceCaption": "هر چقدر دوست دارید بپردازید. قابلیت‌ها در همه قیمت‌ها یکسان است.",
+    "buyError": "خرید انجام نشد. دوباره تلاش کنید.",
+    "getPlus": "تهیه Plus · {{price}}",
+    "getPlusAnyway": "باز هم تهیه Plus · {{price}}",
+    "loading": "در حال بارگذاری",
+    "pending": "در انتظار",
+    "pendingTitle": "در انتظار تأیید پرداخت شما از سوی فروشگاه.",
+    "pendingBody": "به‌محض تأیید، Plus خودش فعال می‌شود. می‌توانید این صفحه را ببندید.",
+    "unavailableTitle": "خرید در حال حاضر در دسترس نیست.",
+    "unavailableBody": "دسترسی به فروشگاه ممکن نشد. بعداً دوباره تلاش کنید یا خرید قبلی‌تان را بازیابی کنید.",
+    "done": "تمام",
+    "oneTimePurchase": "خرید یک‌باره",
+    "restore": "بازیابی",
+    "openSource": "متن‌باز ↗",
+    "licence": "خرید یک‌باره مجوز استفاده از Plus.",
+    "terms": "شرایط",
+    "appleMediaTerms": "شرایط خدمات رسانه‌ای Apple",
+    "noPurchaseFound": "خریدی برای Plus پیدا نشد.",
+    "restoreFailed": "دسترسی به فروشگاه ممکن نشد. دوباره تلاش کنید.",
+    "sidebar": {
+      "title": "PocketPal Plus",
+      "unlocked": "فعال‌شده",
+      "subtitleOne": "{{first}}",
+      "subtitleTwo": "{{first}}، {{second}}",
+      "subtitleMore": "{{first}}، {{second}} و موارد دیگر"
+    }
   }
 }

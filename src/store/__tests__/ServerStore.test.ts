@@ -12,7 +12,7 @@ jest.mock('mobx-persist-store', () => ({
 }));
 
 jest.mock('../../api/openai', () => ({
-  fetchModels: jest.fn(),
+  fetchModelsWithHeaders: jest.fn(),
   testConnection: jest.fn(),
 }));
 
@@ -20,6 +20,11 @@ jest.mock('../../api/llamaServer/props', () => ({
   fetchServerProps: jest.fn(),
   PROPS_TIMEOUT_MS: 5000,
 }));
+
+// The store subscribes at import, before the spy below replaces the mock.
+const appStateListener: (state: string) => void = (
+  AppState.addEventListener as jest.Mock
+).mock.calls.find(([event]) => event === 'change')[1];
 
 // Mock AppState.addEventListener
 const mockAddEventListener = jest.fn().mockReturnValue({remove: jest.fn()});
@@ -42,7 +47,12 @@ const persistedProperties: string[] = (
 
 /** A probe result that resolves the capability tier and nothing else. */
 
-const mockedFetchModels = openaiModule.fetchModels as jest.Mock;
+const mockedFetchList = openaiModule.fetchModelsWithHeaders as jest.Mock;
+const listOf = (models: unknown[], extra: {hasModelsKey?: true} = {}) => ({
+  models,
+  headers: {},
+  ...extra,
+});
 const mockedFetchServerProps = propsModule.fetchServerProps as jest.Mock;
 const mockedTestConnection = openaiModule.testConnection as jest.Mock;
 const {PROPS_TIMEOUT_MS} = propsModule;
@@ -63,6 +73,8 @@ describe('ServerStore', () => {
       serverStore.remoteCaps = {};
       serverStore.remoteModelPreferences = {};
       serverStore.remoteCatalogMetadata = {};
+      serverStore.listReads = {};
+      serverStore.appActive = true;
     });
   });
 
@@ -108,7 +120,7 @@ describe('ServerStore', () => {
         url: 'http://localhost:1234',
       });
 
-      expect(mockedFetchModels).not.toHaveBeenCalled();
+      expect(mockedFetchList).not.toHaveBeenCalled();
     });
 
     it('generates unique ids for each server', () => {
@@ -274,7 +286,7 @@ describe('ServerStore', () => {
           {id: 'srv-3', name: 'absent', url: 'http://localhost:8082'},
         ];
       });
-      mockedFetchModels.mockResolvedValue([]);
+      mockedFetchList.mockResolvedValue(listOf([]));
 
       await serverStore.afterHydration();
 
@@ -287,9 +299,9 @@ describe('ServerStore', () => {
 
     it('normalises a hydrated type before the first model fetch', async () => {
       const seen: Array<string | undefined> = [];
-      mockedFetchModels.mockImplementation(() => {
+      mockedFetchList.mockImplementation(() => {
         seen.push(serverStore.servers[0].serverType);
-        return Promise.resolve([]);
+        return Promise.resolve(listOf([]));
       });
       runInAction(() => {
         serverStore.servers = [
@@ -591,8 +603,8 @@ describe('ServerStore', () => {
     });
 
     it('derives from the fetch alone for a newly added llama.cpp server', async () => {
-      mockedFetchModels.mockResolvedValue(
-        routerModelsBody.data as RemoteModelInfo[],
+      mockedFetchList.mockResolvedValue(
+        listOf(routerModelsBody.data as RemoteModelInfo[]),
       );
       const id = serverStore.addServer({
         name: 'router',
@@ -1126,7 +1138,7 @@ describe('ServerStore', () => {
         {id: 'llama-7b', object: 'model', owned_by: 'system'},
         {id: 'codellama', object: 'model', owned_by: 'library'},
       ];
-      mockedFetchModels.mockResolvedValueOnce(mockModels);
+      mockedFetchList.mockResolvedValueOnce(listOf(mockModels));
       (Keychain.getGenericPassword as jest.Mock).mockResolvedValueOnce(false);
 
       await serverStore.fetchModelsForServer(id);
@@ -1151,10 +1163,12 @@ describe('ServerStore', () => {
         url: 'https://old.example.com',
       });
       let resolveFetch!: (models: RemoteModelInfo[]) => void;
-      mockedFetchModels.mockReturnValueOnce(
-        new Promise(resolve => {
-          resolveFetch = resolve;
-        }),
+      mockedFetchList.mockImplementationOnce(async () =>
+        listOf(
+          await new Promise(resolve => {
+            resolveFetch = resolve;
+          }),
+        ),
       );
       (Keychain.getGenericPassword as jest.Mock).mockResolvedValueOnce(false);
 
@@ -1195,7 +1209,7 @@ describe('ServerStore', () => {
       });
       await fetchPromise;
 
-      expect(mockedFetchModels).not.toHaveBeenCalled();
+      expect(mockedFetchList).not.toHaveBeenCalled();
     });
 
     it('lets only the newest overlapping fetch commit', async () => {
@@ -1204,20 +1218,24 @@ describe('ServerStore', () => {
         url: 'https://api.example.com',
       });
       let resolveOld!: (models: RemoteModelInfo[]) => void;
-      mockedFetchModels
-        .mockReturnValueOnce(
-          new Promise(resolve => {
-            resolveOld = resolve;
-          }),
+      mockedFetchList
+        .mockImplementationOnce(async () =>
+          listOf(
+            await new Promise(resolve => {
+              resolveOld = resolve;
+            }),
+          ),
         )
-        .mockResolvedValueOnce([
-          {
-            id: 'new',
-            object: 'model',
-            owned_by: 'system',
-            supported_endpoints: ['/responses'],
-          },
-        ]);
+        .mockResolvedValueOnce(
+          listOf([
+            {
+              id: 'new',
+              object: 'model',
+              owned_by: 'system',
+              supported_endpoints: ['/responses'],
+            },
+          ]),
+        );
       (Keychain.getGenericPassword as jest.Mock).mockResolvedValue(false);
 
       const oldFetch = serverStore.fetchModelsForServer(id);
@@ -1242,7 +1260,7 @@ describe('ServerStore', () => {
       });
       jest.clearAllMocks();
 
-      mockedFetchModels.mockRejectedValueOnce(new Error('Connection refused'));
+      mockedFetchList.mockRejectedValueOnce(new Error('Connection refused'));
       (Keychain.getGenericPassword as jest.Mock).mockResolvedValueOnce(false);
 
       await serverStore.fetchModelsForServer(id);
@@ -1254,10 +1272,10 @@ describe('ServerStore', () => {
     it('skips fetch for non-existent server id', async () => {
       await serverStore.fetchModelsForServer('non-existent');
 
-      expect(mockedFetchModels).not.toHaveBeenCalled();
+      expect(mockedFetchList).not.toHaveBeenCalled();
     });
 
-    it('forwards the server requestTimeoutMs to fetchModels', async () => {
+    it('forwards the server requestTimeoutMs raw to the list request', async () => {
       const id = serverStore.addServer({
         name: 'Slow Server',
         url: 'http://localhost:1234',
@@ -1266,12 +1284,12 @@ describe('ServerStore', () => {
       });
       jest.clearAllMocks();
 
-      mockedFetchModels.mockResolvedValueOnce([]);
+      mockedFetchList.mockResolvedValueOnce(listOf([]));
       (Keychain.getGenericPassword as jest.Mock).mockResolvedValueOnce(false);
 
       await serverStore.fetchModelsForServer(id);
 
-      expect(mockedFetchModels).toHaveBeenCalledWith(
+      expect(mockedFetchList).toHaveBeenCalledWith(
         'http://localhost:1234',
         undefined,
         600000,
@@ -1288,12 +1306,12 @@ describe('ServerStore', () => {
       });
       jest.clearAllMocks();
 
-      mockedFetchModels.mockResolvedValueOnce([]);
+      mockedFetchList.mockResolvedValueOnce(listOf([]));
       (Keychain.getGenericPassword as jest.Mock).mockResolvedValueOnce(false);
 
       await serverStore.fetchModelsForServer(id);
 
-      expect(mockedFetchModels).toHaveBeenCalledWith(
+      expect(mockedFetchList).toHaveBeenCalledWith(
         'http://localhost:1234',
         undefined,
         undefined,
@@ -1309,7 +1327,7 @@ describe('ServerStore', () => {
       });
       jest.clearAllMocks();
 
-      mockedFetchModels.mockResolvedValueOnce([]);
+      mockedFetchList.mockResolvedValueOnce(listOf([]));
       (Keychain.getGenericPassword as jest.Mock).mockResolvedValueOnce(false);
 
       const before = Date.now();
@@ -1321,13 +1339,13 @@ describe('ServerStore', () => {
 
     describe('when the url moves while the list is in flight', () => {
       const pendingFetch = () => {
-        let resolve!: (models: any[]) => void;
-        mockedFetchModels.mockReturnValueOnce(
+        let resolve!: (value: unknown) => void;
+        mockedFetchList.mockReturnValueOnce(
           new Promise(r => {
             resolve = r;
           }),
         );
-        return (models: any[]) => resolve(models);
+        return (models: any[]) => resolve(listOf(models));
       };
       const models = (id: string) => [
         {id, object: 'model', owned_by: 'system'},
@@ -1343,7 +1361,7 @@ describe('ServerStore', () => {
       const started = () =>
         new Promise<void>(resolve => {
           const check = () =>
-            mockedFetchModels.mock.calls.length > 0
+            mockedFetchList.mock.calls.length > 0
               ? resolve()
               : setImmediate(check);
           check();
@@ -1367,7 +1385,7 @@ describe('ServerStore', () => {
       it('drops a failure from the url the server left', async () => {
         const id = addServer();
         let rejectA!: (error: Error) => void;
-        mockedFetchModels.mockReturnValueOnce(
+        mockedFetchList.mockReturnValueOnce(
           new Promise((_, reject) => {
             rejectA = reject;
           }),
@@ -1428,7 +1446,7 @@ describe('ServerStore', () => {
       jest.clearAllMocks();
 
       const mockModels = [{id: 'm', object: 'model', owned_by: 'system'}];
-      mockedFetchModels.mockResolvedValueOnce(mockModels);
+      mockedFetchList.mockResolvedValueOnce(listOf(mockModels));
       (Keychain.getGenericPassword as jest.Mock).mockResolvedValueOnce(false);
 
       await serverStore.fetchModelsForServer(id);
@@ -1439,6 +1457,142 @@ describe('ServerStore', () => {
       expect(mockedFetchServerProps).not.toHaveBeenCalled();
       expect(serverStore.serverModels.get(id)).toEqual(mockModels);
       expect(serverStore.remoteCaps).toEqual({});
+    });
+  });
+
+  describe('list read record', () => {
+    const rows = (id: string) => [{id, object: 'model', owned_by: 'system'}];
+    const addServer = () => {
+      const id = serverStore.addServer({
+        name: 'Server',
+        url: 'http://localhost:8080',
+      });
+      jest.clearAllMocks();
+      (Keychain.getGenericPassword as jest.Mock).mockResolvedValue(false);
+      return id;
+    };
+    const deferred = () => {
+      let resolve!: (value: unknown) => void;
+      let reject!: (error: Error) => void;
+      mockedFetchList.mockReturnValueOnce(
+        new Promise((res, rej) => {
+          resolve = res;
+          reject = rej;
+        }),
+      );
+      return {resolve, reject};
+    };
+
+    it('stamps a read with the counter value taken at its start', async () => {
+      const id = addServer();
+      const before = serverStore.readSeq;
+      mockedFetchList.mockResolvedValueOnce(
+        listOf(rows('a'), {hasModelsKey: true}),
+      );
+
+      const pending = serverStore.fetchModelsForServer(id);
+      expect(serverStore.readSeq).toBe(before + 1);
+      await expect(pending).resolves.toEqual({ok: true});
+
+      expect(serverStore.listReads[id]).toEqual({
+        seq: before + 1,
+        hasModelsKey: true,
+        stale: false,
+      });
+    });
+
+    it('records a body without a models key as such', async () => {
+      const id = addServer();
+      mockedFetchList.mockResolvedValueOnce(listOf(rows('a')));
+
+      await serverStore.fetchModelsForServer(id);
+
+      expect(serverStore.listReads[id].hasModelsKey).toBe(false);
+    });
+
+    it('keeps the newer read when an older one answers after it', async () => {
+      const id = addServer();
+      const older = deferred();
+      const olderRead = serverStore.fetchModelsForServer(id);
+      mockedFetchList.mockResolvedValueOnce(listOf(rows('newer')));
+      await serverStore.fetchModelsForServer(id);
+      const installed = serverStore.listReads[id];
+
+      older.resolve(listOf(rows('older'), {hasModelsKey: true}));
+      await olderRead;
+
+      expect(serverStore.serverModels.get(id)).toEqual(rows('newer'));
+      expect(serverStore.listReads[id]).toEqual(installed);
+    });
+
+    it('does not mark the list stale when an older read fails after a newer success', async () => {
+      const id = addServer();
+      const older = deferred();
+      const olderRead = serverStore.fetchModelsForServer(id);
+      mockedFetchList.mockResolvedValueOnce(listOf(rows('newer')));
+      await serverStore.fetchModelsForServer(id);
+
+      older.reject(new Error('Connection refused'));
+      await expect(olderRead).resolves.toEqual({
+        ok: false,
+        error: 'Connection refused',
+      });
+
+      expect(serverStore.listReads[id].stale).toBe(false);
+    });
+
+    it('marks the list stale on a newer failure and keeps its rows', async () => {
+      const id = addServer();
+      mockedFetchList.mockResolvedValueOnce(listOf(rows('a')));
+      await serverStore.fetchModelsForServer(id);
+
+      mockedFetchList.mockRejectedValueOnce(new Error('Network error'));
+      await serverStore.fetchModelsForServer(id);
+
+      expect(serverStore.listReads[id].stale).toBe(true);
+      expect(serverStore.serverModels.get(id)).toEqual(rows('a'));
+    });
+
+    it('drops the record with the list on an invalidating update', async () => {
+      const id = addServer();
+      mockedFetchList.mockResolvedValueOnce(listOf(rows('a')));
+      await serverStore.fetchModelsForServer(id);
+
+      serverStore.updateServer(id, {name: 'Renamed'});
+      expect(serverStore.listReads[id]).toBeDefined();
+
+      serverStore.updateServer(id, {url: 'http://localhost:9090'});
+      expect(serverStore.listReads[id]).toBeUndefined();
+      expect(serverStore.serverModels.has(id)).toBe(false);
+    });
+
+    it('drops the record with the list on removal', async () => {
+      const id = addServer();
+      mockedFetchList.mockResolvedValueOnce(listOf(rows('a')));
+      await serverStore.fetchModelsForServer(id);
+
+      serverStore.removeServer(id);
+
+      expect(serverStore.listReads[id]).toBeUndefined();
+    });
+
+    it('persists neither the record, the counter nor the foreground flag', () => {
+      for (const field of ['listReads', 'readCounter', 'appActive']) {
+        expect(persistedProperties).not.toContain(field);
+      }
+    });
+  });
+
+  describe('foreground flag', () => {
+    it('follows every app state transition', () => {
+      appStateListener('background');
+      expect(serverStore.appActive).toBe(false);
+
+      appStateListener('active');
+      expect(serverStore.appActive).toBe(true);
+
+      appStateListener('inactive');
+      expect(serverStore.appActive).toBe(false);
     });
   });
 
@@ -1458,12 +1612,12 @@ describe('ServerStore', () => {
       });
       jest.clearAllMocks();
 
-      mockedFetchModels.mockResolvedValue([]);
+      mockedFetchList.mockResolvedValue(listOf([]));
       (Keychain.getGenericPassword as jest.Mock).mockResolvedValue(false);
 
       await serverStore.fetchAllRemoteModels();
 
-      expect(mockedFetchModels).toHaveBeenCalledTimes(3);
+      expect(mockedFetchList).toHaveBeenCalledTimes(3);
     });
 
     it('does nothing when no servers exist', async () => {
@@ -1471,7 +1625,7 @@ describe('ServerStore', () => {
 
       await serverStore.fetchAllRemoteModels();
 
-      expect(mockedFetchModels).not.toHaveBeenCalled();
+      expect(mockedFetchList).not.toHaveBeenCalled();
     });
   });
 

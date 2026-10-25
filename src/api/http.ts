@@ -17,6 +17,52 @@ export function resolveTimeout(
   return timeoutMs;
 }
 
+export interface FetchTimeoutOptions {
+  timeoutMs: number;
+  signal?: AbortSignal;
+}
+
+function abortError(): Error {
+  const error = new Error('Aborted');
+  error.name = 'AbortError';
+  return error;
+}
+
+/**
+ * `fetch` bounded by a timer and linked to an optional caller signal. Expiry
+ * rejects `Connection timed out`; a caller abort rejects as an abort, so the
+ * two stay distinguishable.
+ */
+export async function fetchWithTimeout(
+  url: string,
+  init: RequestInit,
+  {timeoutMs, signal}: FetchTimeoutOptions,
+): Promise<Response> {
+  if (signal?.aborted) {
+    throw abortError();
+  }
+  const controller = new AbortController();
+  let timedOut = false;
+  const timer = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, timeoutMs);
+  const onCallerAbort = () => controller.abort();
+  signal?.addEventListener('abort', onCallerAbort, {once: true});
+
+  try {
+    return await fetch(url, {...init, signal: controller.signal});
+  } catch (error) {
+    if (timedOut) {
+      throw new Error('Connection timed out');
+    }
+    throw error;
+  } finally {
+    clearTimeout(timer);
+    signal?.removeEventListener('abort', onCallerAbort);
+  }
+}
+
 /**
  * Build headers for OpenAI-compatible API requests.
  */
@@ -45,7 +91,7 @@ export function buildHeaders(
 }
 
 /**
- * Normalize server URL: remove trailing slash.
+ * Normalize server URL: remove trailing slashes and one trailing `/v1`.
  */
 export function normalizeUrl(serverUrl: string): string {
   const parsed = new URL(serverUrl);
@@ -59,7 +105,7 @@ export function normalizeUrl(serverUrl: string): string {
   if ((!isLocal && parsed.protocol !== 'https:') || !parsed.hostname) {
     throw new Error('Remote AI servers must use HTTPS.');
   }
-  return serverUrl.replace(/\/+$/, '');
+  return serverUrl.replace(/\/+$/, '').replace(/\/v1$/, '').replace(/\/+$/, '');
 }
 
 export function buildOpenAIUrl(

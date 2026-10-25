@@ -9,3 +9,6 @@ export * from './usePalLoadHint';
 export * from './useSpeechRecognition';
 export * from './useVoiceConversation';
 export * from './useChatSearch';
+export * from './useVoiceCapture';
+export * from './useVoiceMode';
+export * from './useMenuStatusBarHeight';

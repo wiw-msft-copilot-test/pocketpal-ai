@@ -78,11 +78,7 @@ jobs:
           NODE
 
       - name: Verify disabled integrations do not initialize
-        run: |
-          yarn jest \
-            src/services/palshub/__tests__/disabledBuild.test.ts \
-            --runInBand \
-            --coverage=false
+        run: yarn test:disabled-build
 
       - name: Derive the rnllama variant allowlist from the payload manifest
         run: |

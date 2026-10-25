@@ -1,6 +1,6 @@
 # 010: Preserve fork conversation and disable upstream Plus voice
 
-**Status:** Accepted policy; upstream integration and validation pending
+**Status:** Implemented by [011](011-sync-upstream-f0e6619.md); policy remains permanent
 
 ## Revisions and context
 
@@ -99,14 +99,21 @@ fixes, but they must not silently substitute the fork conversation path.
 
 ## Preservation checks and actual validation status
 
-This is an accepted policy record only. No implementation changes or
-policy-specific validation have been completed at the time of recording.
+The original record established policy before implementation. The pinned merge
+and combined-intent resolutions are recorded in [011](011-sync-upstream-f0e6619.md).
+Normal fork builds now gate Plus availability, entitlement, controller entry,
+settings, paywall hosting, and purchase startup behind the centralized
+integration flag. Persisted user and E2E overrides cannot bypass that flag.
+The existing fork conversation remains independent of Plus, and Whisper capture
+cannot overlap launcher-triggered fork recognition.
 
-The integration must retain and run focused conversation, recognition, cue,
+The integration retains focused conversation, recognition, cue,
 TTS, startup-selection, compatible-selection, deep-link, ChatInput, and Android
-native-contract coverage. Add focused disabled-build coverage proving that
+native-contract coverage. Disabled-build coverage proves that
 Plus voice controls and activation remain unavailable in normal fork builds,
-without disabling existing fork conversation or initializing purchases.
+without disabling existing fork conversation or initializing purchases. Actual
+local checks and the exact-commit Android acceptance requirement are recorded
+in 011 and the final implementation result.
 
 Also run the sync's required type, lint, localization, transport fixture,
 native-autolinking, and payload checks. Final sync acceptance requires a fresh

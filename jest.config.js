@@ -1,6 +1,7 @@
 module.exports = {
-  preset: 'react-native',
-  collectCoverage: true,
+  preset: '@react-native/jest-preset',
+  resolver: '<rootDir>/jest/resolver.js',
+  collectCoverage: !process.env.REASSURE_OUTPUT_FILE,
   collectCoverageFrom: [
     'src/**/*.{ts,tsx}',
     '!**/index.{ts,tsx}',
@@ -10,6 +11,7 @@ module.exports = {
     '!**/ImageView.android.ts',
     '!**/ImageView.ios.ts',
     '!**/ImageView.tsx',
+    '!**/*.perf-test.{ts,tsx}',
   ],
   coveragePathIgnorePatterns: ['/src/screens/DevToolsScreen/'],
   coverageThreshold: {
@@ -24,7 +26,7 @@ module.exports = {
   setupFiles: ['./jest/setup.ts'],
   setupFilesAfterEnv: ['./jest/setupFilesAfterEnv.ts'],
   transformIgnorePatterns: [
-    'node_modules/(?!(@supabase|isows|@react-native-google-signin|@flyerhq|@react-native|react-native|uuid|react-native-reanimated|react-native-gesture-handler|react-native-vector-icons|react-native-image-viewing|react-native-parsed-text|@react-navigation/.*|@react-native-masked-view/masked-view|react-native-linear-gradient|react-native-picker-select|react-native-paper|react-native-keyboard-controller|react-native-drawer-layout|marked|react-native-code-highlighter|react-syntax-highlighter|trim-newlines|react-native-worklets)/)',
+    'node_modules/(?!(@supabase|isows|@react-native-google-signin|@flyerhq|@react-native|react-native|react-native-url-polyfill|uuid|react-native-reanimated|react-native-gesture-handler|react-native-vector-icons|react-native-image-viewing|react-native-parsed-text|@react-navigation/.*|@react-native-masked-view/masked-view|react-native-linear-gradient|react-native-picker-select|react-native-paper|react-native-keyboard-controller|react-native-drawer-layout|marked|react-native-code-highlighter|react-syntax-highlighter|trim-newlines|react-native-worklets)/)',
   ],
   testMatch: [
     '**/__tests__/**/*.test.[jt]s?(x)',
@@ -32,9 +34,15 @@ module.exports = {
   ],
   testPathIgnorePatterns: ['/node_modules/', '/e2e/'],
   moduleNameMapper: {
+    '^react-native-paper$': '<rootDir>/node_modules/react-native-paper/src',
     '@react-native-async-storage/async-storage':
       '<rootDir>/__mocks__/external/@react-native-async-storage/async-storage.js',
     'llama.rn': '<rootDir>/__mocks__/external/llama.rn.ts',
+    'whisper.rn': '<rootDir>/__mocks__/external/whisper.rn.ts',
+    '@fugood/react-native-audio-pcm-stream':
+      '<rootDir>/__mocks__/external/react-native-audio-pcm-stream.ts',
+    'react-native-permissions':
+      '<rootDir>/__mocks__/external/react-native-permissions.ts',
     'react-native-webview':
       '<rootDir>/__mocks__/external/react-native-webview.ts',
     'react-dom': '<rootDir>/__mocks__/external/react-dom.js',
@@ -83,8 +91,10 @@ module.exports = {
     '@env': '<rootDir>/__mocks__/external/@env.js',
     '@gorhom/bottom-sheet':
       '<rootDir>/__mocks__/external/@gorhom/bottom-sheet.js',
-    '@pocketpalai/react-native-speech':
+    '^@pocketpalai/react-native-speech$':
       '<rootDir>/__mocks__/external/@pocketpalai/react-native-speech.ts',
+    '^@pocketpalai/react-native-speech-phonon$':
+      '<rootDir>/__mocks__/external/@pocketpalai/react-native-speech-phonon.ts',
     '^react-native-iap$': '<rootDir>/__mocks__/external/react-native-iap.ts',
   },
 };

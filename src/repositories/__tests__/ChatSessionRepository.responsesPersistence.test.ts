@@ -81,6 +81,7 @@ describe('ChatSessionRepository Responses persistence', () => {
   it('adds assistant turns without mutating shared metadata', async () => {
     let storedMetadata = '';
     (database.collections.get as jest.Mock).mockReturnValue({
+      find: jest.fn().mockResolvedValue({id: 'session-1'}),
       query: jest.fn().mockReturnValue({
         fetch: jest.fn().mockResolvedValue([]),
       }),
