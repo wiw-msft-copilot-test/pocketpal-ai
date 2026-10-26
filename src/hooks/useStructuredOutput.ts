@@ -1,25 +1,37 @@
-import {useCallback, useRef, useState, useContext} from 'react';
+import {useCallback, useContext, useEffect, useRef, useState} from 'react';
 
 import {toJS} from 'mobx';
 
 import {chatSessionStore, modelStore} from '../store';
+import type {GenerationLease} from '../store/generationLease';
 import {safeParseJSON} from '../utils';
 import {L10nContext} from '../utils';
+import {stopQuietly} from '../utils/stopQuietly';
 
 export const useStructuredOutput = () => {
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isBusy, setIsBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const l10n = useContext(L10nContext);
 
-  const stopRef = useRef<(() => void) | null>(null);
+  const leaseRef = useRef<GenerationLease | null>(null);
+  const cancelledRef = useRef(false);
 
   const stop = useCallback(() => {
-    if (stopRef.current) {
-      stopRef.current();
-      stopRef.current = null;
-      setIsGenerating(false);
-    }
+    leaseRef.current?.abort();
+    setIsGenerating(false);
   }, []);
+
+  const cancel = useCallback(() => {
+    setIsBusy(false);
+    if (!leaseRef.current) {
+      return;
+    }
+    cancelledRef.current = true;
+    leaseRef.current.abort();
+  }, []);
+
+  useEffect(() => cancel, [cancel]);
 
   const generate = useCallback(
     async (
@@ -32,29 +44,29 @@ export const useStructuredOutput = () => {
         repeat_penalty?: number;
       },
     ) => {
-      // `engine` is set for both local (LocalCompletionEngine wrapping a
-      // LlamaContext) and remote (OpenAICompletionEngine) — so structured
-      // output works against any backend that honours
-      // response_format.json_schema.
-      const engine = modelStore.engine;
-      if (!engine) {
+      cancelledRef.current = false;
+      setIsBusy(false);
+      const lease = modelStore.tryAcquireGeneration();
+      if (!lease) {
+        if (modelStore.isGenerationBusy) {
+          setIsBusy(true);
+          return undefined;
+        }
         throw new Error(l10n.generation.modelNotInitialized);
       }
-
-      setIsGenerating(true);
-      setError(null);
-      const stopWords = toJS(modelStore.activeModel?.stopWords);
-
+      const onAbort = () => stopQuietly(() => lease.engine.stopCompletion());
       try {
-        stopRef.current = () => {
-          engine.stopCompletion().catch(() => {});
-        };
+        leaseRef.current = lease;
+        setIsGenerating(true);
+        setError(null);
+        const stopWords = toJS(modelStore.activeModel?.stopWords);
+        lease.signal.addEventListener('abort', onAbort, {once: true});
 
         const resolvedSettings =
           await chatSessionStore.getCurrentCompletionSettings(
             modelStore.activeModelCompletionSettings,
           );
-        const result = await engine.completion({
+        const result = await lease.engine.completion({
           ...resolvedSettings,
           messages: [{role: 'user', content: prompt}],
           response_format: {
@@ -79,7 +91,9 @@ export const useStructuredOutput = () => {
             : {}),
         });
 
-        stopRef.current = null;
+        if (cancelledRef.current) {
+          return undefined;
+        }
         if (result.refusal) {
           throw new Error('The model refused the structured output request');
         }
@@ -108,8 +122,10 @@ export const useStructuredOutput = () => {
         setError(errorMessage);
         throw err;
       } finally {
+        lease.signal.removeEventListener('abort', onAbort);
+        lease.end();
+        leaseRef.current = null;
         setIsGenerating(false);
-        stopRef.current = null;
       }
     },
     [l10n.generation],
@@ -118,7 +134,9 @@ export const useStructuredOutput = () => {
   return {
     generate,
     isGenerating,
+    isBusy,
     error,
     stop,
+    cancel,
   };
 };

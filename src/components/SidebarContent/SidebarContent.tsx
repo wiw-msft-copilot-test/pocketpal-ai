@@ -8,6 +8,7 @@ import {useSafeAreaInsets} from 'react-native-safe-area-context';
 
 import {useTheme} from '../../hooks';
 import {createStyles} from './styles';
+import {PlusDrawerItem} from './PlusDrawerItem/PlusDrawerItem';
 import {chatSessionStore, SessionMetaData} from '../../store';
 import {Menu, RenameModal, Checkbox} from '..';
 import {
@@ -27,6 +28,7 @@ import {L10nContext} from '../../utils';
 import {t} from '../../locales';
 import {ROUTES} from '../../utils/navigationConstants';
 import {exportChatSession} from '../../utils/exportUtils';
+import {openPlus} from '../../services/plus/gate';
 
 // Check if app is in debug mode
 const isDebugMode = __DEV__;
@@ -341,12 +343,21 @@ export const SidebarContent: React.FC<DrawerContentComponentProps> = observer(
       setMenuVisible(null);
     }, []);
 
+    // The drawer router closes the drawer only when the focused route changes.
+    const navigateTo = React.useCallback(
+      (route: string) => {
+        props.navigation.navigate(route);
+        props.navigation.closeDrawer();
+      },
+      [props.navigation],
+    );
+
     const handleSessionPress = React.useCallback(
       async (sessionId: string) => {
         try {
           chatSessionStore.setSearchReturnAvailable(false);
           await chatSessionStore.setActiveSession(sessionId);
-          props.navigation.navigate(ROUTES.CHAT);
+          navigateTo(ROUTES.CHAT);
         } catch (error) {
           console.error('Failed to open chat session:', error);
           Alert.alert(
@@ -355,7 +366,7 @@ export const SidebarContent: React.FC<DrawerContentComponentProps> = observer(
           );
         }
       },
-      [l10n, props.navigation],
+      [l10n, navigateTo],
     );
 
     const handleSessionLongPress = React.useCallback(
@@ -552,7 +563,7 @@ export const SidebarContent: React.FC<DrawerContentComponentProps> = observer(
               icon={() => <ChatIcon stroke={theme.colors.primary} />}
               onPress={() => {
                 chatSessionStore.setSearchReturnAvailable(false);
-                props.navigation.navigate(ROUTES.CHAT);
+                navigateTo(ROUTES.CHAT);
               }}
               style={styles.menuDrawerItem}
               testID="drawer-item-chat"
@@ -560,7 +571,7 @@ export const SidebarContent: React.FC<DrawerContentComponentProps> = observer(
             <Drawer.Item
               label={l10n.components.sidebarContent.menuItems.searchChats}
               icon={() => <SearchIcon stroke={theme.colors.primary} />}
-              onPress={() => props.navigation.navigate(ROUTES.SEARCH_CHATS)}
+              onPress={() => navigateTo(ROUTES.SEARCH_CHATS)}
               style={styles.menuDrawerItem}
               testID="drawer-item-search-chats"
             />
@@ -576,14 +587,14 @@ export const SidebarContent: React.FC<DrawerContentComponentProps> = observer(
             <Drawer.Item
               label={l10n.components.sidebarContent.menuItems.models}
               icon={() => <ModelIcon stroke={theme.colors.primary} />}
-              onPress={() => props.navigation.navigate(ROUTES.MODELS)}
+              onPress={() => navigateTo(ROUTES.MODELS)}
               style={styles.menuDrawerItem}
               testID="drawer-item-models"
             />
             <Drawer.Item
               label={l10n.components.sidebarContent.menuItems.benchmark}
               icon={() => <BenchmarkIcon stroke={theme.colors.primary} />}
-              onPress={() => props.navigation.navigate(ROUTES.BENCHMARK)}
+              onPress={() => navigateTo(ROUTES.BENCHMARK)}
               style={styles.menuDrawerItem}
               testID="drawer-item-benchmark"
             />
@@ -596,9 +607,15 @@ export const SidebarContent: React.FC<DrawerContentComponentProps> = observer(
                   stroke={theme.colors.primary}
                 />
               )}
-              onPress={() => props.navigation.navigate(ROUTES.SETTINGS)}
+              onPress={() => navigateTo(ROUTES.SETTINGS)}
               style={styles.menuDrawerItem}
               testID="drawer-item-settings"
+            />
+            <PlusDrawerItem
+              onPress={() => {
+                props.navigation.closeDrawer();
+                openPlus();
+              }}
             />
             <Drawer.Item
               label={l10n.components.sidebarContent.menuItems.appInfo}
@@ -609,7 +626,7 @@ export const SidebarContent: React.FC<DrawerContentComponentProps> = observer(
                   stroke={theme.colors.primary}
                 />
               )}
-              onPress={() => props.navigation.navigate(ROUTES.APP_INFO)}
+              onPress={() => navigateTo(ROUTES.APP_INFO)}
               style={styles.menuDrawerItem}
             />
             {/* Only show Dev Tools in debug mode */}
@@ -623,7 +640,7 @@ export const SidebarContent: React.FC<DrawerContentComponentProps> = observer(
                     stroke={theme.colors.primary}
                   />
                 )}
-                onPress={() => props.navigation.navigate(ROUTES.DEV_TOOLS)}
+                onPress={() => navigateTo(ROUTES.DEV_TOOLS)}
                 style={styles.menuDrawerItem}
               />
             )}
@@ -631,7 +648,7 @@ export const SidebarContent: React.FC<DrawerContentComponentProps> = observer(
           <Divider style={styles.divider} />
         </View>
       ),
-      [l10n, theme, styles, props.navigation],
+      [l10n, theme, styles, navigateTo, props.navigation],
     );
 
     return (

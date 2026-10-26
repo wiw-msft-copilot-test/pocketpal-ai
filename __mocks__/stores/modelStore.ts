@@ -14,7 +14,13 @@ import type {Samplers} from '../../src/utils/samplerParams';
 import type {ErrorState} from '../../src/utils/errors';
 import {LlamaContext} from 'llama.rn';
 import {CompletionEngine} from '../../src/utils/completionTypes';
+import {GenerationSlot} from '../../src/store/generationLease';
 import {createDefaultContextInitParams} from '../../src/utils/contextInitParamsVersions';
+import {
+  MemoryEstimateSettings,
+  stateCacheBudgetMb,
+} from '../../src/utils/memoryEstimator';
+import type {Tier} from '../../src/services/deviceRules/types';
 import {
   draftCacheDefaults,
   effectiveDraftModeOf,
@@ -30,6 +36,7 @@ import type {StartupModelSelection} from '../../src/store/StartupSelectionStore'
 class MockModelStore {
   models = modelsList;
   contextInitParams: ContextInitParams = createDefaultContextInitParams();
+  deviceTier: Tier | null = null;
   max_threads = 4;
   MIN_CONTEXT_SIZE = 200;
   useAutoRelease = true;
@@ -45,6 +52,7 @@ class MockModelStore {
   // Memory calibration variables
   availableMemoryCeiling: number | undefined = 5 * 1e9; // 5GB ceiling
   largestSuccessfulLoad: number | undefined = 4 * 1e9; // 4GB largest successful load
+  loadedModelBytes: number | undefined = undefined;
 
   refreshDownloadStatuses: jest.Mock;
   retryDownload: jest.Mock;
@@ -102,6 +110,11 @@ class MockModelStore {
   recordReasoningObserved: jest.Mock;
   reprobeRemoteCapsAfterCompletion: jest.Mock;
   setReasoningOverride: jest.Mock;
+  acquireGeneration: jest.Mock;
+  tryAcquireGeneration: jest.Mock;
+  abortActiveGeneration: jest.Mock;
+  // A real slot, so lease ordering behaves as in the store.
+  generationSlot = new GenerationSlot();
   benchmarkActive: boolean = false;
   isContextLoading: boolean = false;
   hasPendingModelOperations: boolean = false;
@@ -161,7 +174,13 @@ class MockModelStore {
       exitBenchmarkMode: false,
       recordReasoningObserved: false,
       setReasoningOverride: false,
+      acquireGeneration: false,
+      tryAcquireGeneration: false,
+      abortActiveGeneration: false,
+      generationSlot: false,
+      isGenerationBusy: false,
       contextId: computed,
+      memoryEstimateSettings: computed,
       lastUsedModel: computed,
       activeModel: computed,
       activeModelCaps: computed,
@@ -242,6 +261,18 @@ class MockModelStore {
     this.setSpecDraftCacheTypeK = jest.fn();
     this.setSpecDraftCacheTypeV = jest.fn();
     this.enterBenchmarkMode = jest.fn().mockResolvedValue(undefined);
+    this.acquireGeneration = jest.fn(() =>
+      this.generationSlot.acquire(
+        () => Promise.resolve(),
+        () => this.engine ?? null,
+      ),
+    );
+    this.tryAcquireGeneration = jest.fn(() =>
+      this.generationSlot.tryAcquire(() => this.engine ?? null),
+    );
+    this.abortActiveGeneration = jest.fn(() => {
+      this.generationSlot.abortActive();
+    });
     this.exitBenchmarkMode = jest.fn();
     this.recordReasoningObserved = jest.fn();
     // Mirror the real writer so tests exercise the live override → resolver →
@@ -269,9 +300,21 @@ class MockModelStore {
     this.isStreaming = value;
   };
 
-  // Safe context release methods
-  registerCompletionPromise = jest.fn();
-  clearCompletionPromise = jest.fn();
+  get isGenerationBusy(): boolean {
+    return this.generationSlot.isBusy;
+  }
+
+  /** A lease a test left held must not make a later test's send wait. */
+  resetGenerationSlot = () => {
+    this.generationSlot = new GenerationSlot();
+  };
+
+  get memoryEstimateSettings(): MemoryEstimateSettings {
+    return {
+      ...this.contextInitParams,
+      state_cache_budget_mb: stateCacheBudgetMb(this.deviceTier),
+    };
+  }
 
   get contextId(): string | undefined {
     if (this.context) {

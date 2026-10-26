@@ -50,6 +50,11 @@ export interface ServerProfile {
   hasProps: boolean;
   /** Responses may request encrypted reasoning replay from this provider. */
   supportsEncryptedReasoning?: boolean;
+  /**
+   * The type can run llama-server router mode. Static: whether a given server
+   * is a router is decided from its models list.
+   */
+  hasRouter: boolean;
   /** Absent = `/v1/models` rows carry no caps worth reading. Pure. */
   readListRow?(row: RemoteModelInfo | undefined): ListDerivedCaps;
 }
@@ -259,39 +264,46 @@ export const SERVER_PROFILES = {
     sendNames: LLAMA_CPP_SEND_NAMES,
     reasoningExtras: llamaCppReasoningExtras,
     hasProps: true,
+    hasRouter: true,
     readListRow: readLlamaCppListRow,
   },
   'LM Studio': {
     sendNames: BASE_SEND_NAMES,
     reasoningExtras: lmStudioReasoningExtras,
     hasProps: false,
+    hasRouter: false,
   },
   Ollama: {
     sendNames: BASE_SEND_NAMES,
     reasoningExtras: ollamaReasoningExtras,
     hasProps: false,
+    hasRouter: false,
   },
   OpenAI: {
     sendNames: BASE_SEND_NAMES,
     reasoningExtras: openaiReasoningExtras,
     hasProps: false,
     supportsEncryptedReasoning: true,
+    hasRouter: false,
   },
   'GitHub Copilot': {
     sendNames: BASE_SEND_NAMES,
     reasoningExtras: openaiReasoningExtras,
     hasProps: false,
     supportsEncryptedReasoning: true,
+    hasRouter: false,
   },
   vLLM: {
     sendNames: BASE_SEND_NAMES,
     reasoningExtras: vllmReasoningExtras,
     hasProps: false,
+    hasRouter: false,
   },
   unknown: {
     sendNames: BASE_SEND_NAMES,
     reasoningExtras: noReasoningExtras,
     hasProps: false,
+    hasRouter: false,
   },
 } satisfies Record<ServerType, ServerProfile>;
 

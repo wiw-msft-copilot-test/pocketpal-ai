@@ -28,6 +28,9 @@ yarn ios
 
 Keep changes focused on one logical concern. Add or update tests when behavior
 changes. Follow Conventional Commits (`feat:`, `fix:`, `docs:`, or `chore:`).
+Run changes on at least one platform and report actual verification evidence.
+For visible UI changes in a pull request, attach screenshots or a recording.
+See `e2e/README.md` for E2E builds and specifications. Never claim an unrun check.
 
 ## Use compact phase handoffs
 

@@ -1,6 +1,7 @@
 import * as RNFS from '@dr.pogodin/react-native-fs';
 
-import {SSEParser} from './sseParser';
+import {openEventStream} from './eventStream';
+import type {SSEEvent} from './eventStream';
 import {
   CompletionResult,
   CompletionStreamData,
@@ -10,9 +11,17 @@ import {
   ToolCall,
 } from '../utils/completionTypes';
 import {RemoteModelInfo} from '../utils/types';
-import {xhrHttpError} from './xhrStream';
+import {RemoteHttpError} from '../utils/errors';
 import {applyGenerationParameterModes} from '../utils/generationParameterModes';
-import {CONNECTION_TIMEOUT_MS, IDLE_TIMEOUT_MS, resolveTimeout} from './http';
+import {
+  CONNECTION_TIMEOUT_MS,
+  IDLE_TIMEOUT_MS,
+  buildHeaders,
+  buildOpenAIUrl,
+  fetchWithTimeout,
+  resolveTimeout,
+} from './http';
+export {buildHeaders, buildOpenAIUrl, normalizeUrl} from './http';
 import {bodyExtras, readFinish} from './servers';
 import type {FinishRead, RemoteEndpoint} from './servers';
 import {pickSamplers, type Samplers} from '../utils/samplerParams';
@@ -191,66 +200,19 @@ function isValidChatChunk(parsed: any): boolean {
   return choice.delta !== undefined || choice.finish_reason !== undefined;
 }
 
-/**
- * Build headers for OpenAI-compatible API requests.
- */
-const GITHUB_COPILOT_SERVER_TYPE = 'GitHub Copilot';
-
-// Derived from the published Copilot CLI 1.0.83 Linux distribution, with the
-// deliberately requested "-test" suffix applied to each complete value.
-const GITHUB_COPILOT_HEADERS = {
-  'Copilot-Integration-Id': 'copilot-developer-cli-test',
-  'User-Agent': 'copilot/1.0.83 (linux v24.20.0) term/unknown-test',
-  'Editor-Version': 'copilot/1.0.83-test',
-} as const;
-
-export function buildHeaders(
-  apiKey?: string,
-  serverType?: string,
-): Record<string, string> {
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-  };
-  if (apiKey) {
-    headers.Authorization = `Bearer ${apiKey}`;
-  }
-  if (serverType === GITHUB_COPILOT_SERVER_TYPE) {
-    Object.assign(headers, GITHUB_COPILOT_HEADERS);
-  }
-  return headers;
-}
-
-/**
- * Normalize server URL: remove trailing slash.
- */
-export function normalizeUrl(serverUrl: string): string {
-  const parsed = new URL(serverUrl);
-  const isLocal =
-    parsed.hostname === 'localhost' ||
-    parsed.hostname === '::1' ||
-    parsed.hostname.startsWith('127.') ||
-    parsed.hostname.startsWith('10.') ||
-    parsed.hostname.startsWith('192.168.') ||
-    /^172\.(1[6-9]|2\d|3[01])\./.test(parsed.hostname);
-  if ((!isLocal && parsed.protocol !== 'https:') || !parsed.hostname) {
-    throw new Error('Remote AI servers must use HTTPS.');
-  }
-  return serverUrl.replace(/\/+$/, '');
-}
-
-export function buildOpenAIUrl(
-  serverUrl: string,
-  endpoint: 'models' | 'chat/completions' | 'responses',
-  serverType?: string,
-): string {
-  const prefix = serverType === GITHUB_COPILOT_SERVER_TYPE ? '' : '/v1';
-  return `${normalizeUrl(serverUrl)}${prefix}/${endpoint}`;
-}
+const isObject = (value: unknown): value is object =>
+  typeof value === 'object' && value !== null;
 
 /** Result from fetchModelsWithHeaders: models + raw response headers. */
 export interface FetchModelsResult {
   models: RemoteModelInfo[];
   headers: Record<string, string>;
+  /**
+   * Present when the body carried a top-level `models` key: a single-model
+   * llama.cpp server emits one, a router does not. A property of the response
+   * rather than of a row, so it still answers when `data` is empty.
+   */
+  hasModelsKey?: true;
 }
 
 /**
@@ -289,49 +251,32 @@ export async function fetchModelsWithHeaders(
   serverType?: string,
 ): Promise<FetchModelsResult> {
   const url = buildOpenAIUrl(serverUrl, 'models', serverType);
-  const controller = new AbortController();
-  const timeout = setTimeout(
-    () => controller.abort(),
-    resolveTimeout(timeoutMs, CONNECTION_TIMEOUT_MS),
+  const response = await fetchWithTimeout(
+    url,
+    {method: 'GET', headers: buildHeaders(apiKey, serverType)},
+    {timeoutMs: resolveTimeout(timeoutMs, CONNECTION_TIMEOUT_MS)},
   );
-
-  try {
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: buildHeaders(apiKey, serverType),
-      signal: controller.signal,
-    });
-
-    if (!response.ok) {
-      if (response.status === 401) {
-        throw new Error('Unauthorized: Invalid or missing API key');
-      }
-      throw new Error(
-        `Server error: ${response.status} ${response.statusText}`,
-      );
+  if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error('Unauthorized: Invalid or missing API key');
     }
-
-    const responseHeaders: Record<string, string> = {};
-    response.headers.forEach((value: string, key: string) => {
-      responseHeaders[key] = value;
-    });
-
-    const data = await response.json();
-    return {
-      models: liftModelEntryCapabilities(
-        (data.data || []) as RemoteModelInfo[],
-        data.models,
-      ),
-      headers: responseHeaders,
-    };
-  } catch (error: any) {
-    if (error.name === 'AbortError') {
-      throw new Error('Connection timed out');
-    }
-    throw error;
-  } finally {
-    clearTimeout(timeout);
+    throw new Error(`Server error: ${response.status} ${response.statusText}`);
   }
+
+  const responseHeaders: Record<string, string> = {};
+  response.headers.forEach((value: string, key: string) => {
+    responseHeaders[key] = value;
+  });
+
+  const data = await response.json();
+  return {
+    models: liftModelEntryCapabilities(
+      (data.data || []) as RemoteModelInfo[],
+      data.models,
+    ),
+    headers: responseHeaders,
+    ...(isObject(data) && 'models' in data && {hasModelsKey: true}),
+  };
 }
 
 /**
@@ -616,22 +561,15 @@ export async function streamChatCompletion(
   }
 
   return new Promise<CompletionResult>((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    xhr.open('POST', url);
-
-    // Set headers
-    const headers = buildHeaders(apiKey, serverType);
-    for (const [key, value] of Object.entries(headers)) {
-      xhr.setRequestHeader(key, value);
+    if (signal?.aborted) {
+      reject(new Error('Completion aborted'));
+      return;
     }
 
-    const parser = new SSEParser();
     let fullContent = '';
     let fullReasoningContent = '';
     let finishReason: string | null = null;
     let tokensPredicted = 0;
-    let lastProcessedLength = 0;
-    let settled = false;
     let serverFinish: FinishRead | undefined;
     // OpenAI streams partial tool_calls across chunks, indexed by
     // `delta.tool_calls[i].index`. Rebuild the per-call shape here so
@@ -639,52 +577,19 @@ export async function streamChatCompletion(
     // callback sees a running snapshot.
     const toolCallAcc: ToolCallAccumulator = new Map();
 
-    // Connection timeout: abort if no headers received in time
-    const connectionTimer = setTimeout(() => {
-      if (!settled) {
-        settled = true;
-        cleanup();
-        xhr.abort();
-        reject(new Error('Connection timed out'));
-      }
-    }, connectionTimeoutMs);
-
     // Idle timeout: abort if no data received between chunks
     let idleTimer: ReturnType<typeof setTimeout> | null = null;
+    const clearIdleTimer = () => {
+      if (idleTimer) {
+        clearTimeout(idleTimer);
+      }
+    };
     const resetIdleTimer = () => {
-      if (idleTimer) {
-        clearTimeout(idleTimer);
-      }
+      clearIdleTimer();
       idleTimer = setTimeout(() => {
-        if (!settled) {
-          settled = true;
-          cleanup();
-          xhr.abort();
-          reject(new Error('Idle timeout: no data received'));
-        }
+        stream.close();
+        reject(new Error('Idle timeout: no data received'));
       }, idleTimeoutMs);
-    };
-
-    // Handle external abort signal
-    const onAbort = () => {
-      xhr.abort();
-    };
-    if (signal) {
-      if (signal.aborted) {
-        reject(new Error('Completion aborted'));
-        return;
-      }
-      signal.addEventListener('abort', onAbort, {once: true});
-    }
-
-    const cleanup = () => {
-      clearTimeout(connectionTimer);
-      if (idleTimer) {
-        clearTimeout(idleTimer);
-      }
-      if (signal) {
-        signal.removeEventListener('abort', onAbort);
-      }
     };
 
     /**
@@ -724,12 +629,8 @@ export async function streamChatCompletion(
       return {content, reasoningContent, toolCallsDelta};
     };
 
-    /**
-     * Process new SSE data from the response.
-     * Called from onprogress with the new text chunk.
-     */
-    const processChunk = (chunk: string) => {
-      for (const event of parser.feed(chunk)) {
+    const processEvents = (events: Iterable<SSEEvent>) => {
+      for (const event of events) {
         if (event === 'done') {
           return;
         }
@@ -763,70 +664,12 @@ export async function streamChatCompletion(
       }
     };
 
-    xhr.onreadystatechange = () => {
-      if (xhr.readyState === XMLHttpRequest.HEADERS_RECEIVED) {
-        // Headers received — clear connection timeout
-        clearTimeout(connectionTimer);
+    const onLoad = (flushed: Iterable<SSEEvent>) => {
+      clearIdleTimer();
 
-        if (xhr.status !== 200) {
-          // Don't reject yet — wait for onload to read the error body
-          clearTimeout(connectionTimer);
-        } else {
-          resetIdleTimer();
-        }
-      }
-
-      // When the full response is available for non-200 status, read the error body
-      if (
-        xhr.readyState === XMLHttpRequest.DONE &&
-        xhr.status !== 200 &&
-        xhr.status !== 0
-      ) {
-        if (settled) {
-          return;
-        }
-        settled = true;
-        cleanup();
-
-        reject(xhrHttpError(xhr.status, xhr.responseText));
-        xhr.abort();
-      }
-    };
-
-    xhr.onprogress = () => {
-      // After `xhr.abort()` the OS may still deliver bytes already
-      // queued in the receive buffer via further onprogress firings.
-      // Drop them — but consume the offset so onload (if it ever
-      // fires) doesn't double-process them.
-      if (signal?.aborted) {
-        lastProcessedLength = xhr.responseText.length;
-        return;
-      }
-      // Extract only the new data since last onprogress
-      const newText = xhr.responseText.substring(lastProcessedLength);
-      lastProcessedLength = xhr.responseText.length;
-
-      if (newText) {
-        processChunk(newText);
-      }
-    };
-
-    xhr.onload = () => {
-      if (settled) {
-        return;
-      }
-      settled = true;
-      cleanup();
-
-      // Process any remaining data not yet seen in onprogress
-      const remaining = xhr.responseText.substring(lastProcessedLength);
-      if (remaining) {
-        processChunk(remaining);
-      }
-
-      // Flush the SSE parser buffer: a server that closes the stream on a
-      // final frame with no trailing blank line leaves it here.
-      for (const event of parser.flush()) {
+      // A server that closes the stream on a final frame with no trailing
+      // blank line leaves it in the parser buffer.
+      for (const event of flushed) {
         if (event === 'done') {
           break;
         }
@@ -840,7 +683,6 @@ export async function streamChatCompletion(
       // observed during the stream.
       const finalToolCalls = assembleFinalToolCalls(toolCallAcc);
 
-      // Build result
       if (signal?.aborted) {
         resolve({
           text: fullContent,
@@ -886,39 +728,30 @@ export async function streamChatCompletion(
       resolve(result);
     };
 
-    xhr.onerror = () => {
-      if (settled) {
-        return;
-      }
-      settled = true;
-      cleanup();
+    const onHttpError = (status: number, responseText: string) => {
+      clearIdleTimer();
 
-      if (signal?.aborted) {
-        reject(new Error('Completion aborted'));
+      let errorMessage = `Server error: ${status}`;
+      let serverMessage: string | undefined;
+      try {
+        const errorBody = JSON.parse(responseText);
+        const detail =
+          errorBody?.error?.message || errorBody?.error || responseText;
+        if (typeof errorBody?.error?.message === 'string') {
+          serverMessage = errorBody.error.message;
+        }
+        errorMessage = `Server error: ${status} — ${detail}`;
+      } catch {
+        if (responseText) {
+          errorMessage = `Server error: ${status} — ${responseText.substring(0, 200)}`;
+        }
+      }
+
+      if (status === 401) {
+        reject(new Error('Unauthorized: Invalid or missing API key'));
       } else {
-        reject(new Error('Network error'));
+        reject(new RemoteHttpError(errorMessage, status, serverMessage));
       }
-    };
-
-    xhr.onabort = () => {
-      if (settled) {
-        return;
-      }
-      settled = true;
-      cleanup();
-
-      if (signal?.aborted) {
-        // Externally aborted — resolve with partial content
-        resolve({
-          text: fullContent,
-          content: fullContent,
-          reasoning_content: fullReasoningContent || undefined,
-          tokens_predicted: tokensPredicted,
-          interrupted: true,
-        });
-      }
-      // If not externally aborted, the reject was already called
-      // by the timeout handler that triggered xhr.abort()
     };
 
     const samplers =
@@ -980,6 +813,44 @@ export async function streamChatCompletion(
         : {}),
       ...transportBody,
     };
-    xhr.send(JSON.stringify(requestBody));
+
+    const stream = openEventStream(
+      url,
+      {
+        method: 'POST',
+        headers: buildHeaders(apiKey, serverType),
+        body: JSON.stringify(requestBody),
+        connectTimeoutMs: connectionTimeoutMs,
+        signal,
+      },
+      {
+        onOpen: resetIdleTimer,
+        onEvents: processEvents,
+        onLoad,
+        onHttpError,
+        onNetworkError: () => {
+          clearIdleTimer();
+          reject(
+            new Error(signal?.aborted ? 'Completion aborted' : 'Network error'),
+          );
+        },
+        onConnectTimeout: () => {
+          clearIdleTimer();
+          reject(new Error('Connection timed out'));
+        },
+        onAbort: () => {
+          clearIdleTimer();
+          if (signal?.aborted) {
+            resolve({
+              text: fullContent,
+              content: fullContent,
+              reasoning_content: fullReasoningContent || undefined,
+              tokens_predicted: tokensPredicted,
+              interrupted: true,
+            });
+          }
+        },
+      },
+    );
   });
 }

@@ -6,9 +6,11 @@ import {
   SystemPromptContext,
 } from './types';
 import type {SearchAccess} from './searchAccess';
+import {SEARCH_NOT_SET_UP_MESSAGE} from './searchAccess';
 import type {SearchHit} from '../search/types';
 import {
   budgetHits,
+  cacheKey,
   getCachedHits,
   prepareFullHits,
   setCachedHits,
@@ -17,6 +19,14 @@ import {wrapUntrusted} from './untrustedContent';
 import {allowReadUrls} from './readUrlAllowlist';
 
 const PER_SNIPPET_CHARS = 280;
+
+const inFlight = new Map<
+  string,
+  {
+    signal?: AbortSignal;
+    request: Promise<SearchHit[]>;
+  }
+>();
 
 const formatHit = (hit: SearchHit): string => {
   const date = hit.publishedAt ? ` *(${hit.publishedAt})*` : '';
@@ -61,11 +71,10 @@ export class WebSearchEngine implements TalentEngine {
     }
 
     if (!this.access.canSearch()) {
-      const provider = this.access.getActiveProvider();
       return {
         type: 'error',
-        summary: `web_search: ${provider.id} not enabled`,
-        errorMessage: `Internet search is not enabled. Accept the disclosure and set an API key for ${provider.id} in Settings → Internet Search.`,
+        summary: `web_search: ${SEARCH_NOT_SET_UP_MESSAGE}`,
+        errorMessage: SEARCH_NOT_SET_UP_MESSAGE,
       };
     }
 
@@ -79,7 +88,24 @@ export class WebSearchEngine implements TalentEngine {
       if (cached) {
         preparedHits = cached;
       } else {
-        const hits = await provider.search(query, {maxResults}, ctx?.signal);
+        const key = cacheKey(provider.id, query, maxResults, fullResults);
+        const shared = inFlight.get(key);
+        const entry =
+          shared && shared.signal === ctx?.signal
+            ? shared
+            : {
+                signal: ctx?.signal,
+                request: provider.search(query, {maxResults}, ctx?.signal),
+              };
+        inFlight.set(key, entry);
+        let hits: SearchHit[];
+        try {
+          hits = await entry.request;
+        } finally {
+          if (inFlight.get(key) === entry) {
+            inFlight.delete(key);
+          }
+        }
         preparedHits = fullResults
           ? prepareFullHits(hits, maxResults)
           : budgetHits(

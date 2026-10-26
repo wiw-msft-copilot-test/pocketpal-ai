@@ -24,17 +24,26 @@ function toFileName(title: string): string {
 /** Capture a screenshot for a failed test. Never throws. */
 export async function saveFailureScreenshot(title: string): Promise<void> {
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const basename = `failure-${toFileName(title)}-${timestamp}`;
   try {
     if (!fs.existsSync(SCREENSHOT_DIR)) {
       fs.mkdirSync(SCREENSHOT_DIR, {recursive: true});
     }
-    await driver.saveScreenshot(
-      path.join(
-        SCREENSHOT_DIR,
-        `failure-${toFileName(title)}-${timestamp}.png`,
-      ),
-    );
+    await driver.saveScreenshot(path.join(SCREENSHOT_DIR, `${basename}.png`));
   } catch (e) {
     console.error('Failed to capture screenshot:', (e as Error).message);
+  }
+  try {
+    fs.mkdirSync(SCREENSHOT_DIR, {recursive: true});
+    fs.writeFileSync(
+      path.join(SCREENSHOT_DIR, `${basename}.xml`),
+      await driver.getPageSource(),
+      'utf8',
+    );
+  } catch (e) {
+    console.error(
+      'Failed to capture accessibility tree:',
+      (e as Error).message,
+    );
   }
 }

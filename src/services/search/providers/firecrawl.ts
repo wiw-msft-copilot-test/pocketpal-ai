@@ -13,6 +13,7 @@ interface FirecrawlWebResult {
 }
 
 interface FirecrawlSearchResponse {
+  success?: boolean;
   data?: {web?: FirecrawlWebResult[]} | null;
 }
 
@@ -36,12 +37,15 @@ export class FirecrawlProvider implements SearchProvider {
     opts: SearchOptions,
     signal?: AbortSignal,
   ): Promise<SearchHit[]> {
-    const data = await this.post<FirecrawlSearchResponse>(
+    const res = await this.post<FirecrawlSearchResponse | null>(
       '/search',
       {query, limit: opts.maxResults},
-      signal,
+      {retryOn429: true, signal},
     );
-    return (data.data?.web ?? []).map(r => ({
+    if (res?.success !== true || !res.data) {
+      throw new Error('unexpected response');
+    }
+    return (res.data.web ?? []).map(r => ({
       title: r.title ?? '',
       url: r.url ?? '',
       snippet: r.description ?? '',
@@ -57,7 +61,7 @@ export class FirecrawlProvider implements SearchProvider {
         onlyMainContent: true,
         timeout: SCRAPE_SERVER_TIMEOUT_MS,
       },
-      signal,
+      {signal},
     );
     if (res.success !== true || !res.data) {
       throw new Error('scrape failed');
@@ -76,17 +80,21 @@ export class FirecrawlProvider implements SearchProvider {
   private post<T>(
     path: string,
     body: Record<string, unknown>,
-    signal?: AbortSignal,
+    {retryOn429, signal}: {retryOn429?: boolean; signal?: AbortSignal} = {},
   ): Promise<T> {
     const key = requireKey(this.getKey(), 'Firecrawl');
-    return fetchJson<T>(`https://api.firecrawl.dev/v2${path}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${key}`,
+    return fetchJson<T>(
+      `https://api.firecrawl.dev/v2${path}`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${key}`,
+        },
+        body: JSON.stringify({...body, origin: 'pocketpal'}),
+        signal,
       },
-      body: JSON.stringify({...body, origin: 'pocketpal'}),
-      signal,
-    });
+      {retryOn429},
+    );
   }
 }

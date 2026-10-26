@@ -16,6 +16,7 @@ describe('BraveProvider', () => {
   it('normalizes web.results to SearchHit[] using description', async () => {
     (global.fetch as jest.Mock).mockReturnValue(
       okJson({
+        type: 'search',
         web: {
           results: [
             {
@@ -41,11 +42,46 @@ describe('BraveProvider', () => {
   });
 
   it('sends the key as the X-Subscription-Token header', async () => {
-    (global.fetch as jest.Mock).mockReturnValue(okJson({web: {results: []}}));
+    (global.fetch as jest.Mock).mockReturnValue(
+      okJson({type: 'search', web: {results: []}}),
+    );
     const provider = new BraveProvider(() => 'secret');
     await provider.search('q', {maxResults: 3});
     const [, init] = (global.fetch as jest.Mock).mock.calls[0];
     expect(init.headers['X-Subscription-Token']).toBe('secret');
+  });
+
+  it('retries a 429 once the shortest rate-limit window resets', async () => {
+    jest.useFakeTimers();
+    try {
+      (global.fetch as jest.Mock)
+        .mockResolvedValueOnce({
+          ok: false,
+          status: 429,
+          headers: {
+            get: (name: string) =>
+              name.toLowerCase() === 'x-ratelimit-reset' ? '1, 1419704' : null,
+          },
+        })
+        .mockReturnValueOnce(
+          okJson({
+            type: 'search',
+            web: {results: [{title: 'Result', url: 'https://example.com/a'}]},
+          }),
+        );
+
+      const search = new BraveProvider(() => 'key').search('q', {
+        maxResults: 5,
+      });
+      await jest.advanceTimersByTimeAsync(999);
+      expect(global.fetch).toHaveBeenCalledTimes(1);
+      await jest.advanceTimersByTimeAsync(1);
+
+      expect(global.fetch).toHaveBeenCalledTimes(2);
+      await expect(search).resolves.toHaveLength(1);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it('has no native read (falls back to default reader)', () => {
@@ -53,9 +89,23 @@ describe('BraveProvider', () => {
     expect(provider.read).toBeUndefined();
   });
 
-  it('returns [] for an empty or missing-field body without throwing', async () => {
+  it('throws when the body is not a search envelope', async () => {
     const provider = new BraveProvider(() => 'key');
-    for (const body of [{}, {web: {}}, {web: {results: null}}]) {
+    for (const body of [null, {}, {web: {results: []}}]) {
+      (global.fetch as jest.Mock).mockReturnValue(okJson(body));
+      await expect(provider.search('q', {maxResults: 3})).rejects.toThrow(
+        /^unexpected response$/,
+      );
+    }
+  });
+
+  it('returns [] for a search envelope with no web hits', async () => {
+    const provider = new BraveProvider(() => 'key');
+    for (const body of [
+      {type: 'search'},
+      {type: 'search', web: {}},
+      {type: 'search', web: {results: []}},
+    ]) {
       (global.fetch as jest.Mock).mockReturnValue(okJson(body));
       await expect(provider.search('q', {maxResults: 3})).resolves.toEqual([]);
     }

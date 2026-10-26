@@ -28,6 +28,12 @@ export const byTestId = (testId: string): string => {
   return `~${testId}`;
 };
 
+// Paper adds label IDs with the input's prefix; only the editor accepts text.
+export const byInputTestId = (testId: string): string =>
+  isAndroid()
+    ? `//android.widget.EditText[contains(@resource-id, "${testId}")]`
+    : byTestId(testId);
+
 /**
  * Create selector by text content (fallback for elements without testID)
  */
@@ -186,6 +192,9 @@ export const Selectors = {
     },
     get stopButton(): string {
       return byExactTestId('stop-button');
+    },
+    get voiceModeButton(): string {
+      return byExactTestId('voice-mode-button');
     },
     get attachmentButton(): string {
       return byTestId('attachment-button');
@@ -717,16 +726,16 @@ export const Selectors = {
   // Remote model sheet (add model from server)
   remoteModel: {
     get urlInput(): string {
-      return byTestId('remote-url-input');
+      return byInputTestId('remote-url-input');
     },
     get nameInput(): string {
-      return byTestId('remote-name-input');
+      return byInputTestId('remote-name-input');
     },
     get apiKeyInput(): string {
-      return byTestId('remote-apikey-input');
+      return byInputTestId('remote-apikey-input');
     },
     get timeoutInput(): string {
-      return byTestId('remote-timeout-input');
+      return byInputTestId('remote-timeout-input');
     },
     get addModelButton(): string {
       return byTestId('add-model-button');
@@ -745,13 +754,13 @@ export const Selectors = {
   // Server details sheet (edit/delete server)
   serverDetails: {
     get urlInput(): string {
-      return byTestId('server-details-url-input');
+      return byInputTestId('server-details-url-input');
     },
     get apiKeyInput(): string {
-      return byTestId('server-details-apikey-input');
+      return byInputTestId('server-details-apikey-input');
     },
     get timeoutInput(): string {
-      return byTestId('server-details-timeout-input');
+      return byInputTestId('server-details-timeout-input');
     },
     get removeButton(): string {
       return byTestId('remove-server-button');

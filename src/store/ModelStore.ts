@@ -5,7 +5,7 @@ import {v4 as uuidv4} from 'uuid';
 import 'react-native-get-random-values';
 import {makePersistable} from 'mobx-persist-store';
 import * as RNFS from '@dr.pogodin/react-native-fs';
-import {computed, makeAutoObservable, runInAction, toJS} from 'mobx';
+import {comparer, computed, makeAutoObservable, runInAction, toJS} from 'mobx';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {ContextParams, LlamaContext, initLlama} from 'llama.rn';
 import {
@@ -27,7 +27,9 @@ import {
 
 import {uiStore, hfStore} from '.';
 import {serverStore} from './ServerStore';
+import {routerStore} from './RouterStore';
 import {chatSessionStore} from './ChatSessionStore';
+import {GenerationSlot, type GenerationLease} from './generationLease';
 import {
   createStartupModelSelection,
   startupSelectionStore,
@@ -54,6 +56,7 @@ import {
 import {getRecommendedProjectionModel} from '../utils/multimodalHelpers';
 import {isDraftOnlyModel} from '../utils/mtp';
 import {getOriginalModelName} from '../utils/formatters';
+import {stopQuietly} from '../utils/stopQuietly';
 import type {OnboardingPalModelEntry} from './onboarding/onboardingPals';
 
 import {downloadManager, DownloadCancelledError} from '../services/downloads';
@@ -112,12 +115,17 @@ import {resolveModelCaps} from '../utils/modelCaps';
 import type {CapabilityEnv, ModelCapabilityView} from '../utils/modelCaps';
 import {t} from '../locales';
 import {resolveUseMmap} from '../utils/memorySettings';
+import {vtrace} from '../utils/voiceTrace';
 import {
   createContextInitParams,
   createDefaultContextInitParams,
 } from '../utils/contextInitParamsVersions';
 import NativeHardwareInfo from '../specs/NativeHardwareInfo';
-import {getModelMemoryRequirement} from '../utils/memoryEstimator';
+import {
+  getModelMemoryRequirement,
+  MemoryEstimateSettings,
+  stateCacheBudgetMb,
+} from '../utils/memoryEstimator';
 import {loadLlamaModelInfo} from 'llama.rn';
 
 /**
@@ -202,7 +210,7 @@ class ModelStore {
     return [...filterProjectionModels(this.models), ...this.remoteModels];
   }
 
-  appState: AppStateStatus = AppState.currentState;
+  appState: AppStateStatus = AppState.currentState as AppStateStatus;
   useAutoRelease: boolean = true;
   // UI loading state - true during model load/release transitions
   isContextLoading: boolean = false;
@@ -258,9 +266,10 @@ class ModelStore {
   inferencing: boolean = false;
   isStreaming: boolean = false;
 
-  // Track active completion promise for safe context release
-  // This prevents race condition where context is freed while completion is still running
-  private activeCompletionPromise: Promise<any> | null = null;
+  // The in-flight chat run or VideoPal completion; release aborts it and
+  // waits for it to end before freeing the context.
+  private generationSlot = new GenerationSlot();
+  private isReleasingContext = false;
 
   // Mutex to serialize model load/release operations to prevent memory leaks
   private contextOperationMutex: Promise<void> = Promise.resolve();
@@ -290,18 +299,27 @@ class ModelStore {
   availableMemoryCeiling: number | undefined = undefined;
   // Updated after successful model load using GGUF estimator
   largestSuccessfulLoad: number | undefined = undefined;
+  // Estimated memory of the loaded local context; undefined when none.
+  loadedModelBytes: number | undefined = undefined;
   // Projection models orphaned by the vision heal, awaiting deletion; drained
   // every launch (see drainPendingProjectionCleanup).
   pendingProjectionCleanupIds: string[] = [];
   initializationComplete: boolean = false;
 
   constructor() {
-    makeAutoObservable<ModelStore, 'postCompletionProbeFor'>(this, {
+    makeAutoObservable<
+      ModelStore,
+      'postCompletionProbeFor' | 'generationSlot' | 'isReleasingContext'
+    >(this, {
       postCompletionProbeFor: false,
+      generationSlot: false,
+      isReleasingContext: false,
+      isGenerationBusy: false,
       activeModel: computed,
-      activeModelCaps: computed,
+      activeModelCaps: computed({equals: comparer.structural}),
       activeSamplerDefaults: computed,
       contextId: computed,
+      memoryEstimateSettings: computed,
       remoteModels: computed,
       activeDownloads: computed,
     });
@@ -644,6 +662,7 @@ class ModelStore {
       use_mlock: this.contextInitParams.use_mlock,
       use_mmap: effectiveUseMmap,
       no_extra_bufts: this.contextInitParams.no_extra_bufts,
+      state_cache_budget_mb: stateCacheBudgetMb(this.deviceTier),
     };
 
     if (speculative) {
@@ -1193,28 +1212,37 @@ class ModelStore {
       const model = this.models.find(
         m => m.id === this.lastAutoReleasedModelId && m.isDownloaded,
       );
+      this.clearAutoReleaseFlags();
       if (model) {
+        this.pendingModelId = model.id;
+        await this.contextOperationMutex;
+        if (this.pendingModelId !== model.id || this.wasAutoReleased) {
+          return;
+        }
         console.log('Reloading auto-released model:', model.id);
         await this.initContext(model);
       }
-      this.clearAutoReleaseFlags();
     }
   };
 
   handleAppStateChange = async (nextAppState: AppStateStatus) => {
-    console.log(`App state change: ${this.appState} → ${nextAppState}`);
+    const prevAppState = this.appState;
+    runInAction(() => {
+      this.appState = nextAppState;
+    });
+    console.log(`App state change: ${prevAppState} → ${nextAppState}`);
 
     if (
-      this.appState.match(/inactive|background/) &&
+      prevAppState.match(/inactive|background/) &&
       nextAppState === 'active'
     ) {
       // Coming to foreground - check if we need to reload auto-released model
       await this.checkAndReloadAutoReleasedModel();
       this.probeSessionCapsIfUnanswered();
-    } else if (this.appState === 'active' && nextAppState === 'inactive') {
+    } else if (prevAppState === 'active' && nextAppState === 'inactive') {
       // active → inactive: NO action (per requirements)
       console.log('Active → Inactive: No auto-release action');
-    } else if (this.appState === 'inactive' && nextAppState === 'background') {
+    } else if (prevAppState === 'inactive' && nextAppState === 'background') {
       // inactive → background: release if enabled
       // Skip for remote models — no native context to release, and
       // releaseContext() would clear the engine with no reload path.
@@ -1227,7 +1255,7 @@ class ModelStore {
         this.markAutoReleased(this.activeModelId);
         await this.releaseContext();
       }
-    } else if (this.appState === 'active' && nextAppState === 'background') {
+    } else if (prevAppState === 'active' && nextAppState === 'background') {
       // active → background: release if enabled (direct transition)
       // Skip for remote models — same reason as above.
       if (
@@ -1240,10 +1268,6 @@ class ModelStore {
         await this.releaseContext();
       }
     }
-
-    runInAction(() => {
-      this.appState = nextAppState;
-    });
   };
 
   /**
@@ -2442,12 +2466,26 @@ class ModelStore {
         this.pendingModelId = null;
       });
 
+      try {
+        const loadedBytes = getModelMemoryRequirement(
+          model,
+          projectionModel,
+          this.memoryEstimateSettings,
+          pairedDraftModel(draftConfig),
+        );
+        runInAction(() => {
+          this.loadedModelBytes = loadedBytes;
+        });
+      } catch (error) {
+        console.warn('[ModelStore] Failed to estimate loaded model:', error);
+      }
+
       // Update largestSuccessfulLoad using GGUF estimator
       try {
         const estimated = getModelMemoryRequirement(
           model,
           projectionModel,
-          contextInitParams,
+          {...contextInitParams, state_cache_budget_mb: 0},
           pairedDraftModel(draftConfig),
         );
         runInAction(() => {
@@ -2494,6 +2532,21 @@ class ModelStore {
   ) => {
     console.log('attempt to release');
     chatSessionStore.exitEditMode();
+    this.isReleasingContext = true;
+    try {
+      vtrace('abortActive', {
+        by: 'release',
+        clearActiveModel,
+        app: this.appState,
+      });
+      await this.generationSlot.abortActive();
+      return await this.releaseEngine(clearActiveModel);
+    } finally {
+      this.isReleasingContext = false;
+    }
+  };
+
+  private releaseEngine = async (clearActiveModel: boolean) => {
     if (!this.context) {
       // For remote models or deletion scenarios, clear engine and state
       if (this.engine || clearActiveModel) {
@@ -2522,45 +2575,6 @@ class ModelStore {
     }
 
     try {
-      // IMPORTANT: Stop-Await-Release Pattern
-      // This prevents race condition where completion callback fires after context is freed
-      // which causes SIGSEGV in isMultimodalEnabled/createCompletionResult
-      if (
-        this.inferencing ||
-        this.isStreaming ||
-        this.activeCompletionPromise
-      ) {
-        console.log('Stopping active completion before context release');
-
-        // Step 1: Signal the completion to stop
-        try {
-          await this.context.stopCompletion();
-        } catch (stopError) {
-          console.warn('Error stopping completion:', stopError);
-          // Continue with release even if stop fails
-        }
-
-        // Step 2: Wait for the completion promise to actually finish
-        // This is critical - stopCompletion() only signals, it doesn't wait
-        if (this.activeCompletionPromise) {
-          console.log('Waiting for completion promise to finish...');
-          try {
-            // Wait for promise to settle (ignore errors, just wait for it to complete)
-            await this.activeCompletionPromise.catch(() => {});
-          } catch {
-            // Ignore any errors, we just need to wait
-          }
-          this.activeCompletionPromise = null;
-        }
-
-        // Clear inference flags
-        runInAction(() => {
-          this.inferencing = false;
-          this.isStreaming = false;
-        });
-      }
-
-      // Step 3: Now safe to release - First check if multimodal is enabled and release it if needed
       if (this.isMultimodalActive) {
         console.log('Releasing multimodal context first');
         try {
@@ -2592,6 +2606,7 @@ class ModelStore {
         this.engine = undefined;
         this.activeRemoteBinding = undefined;
         this.activeContextSettings = undefined;
+        this.loadedModelBytes = undefined;
         // Ensure multimodal state is cleared even if something went wrong above
         this.isMultimodalActive = false;
         this.activeProjectionModelId = undefined;
@@ -2644,6 +2659,7 @@ class ModelStore {
   };
 
   manualReleaseContext = async () => {
+    this.pendingModelId = null;
     await this.releaseContext(true); // Clear active model for manual release
   };
 
@@ -2707,6 +2723,13 @@ class ModelStore {
     return model?.origin === ModelOrigin.REMOTE || model?.isDownloaded
       ? model
       : undefined;
+  }
+
+  get memoryEstimateSettings(): MemoryEstimateSettings {
+    return {
+      ...this.contextInitParams,
+      state_cache_budget_mb: stateCacheBudgetMb(this.deviceTier),
+    };
   }
 
   /**
@@ -2821,7 +2844,22 @@ class ModelStore {
 
       // Release only after validation, so a rejected catalog-only model does not
       // tear down the currently active session.
+      this.pendingModelId = model.id;
       await this.releaseContext();
+
+      const releasedServer = serverStore.servers.find(
+        candidate => candidate.id === model.serverId,
+      );
+      if (
+        !releasedServer ||
+        releasedServer.url !== bindingSnapshot.url ||
+        toServerType(releasedServer.serverType) !==
+          bindingSnapshot.serverType ||
+        (releasedServer.credentialRevision ?? 0) !==
+          bindingSnapshot.credentialRevision
+      ) {
+        throw new Error('Server configuration changed while selecting model');
+      }
 
       const activeBinding = {
         modelId: model.id,
@@ -2845,6 +2883,12 @@ class ModelStore {
             serverType: bindingSnapshot.serverType,
           },
           activeBinding,
+          profileFor(activeBinding.serverType).hasRouter
+            ? {
+                ensureReady: (signal, options) =>
+                  routerStore.ensureReady(activeBinding, signal, options),
+              }
+            : {},
         );
         this.activeRemoteBinding = activeBinding;
         this.setActiveModel(model.id);
@@ -2858,6 +2902,13 @@ class ModelStore {
       serverStore
         .fetchRemoteModelCaps(model.serverId, model.remoteModelId, apiKey)
         .catch(() => {});
+      if (profileFor(activeBinding.serverType).hasRouter) {
+        routerStore
+          .ensureLoaded(model.serverId, model.remoteModelId)
+          .catch(error =>
+            console.warn('Remote router model activation failed:', error),
+          );
+      }
     } finally {
       runInAction(() => {
         this.endModelOperation();
@@ -3554,21 +3605,30 @@ class ModelStore {
   }
 
   /**
-   * Register an active completion promise for safe context release.
-   * This should be called when starting a completion operation.
-   * @param promise The completion promise to track
+   * Waits for every earlier generation to end and for any context operation
+   * queued by then (a model switch) to finish, then grants a lease on the
+   * current engine; null when no model is ready.
    */
-  registerCompletionPromise(promise: Promise<any>) {
-    this.activeCompletionPromise = promise;
+  acquireGeneration = (): Promise<GenerationLease | null> =>
+    this.generationSlot.acquire(
+      () => this.contextOperationMutex,
+      this.grantableEngine,
+    );
+
+  tryAcquireGeneration = (): GenerationLease | null =>
+    this.generationSlot.tryAcquire(this.grantableEngine);
+
+  abortActiveGeneration = (): void => {
+    vtrace('abortActive', {by: 'abortActiveGeneration'});
+    this.generationSlot.abortActive();
+  };
+
+  get isGenerationBusy(): boolean {
+    return this.generationSlot.isBusy;
   }
 
-  /**
-   * Clear the active completion promise.
-   * This should be called when the completion finishes (success or error).
-   */
-  clearCompletionPromise() {
-    this.activeCompletionPromise = null;
-  }
+  private grantableEngine = (): CompletionEngine | null =>
+    this.isReleasingContext ? null : (this.engine ?? null);
 
   /**
    * Get compatible projection models for a given LLM
@@ -3938,6 +3998,13 @@ class ModelStore {
       throw new Error('Multimodal is not enabled for this model');
     }
 
+    const lease = this.tryAcquireGeneration();
+    if (!lease) {
+      return;
+    }
+    const context = this.context;
+    const onAbort = () => stopQuietly(() => context.stopCompletion());
+
     runInAction(() => {
       this.inferencing = true;
       this.isStreaming = false;
@@ -4003,6 +4070,9 @@ class ModelStore {
         globalCompletionParams,
         this.activeModel?.completionSettings,
       );
+      if (lease.signal.aborted) {
+        return;
+      }
       const stopWords = toJS(modelStore.activeModel?.stopWords);
 
       // Create completion params with app-specific properties
@@ -4020,8 +4090,7 @@ class ModelStore {
         completionParamsWithAppProps,
       );
 
-      // Create the completion promise and register it for safe context release
-      const completionPromise = this.context.completion(
+      const completionPromise = context.completion(
         applyGenerationParameterModes(cleanCompletionParams),
         data => {
           if (data.token) {
@@ -4029,28 +4098,22 @@ class ModelStore {
           }
         },
       );
-
-      // Register the promise so releaseContext can wait for it
-      this.registerCompletionPromise(completionPromise);
-
+      lease.signal.addEventListener('abort', onAbort, {once: true});
       const result = await completionPromise;
-
-      // Clear the promise after completion finishes
-      this.clearCompletionPromise();
 
       params.onComplete?.(result.text);
     } catch (error) {
-      // Clear the promise on error too
-      this.clearCompletionPromise();
       console.error('Error in multi-image completion:', error);
       params.onError?.(
         error instanceof Error ? error : new Error(String(error)),
       );
     } finally {
+      lease.signal.removeEventListener('abort', onAbort);
       runInAction(() => {
         this.inferencing = false;
         this.isStreaming = false;
       });
+      lease.end();
     }
   };
 

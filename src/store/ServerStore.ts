@@ -4,7 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import {makePersistable} from 'mobx-persist-store';
 import * as Keychain from 'react-native-keychain';
 
-import {fetchModels, testConnection} from '../api/openai';
+import {fetchModelsWithHeaders, testConnection} from '../api/openai';
 import {fetchServerProps, PROPS_TIMEOUT_MS} from '../api/llamaServer/props';
 import {
   ListDerivedCaps,
@@ -77,6 +77,19 @@ const shallowEqual = (
  * Shared by every path that invalidates per-model state, so a new map cannot
  * be added to one and forgotten in the other.
  */
+/**
+ * What the latest list read of one server established. Live-only: it describes
+ * a backend the app may not reach next launch.
+ */
+export interface ListRead {
+  /** `readSeq` after this read's start, so later-started reads compare higher. */
+  seq: number;
+  /** The body carried a top-level `models` key (a single-model server does). */
+  hasModelsKey: boolean;
+  /** The latest read failed and none has succeeded since. */
+  stale: boolean;
+}
+
 class ServerStore {
   servers: ServerConfig[] = [];
   // Remote reasoning capability keyed by full model id (`${serverId}/${remoteModelId}`).
@@ -94,7 +107,10 @@ class ServerStore {
   error: string | null = null;
   privacyNoticeAcknowledged = false;
   initializationComplete = false;
+  listReads: Record<string, ListRead> = {};
+  appActive = true;
 
+  private readCounter = 0;
   private lastFetchTime = 0;
   private appStateSubscription: any = null;
   private fetchGenerations: Record<string, number> = {};
@@ -142,6 +158,11 @@ class ServerStore {
       }
     }
     await this.fetchAllRemoteModels();
+  }
+
+  /** Counts every list read at its start, store-wide. */
+  get readSeq(): number {
+    return this.readCounter;
   }
 
   // Actions
@@ -197,7 +218,7 @@ class ServerStore {
 
   removeServer(id: string): void {
     this.servers = this.servers.filter(s => s.id !== id);
-    this.serverModels.delete(id);
+    this.dropList(id);
     // Remove all user-selected models for this server
     this.userSelectedModels = this.userSelectedModels.filter(
       m => m.serverId !== id,
@@ -216,6 +237,12 @@ class ServerStore {
     this.isLoading = false;
     // Clean up API key from keychain
     this.removeApiKey(id);
+  }
+
+  /** The list and the record of the read that produced it go together. */
+  private dropList(id: string): void {
+    this.serverModels.delete(id);
+    delete this.listReads[id];
   }
 
   addUserSelectedModel(serverId: string, remoteModelId: string): void {
@@ -477,13 +504,20 @@ class ServerStore {
     }
   }
 
-  // Remote model fetching
-  async fetchModelsForServer(serverId: string): Promise<void> {
+  /**
+   * The only writer of `serverModels` and `listReads`. A response from a url
+   * the server has since left, or one overtaken by a later-started read,
+   * writes nothing: a late older answer must not settle against newer state.
+   */
+  async fetchModelsForServer(
+    serverId: string,
+  ): Promise<{ok: boolean; error?: string}> {
     const server = this.servers.find(s => s.id === serverId);
     if (!server) {
-      return;
+      return {ok: false};
     }
 
+    const seq = ++this.readCounter;
     const generation = this.bumpFetchGeneration(serverId);
     const requestUrl = server.url;
     const requestTimeoutMs = server.requestTimeoutMs;
@@ -492,62 +526,68 @@ class ServerStore {
       serverType: server.serverType,
       credentialRevision: credentialRevisionOf(server),
     };
-
-    runInAction(() => {
-      this.isLoading = true;
-      this.error = null;
-    });
+    this.isLoading = true;
+    this.error = null;
 
     try {
       const apiKey = await this.getApiKey(serverId);
-      if (!this.isCurrentFetch(serverId, generation, snapshot)) {
-        return;
+      if (!this.matchesServerSnapshot(serverId, snapshot)) {
+        return {
+          ok: false,
+          error: 'Server configuration changed during discovery',
+        };
       }
-      const models = await fetchModels(
+      const {models, hasModelsKey} = await fetchModelsWithHeaders(
         requestUrl,
         apiKey,
         requestTimeoutMs,
         snapshot.serverType,
       );
-
       runInAction(() => {
         if (!this.isCurrentFetch(serverId, generation, snapshot)) {
+          return;
+        }
+        this.isLoading = false;
+        const current = this.servers.find(s => s.id === serverId);
+        if (!current || this.isOvertaken(serverId, seq)) {
           return;
         }
         this.serverModels.set(serverId, models);
         this.remoteCatalogMetadata = {
           ...dropServerEntries(this.remoteCatalogMetadata, serverId),
           ...Object.fromEntries(
-            models.map(row => {
-              const modelId = `${serverId}/${row.id}`;
-              return [
-                modelId,
-                {
-                  ...normalizeRemoteCatalogModel(row, 'cached'),
-                  serverId,
-                  ...snapshot,
-                },
-              ];
-            }),
+            models.map(row => [
+              `${serverId}/${row.id}`,
+              {
+                ...normalizeRemoteCatalogModel(row, 'cached'),
+                serverId,
+                ...snapshot,
+              },
+            ]),
           ),
         };
-        this.isLoading = false;
-
-        // Update lastConnected timestamp
-        const s = this.servers.find(sv => sv.id === serverId);
-        if (s) {
-          s.lastConnected = Date.now();
-        }
-        this.isLoading = false;
+        this.listReads[serverId] = {
+          seq,
+          hasModelsKey: hasModelsKey === true,
+          stale: false,
+        };
+        current.lastConnected = Date.now();
       });
+      return {ok: true};
     } catch (error: any) {
+      const message: string = error.message || 'Failed to fetch models';
       runInAction(() => {
         if (!this.isCurrentFetch(serverId, generation, snapshot)) {
           return;
         }
-        this.error = error.message || 'Failed to fetch models';
         this.isLoading = false;
+        this.error = message;
+        const read = this.listReads[serverId];
+        if (read && !this.isOvertaken(serverId, seq)) {
+          read.stale = true;
+        }
       });
+      return {ok: false, error: message};
     }
   }
 
@@ -563,7 +603,7 @@ class ServerStore {
       this.remoteCatalogMetadata,
       serverId,
     );
-    this.serverModels.delete(serverId);
+    this.dropList(serverId);
     this.bumpFetchGeneration(serverId);
     this.isLoading = false;
   }
@@ -586,14 +626,31 @@ class ServerStore {
       credentialRevision: number;
     },
   ): boolean {
-    const current = this.servers.find(server => server.id === serverId);
     return (
       this.fetchGenerations[serverId] === generation &&
+      this.matchesServerSnapshot(serverId, snapshot)
+    );
+  }
+
+  private matchesServerSnapshot(
+    serverId: string,
+    snapshot: {
+      normalizedUrl: string;
+      serverType?: string;
+      credentialRevision: number;
+    },
+  ): boolean {
+    const current = this.servers.find(server => server.id === serverId);
+    return (
       !!current &&
       normalizeServerUrl(current.url) === snapshot.normalizedUrl &&
       current.serverType === snapshot.serverType &&
       credentialRevisionOf(current) === snapshot.credentialRevision
     );
+  }
+
+  private isOvertaken(serverId: string, seq: number): boolean {
+    return (this.listReads[serverId]?.seq ?? 0) > seq;
   }
 
   /**
@@ -772,6 +829,9 @@ class ServerStore {
     this.appStateSubscription = AppState.addEventListener(
       'change',
       (nextAppState: AppStateStatus) => {
+        runInAction(() => {
+          this.appActive = nextAppState === 'active';
+        });
         if (nextAppState !== 'active') {
           return;
         }

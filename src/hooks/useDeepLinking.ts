@@ -27,6 +27,7 @@ import {
   isBenchmarkRunnerUrl,
   parseBenchmarkAutostart,
 } from '../__automation__/benchmarkRoute';
+import {isPlusFeatureUrl} from '../__automation__/plusFeatureRoute';
 
 /**
  * Hook for handling deep link navigation
@@ -455,7 +456,8 @@ export const useDeepLinking = () => {
     [handleChatDeepLink, handleHubRunLink, handleVoiceChatLaunch, navigation],
   );
 
-  // E2E-only routing for the BenchmarkRunnerScreen. Two paths:
+  // E2E-only routing for the benchmark runner and the Plus test feature.
+  // Two paths:
   //   1. Cold launch — Linking.getInitialURL() reads the launching intent's
   //      data URI; no MainActivity onNewIntent override needed.
   //   2. Warm launch — WDIO's `mobile: deepLink` driver command delivers the
@@ -470,7 +472,7 @@ export const useDeepLinking = () => {
     if (!__E2E__) {
       return;
     }
-    const routeIfBench = (url: string | null) => {
+    const routeE2eScreen = (url: string | null | undefined) => {
       if (isBenchmarkRunnerUrl(url)) {
         // Resolve autostart from the same raw URL the gate matched, via the
         // shared helper, so cold-launch (getInitialURL) and warm-launch
@@ -480,10 +482,12 @@ export const useDeepLinking = () => {
         (navigation as any).navigate(ROUTES.BENCHMARK_RUNNER, {
           autostart: parseBenchmarkAutostart(url),
         });
+      } else if (isPlusFeatureUrl(url)) {
+        (navigation as any).navigate(ROUTES.PLUS_TEST_FEATURE);
       }
     };
     Linking.getInitialURL()
-      .then(routeIfBench)
+      .then(routeE2eScreen)
       .catch(() => {
         // getInitialURL rejects on some surfaces; warm-state listener still
         // covers WDIO's deepLink command.
@@ -494,7 +498,7 @@ export const useDeepLinking = () => {
     // down the rest of the hook's lifecycle.
     let sub: {remove: () => void} | null = null;
     try {
-      sub = Linking.addEventListener('url', ({url}) => routeIfBench(url));
+      sub = Linking.addEventListener('url', ({url}) => routeE2eScreen(url));
     } catch {
       sub = null;
     }
@@ -520,7 +524,7 @@ export const useDeepLinking = () => {
   // Prod, always-on Android delivery for supported routes. iOS arrives via the
   // native emitter above; Android uses RN Linking for cold and warm intents.
   useEffect(() => {
-    const routeProdUrl = (url: string | null) => {
+    const routeProdUrl = (url: string | null | undefined) => {
       if (!url) {
         return;
       }
