@@ -1127,6 +1127,156 @@ describe('RemoteModelSheet', () => {
     });
 
     it.each([
+      ['typed', 'https://other.example.com'],
+      ['typed', 'https://original.example.com/another-path'],
+      ['scanned', 'https://other.example.com'],
+      ['scanned', 'https://original.example.com/another-path'],
+    ])(
+      'clears the draft key before probing a %s URL: %s',
+      async (method, nextUrl) => {
+        serverStore.servers = [];
+        mockedFetchModelsWithHeaders.mockResolvedValue({
+          models: [{id: 'test-model', object: 'model'}],
+          headers: {},
+        });
+        const view = render(
+          <RemoteModelSheet isVisible={true} onDismiss={jest.fn()} />,
+        );
+        fireEvent.changeText(
+          view.getByTestId('remote-url-input'),
+          'https://original.example.com',
+        );
+        await waitFor(() =>
+          expect(view.getByTestId('remote-apikey-input')).toBeTruthy(),
+        );
+        fireEvent.changeText(
+          view.getByTestId('remote-apikey-input'),
+          'dummy-original-key',
+        );
+        fireEvent(view.getByTestId('remote-apikey-input'), 'blur');
+        await waitFor(() => {
+          expect(mockedFetchModelsWithHeaders).toHaveBeenLastCalledWith(
+            'https://original.example.com',
+            'dummy-original-key',
+            undefined,
+            'unknown',
+          );
+        });
+        if (method === 'scanned') {
+          await openScanner(view);
+        }
+        mockedFetchModelsWithHeaders.mockClear();
+        act(() => {
+          if (method === 'scanned') {
+            lastScannerProps().onScanned(nextUrl);
+          } else {
+            fireEvent.changeText(view.getByTestId('remote-url-input'), nextUrl);
+          }
+          fireEvent(view.getByTestId('remote-apikey-input'), 'blur');
+        });
+        await waitFor(() => {
+          expect(mockedFetchModelsWithHeaders).toHaveBeenCalledWith(
+            nextUrl,
+            undefined,
+            undefined,
+            'unknown',
+          );
+          expect(view.getByTestId('remote-apikey-input').props.value).toBe('');
+        });
+        expect(
+          mockedFetchModelsWithHeaders.mock.calls.every(
+            ([, key]) => key === undefined,
+          ),
+        ).toBe(true);
+        fireEvent.press(view.getByTestId('add-model-button'));
+        await waitFor(() => expect(serverStore.addServer).toHaveBeenCalled());
+        expect(serverStore.setApiKey).not.toHaveBeenCalled();
+        expect(serverStore.removeApiKey).not.toHaveBeenCalled();
+      },
+    );
+
+    it('accepts a freshly entered key after a URL change', async () => {
+      serverStore.servers = [];
+      mockedFetchModelsWithHeaders.mockResolvedValue({models: [], headers: {}});
+      const view = render(
+        <RemoteModelSheet isVisible={true} onDismiss={jest.fn()} />,
+      );
+      fireEvent.changeText(
+        view.getByTestId('remote-url-input'),
+        'https://first.example.com',
+      );
+      await waitFor(() =>
+        expect(view.getByTestId('remote-apikey-input')).toBeTruthy(),
+      );
+      fireEvent.changeText(
+        view.getByTestId('remote-apikey-input'),
+        'dummy-old-key',
+      );
+      fireEvent.changeText(
+        view.getByTestId('remote-url-input'),
+        'https://second.example.com',
+      );
+      await waitFor(() =>
+        expect(view.getByTestId('remote-apikey-input').props.value).toBe(''),
+      );
+      fireEvent.changeText(
+        view.getByTestId('remote-apikey-input'),
+        'dummy-new-key',
+      );
+      fireEvent(view.getByTestId('remote-apikey-input'), 'blur');
+      await waitFor(() =>
+        expect(mockedFetchModelsWithHeaders).toHaveBeenLastCalledWith(
+          'https://second.example.com',
+          'dummy-new-key',
+          undefined,
+          'unknown',
+        ),
+      );
+    });
+
+    it('does not restore a delayed saved key after returning to manual URL entry', async () => {
+      serverStore.servers = [
+        {id: 'srv-1', name: 'Known server', url: 'https://known.example.com'},
+      ];
+      let finishKey!: (key: string) => void;
+      (serverStore.getApiKey as jest.Mock).mockImplementationOnce(
+        () =>
+          new Promise<string>(resolve => {
+            finishKey = resolve;
+          }),
+      );
+      mockedFetchModelsWithHeaders.mockResolvedValue({models: [], headers: {}});
+      const view = render(
+        <RemoteModelSheet isVisible={true} onDismiss={jest.fn()} />,
+      );
+      fireEvent.press(view.getByTestId('server-chip-srv-1'));
+      fireEvent.press(view.getByTestId('server-chip-srv-1'));
+      fireEvent.changeText(
+        view.getByTestId('remote-url-input'),
+        'https://new.example.com',
+      );
+      await waitFor(() =>
+        expect(view.getByTestId('remote-apikey-input')).toBeTruthy(),
+      );
+      await act(async () => {
+        finishKey('dummy-saved-key');
+      });
+      fireEvent(view.getByTestId('remote-apikey-input'), 'blur');
+      await waitFor(() =>
+        expect(view.getByTestId('remote-apikey-input').props.value).toBe(''),
+      );
+      expect(mockedFetchModelsWithHeaders).toHaveBeenLastCalledWith(
+        'https://new.example.com',
+        undefined,
+        undefined,
+        'unknown',
+      );
+      expect(serverStore.fetchModelsForServer).not.toHaveBeenCalled();
+      expect(serverStore.setApiKey).not.toHaveBeenCalled();
+      expect(serverStore.removeApiKey).not.toHaveBeenCalled();
+    });
+
+    it.each([
       ['resolves false', jest.fn().mockResolvedValue(false)],
       ['throws', jest.fn().mockRejectedValue(new Error('denied'))],
     ])(

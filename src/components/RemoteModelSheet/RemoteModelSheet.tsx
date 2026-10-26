@@ -132,6 +132,7 @@ export const RemoteModelSheet: React.FC<RemoteModelSheetProps> = observer(
         setUrl('');
         setServerName('');
         setApiKey('');
+        apiKeyRef.current = '';
         setTimeoutSeconds('');
         timeoutSecondsRef.current = '';
         setServerType('unknown');
@@ -244,10 +245,24 @@ export const RemoteModelSheet: React.FC<RemoteModelSheetProps> = observer(
       };
     }, [url, debouncedProbe, selectedServerId]);
 
+    const handleUrlChange = useCallback(
+      (value: string) => {
+        debouncedProbe.cancel();
+        invalidateProbe();
+        apiKeyRef.current = '';
+        setApiKey('');
+        setUrl(value);
+        setUrlError('');
+      },
+      [debouncedProbe, invalidateProbe],
+    );
+
     const handleDismiss = useCallback(() => {
+      debouncedProbe.cancel();
+      invalidateProbe();
       setIsScannerOpen(false);
       onDismiss();
-    }, [onDismiss]);
+    }, [debouncedProbe, invalidateProbe, onDismiss]);
 
     const handleScanPress = useCallback(async () => {
       let granted = hasPermission;
@@ -269,11 +284,13 @@ export const RemoteModelSheet: React.FC<RemoteModelSheetProps> = observer(
       setIsScannerOpen(true);
     }, [hasPermission, requestPermission, l10n]);
 
-    const handleScanned = useCallback((value: string) => {
-      setUrl(value);
-      setUrlError('');
-      setIsScannerOpen(false);
-    }, []);
+    const handleScanned = useCallback(
+      (value: string) => {
+        handleUrlChange(value);
+        setIsScannerOpen(false);
+      },
+      [handleUrlChange],
+    );
 
     // Re-probe on apiKey blur
     const handleApiKeyBlur = useCallback(() => {
@@ -329,11 +346,19 @@ export const RemoteModelSheet: React.FC<RemoteModelSheetProps> = observer(
       setSelectedModelId(null);
       setUrlError('');
       setIsScannerOpen(false);
+      apiKeyRef.current = '';
+      setApiKey('');
       try {
         const key = await serverStore.getApiKey(server.id);
+        if (probeGeneration !== probeGenerationRef.current) {
+          return;
+        }
         apiKeyRef.current = key || '';
         setApiKey(key || '');
         const result = await serverStore.fetchModelsForServer(server.id);
+        if (probeGeneration !== probeGenerationRef.current) {
+          return;
+        }
         if (!result.ok) {
           setProbeResult({ok: false, error: result.error});
           return;
@@ -614,14 +639,7 @@ export const RemoteModelSheet: React.FC<RemoteModelSheetProps> = observer(
                   testID="remote-url-input"
                   label={l10n.settings.serverUrl}
                   value={url}
-                  onChangeText={text => {
-                    debouncedProbe.cancel();
-                    invalidateProbe();
-                    setUrl(text);
-                    if (urlError) {
-                      setUrlError('');
-                    }
-                  }}
+                  onChangeText={handleUrlChange}
                   placeholder={l10n.settings.serverUrlPlaceholder}
                   autoCapitalize="none"
                   autoCorrect={false}
