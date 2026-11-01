@@ -22,6 +22,7 @@ import {AgentUiState, initialAgentUiState} from '../services/agent';
 import {isResponsesReplayState} from '../api/responsesTypes';
 import {mergeCompletionParameterLayers} from '../utils/generationParameterModes';
 import {startupSelectionStore} from './StartupSelectionStore';
+import {CompactionError} from '../services/compaction';
 
 /**
  * Update payload accepted by `updateMessage` / `updateMessageStreaming`.
@@ -437,8 +438,13 @@ class ChatSessionStore {
   private hydrateCompletionSnapshot(
     session: SessionMetaData | undefined,
   ): CompletionResultSnapshot | undefined {
+    const compactedAt = session?.messages.find(
+      msg => msg.metadata?.compaction,
+    )?.createdAt;
     const snapshot = session?.messages.find(
-      msg => msg.metadata?.completionResult,
+      msg =>
+        msg.metadata?.completionResult &&
+        (!compactedAt || (msg.createdAt ?? 0) > compactedAt),
     )?.metadata?.completionResult;
     return snapshot as CompletionResultSnapshot | undefined;
   }
@@ -551,6 +557,31 @@ class ChatSessionStore {
     } catch (error) {
       console.error('Failed to delete message:', error);
     }
+  }
+
+  async replaceCompactedHistory(
+    sessionId: string,
+    source: MessageType.Any[],
+    replacement: MessageType.Any[],
+    canCommit: () => boolean,
+  ): Promise<void> {
+    const session = this.sessions.find(item => item.id === sessionId);
+    if (!session) {
+      throw new CompactionError('changed');
+    }
+    const saved = await chatSessionRepository.replaceCompactedHistory(
+      sessionId,
+      source,
+      replacement,
+      canCommit,
+    );
+    runInAction(() => {
+      session.messages = saved;
+      this.exitEditMode();
+      this.lastCompletionResult = undefined;
+      this.dismissedBannerVariants = new Set();
+      this.consecutiveFullFailures = 0;
+    });
   }
 
   get currentSessionMessages(): MessageType.Any[] {

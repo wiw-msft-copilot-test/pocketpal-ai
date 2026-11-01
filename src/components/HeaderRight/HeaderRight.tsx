@@ -33,11 +33,14 @@ import {
 
 import {RenameModal, UsageStats} from '..';
 import {ChatGenerationSettingsSheet} from '..';
+import {CompactionDialog} from '../CompactionDialog/CompactionDialog';
 
 export const HeaderRight: React.FC = observer(() => {
   const theme = useTheme();
   const [menuVisible, setMenuVisible] = React.useState(false);
   const [renameModalVisible, setRenameModalVisible] = React.useState(false);
+  const [compactionSessionId, setCompactionSessionId] =
+    React.useState<string>();
   const [chatGenerationSettingsVisible, setChatGenerationSettingsVisible] =
     React.useState(false);
 
@@ -216,6 +219,16 @@ export const HeaderRight: React.FC = observer(() => {
           <>
             <Menu.Separator />
             <Menu.Item
+              disabled={
+                chatSessionStore.isGenerating || modelStore.isContextLoading
+              }
+              onPress={() => {
+                setCompactionSessionId(session.id);
+                closeMenu();
+              }}
+              label={l10n.components.compaction.title}
+            />
+            <Menu.Item
               onPress={onPressDuplicate}
               label={l10n.components.headerRight.duplicateChatHistory}
               leadingIcon={() => (
@@ -281,6 +294,13 @@ export const HeaderRight: React.FC = observer(() => {
           visible={renameModalVisible}
           onClose={() => setRenameModalVisible(false)}
           session={session}
+        />
+      )}
+      {compactionSessionId && (
+        <CompactionDialog
+          visible
+          sessionId={compactionSessionId}
+          onClose={() => setCompactionSessionId(undefined)}
         />
       )}
     </View>
