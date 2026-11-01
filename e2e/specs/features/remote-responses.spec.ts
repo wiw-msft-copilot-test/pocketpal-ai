@@ -312,7 +312,9 @@ describe('Remote Responses protocol', () => {
       timeout: 10000,
     });
 
-    await browser.$(byTestId('menu-button')).click();
+    await browser
+      .$(`${byTestId('menu-button-container')}//android.widget.Button`)
+      .click();
     await browser.$(byPartialText('Compaction')).click();
     await browser
       .$(byTestId('compaction-dialog'))
@@ -322,7 +324,9 @@ describe('Remote Responses protocol', () => {
       (await fixtureStatus(FIXTURE_URL)).requests.at(-1)?.scenario,
     ).not.toBe('compaction');
 
-    await browser.$(byTestId('menu-button')).click();
+    await browser
+      .$(`${byTestId('menu-button-container')}//android.widget.Button`)
+      .click();
     await browser.$(byPartialText('Compaction')).click();
     await browser
       .$(byTestId('compaction-guidance'))
