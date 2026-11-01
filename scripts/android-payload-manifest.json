@@ -29,111 +29,85 @@
         "assets/ggml-hexagon/libggml-htp-v73.so",
         "assets/ggml-hexagon/libggml-htp-v75.so",
         "assets/ggml-hexagon/libggml-htp-v79.so",
-        "assets/ggml-hexagon/libggml-htp-v81.so"
+        "assets/ggml-hexagon/libggml-htp-v81.so",
+        "assets/ggml-hexagon/libggml-htp-v85.so"
       ],
       "requiredSymbols": [
         {
           "lib": "librnllama_v8_2_dotprod_i8mm_hexagon_opencl.so",
           "kind": "backend",
-          "mustExport": [
-            "ggml_backend_hexagon_reg",
-            "ggml_backend_is_hexagon"
-          ]
+          "mustExport": ["ggml_backend_hexagon_reg", "ggml_backend_is_hexagon"]
         },
         {
           "lib": "librnllama.so",
           "kind": "patch-marker",
-          "mustExport": [
-            "rnllama_patch_abort_v3"
-          ],
+          "mustExport": ["rnllama_patch_abort_v3"],
           "why": "The llama.rn patch in patches/ is not in this library: patch-package must apply it at install and llama.rn must be built from source (ORG_GRADLE_PROJECT_rnllamaBuildFromSource=true)."
         },
         {
           "lib": "librnllama_jni.so",
           "kind": "patch-marker",
-          "mustExport": [
-            "rnllama_jsi_patch_ownership_v3"
-          ],
+          "mustExport": ["rnllama_jsi_patch_ownership_v3"],
           "why": "The llama.rn patch in patches/ is not in this library: patch-package must apply it at install and llama.rn must be built from source (ORG_GRADLE_PROJECT_rnllamaBuildFromSource=true)."
         },
         {
           "lib": "librnllama_v8.so",
           "kind": "patch-marker",
-          "mustExport": [
-            "rnllama_patch_abort_v3"
-          ],
+          "mustExport": ["rnllama_patch_abort_v3"],
           "why": "The llama.rn patch in patches/ is not in this library: patch-package must apply it at install and llama.rn must be built from source (ORG_GRADLE_PROJECT_rnllamaBuildFromSource=true)."
         },
         {
           "lib": "librnllama_jni_v8.so",
           "kind": "patch-marker",
-          "mustExport": [
-            "rnllama_jsi_patch_ownership_v3"
-          ],
+          "mustExport": ["rnllama_jsi_patch_ownership_v3"],
           "why": "The llama.rn patch in patches/ is not in this library: patch-package must apply it at install and llama.rn must be built from source (ORG_GRADLE_PROJECT_rnllamaBuildFromSource=true)."
         },
         {
           "lib": "librnllama_v8_2.so",
           "kind": "patch-marker",
-          "mustExport": [
-            "rnllama_patch_abort_v3"
-          ],
+          "mustExport": ["rnllama_patch_abort_v3"],
           "why": "The llama.rn patch in patches/ is not in this library: patch-package must apply it at install and llama.rn must be built from source (ORG_GRADLE_PROJECT_rnllamaBuildFromSource=true)."
         },
         {
           "lib": "librnllama_jni_v8_2.so",
           "kind": "patch-marker",
-          "mustExport": [
-            "rnllama_jsi_patch_ownership_v3"
-          ],
+          "mustExport": ["rnllama_jsi_patch_ownership_v3"],
           "why": "The llama.rn patch in patches/ is not in this library: patch-package must apply it at install and llama.rn must be built from source (ORG_GRADLE_PROJECT_rnllamaBuildFromSource=true)."
         },
         {
           "lib": "librnllama_v8_2_dotprod.so",
           "kind": "patch-marker",
-          "mustExport": [
-            "rnllama_patch_abort_v3"
-          ],
+          "mustExport": ["rnllama_patch_abort_v3"],
           "why": "The llama.rn patch in patches/ is not in this library: patch-package must apply it at install and llama.rn must be built from source (ORG_GRADLE_PROJECT_rnllamaBuildFromSource=true)."
         },
         {
           "lib": "librnllama_jni_v8_2_dotprod.so",
           "kind": "patch-marker",
-          "mustExport": [
-            "rnllama_jsi_patch_ownership_v3"
-          ],
+          "mustExport": ["rnllama_jsi_patch_ownership_v3"],
           "why": "The llama.rn patch in patches/ is not in this library: patch-package must apply it at install and llama.rn must be built from source (ORG_GRADLE_PROJECT_rnllamaBuildFromSource=true)."
         },
         {
           "lib": "librnllama_v8_2_dotprod_i8mm.so",
           "kind": "patch-marker",
-          "mustExport": [
-            "rnllama_patch_abort_v3"
-          ],
+          "mustExport": ["rnllama_patch_abort_v3"],
           "why": "The llama.rn patch in patches/ is not in this library: patch-package must apply it at install and llama.rn must be built from source (ORG_GRADLE_PROJECT_rnllamaBuildFromSource=true)."
         },
         {
           "lib": "librnllama_jni_v8_2_dotprod_i8mm.so",
           "kind": "patch-marker",
-          "mustExport": [
-            "rnllama_jsi_patch_ownership_v3"
-          ],
+          "mustExport": ["rnllama_jsi_patch_ownership_v3"],
           "why": "The llama.rn patch in patches/ is not in this library: patch-package must apply it at install and llama.rn must be built from source (ORG_GRADLE_PROJECT_rnllamaBuildFromSource=true)."
         },
         {
           "lib": "librnllama_v8_2_dotprod_i8mm_hexagon_opencl.so",
           "kind": "patch-marker",
-          "mustExport": [
-            "rnllama_patch_abort_v3"
-          ],
+          "mustExport": ["rnllama_patch_abort_v3"],
           "why": "The llama.rn patch in patches/ is not in this library: patch-package must apply it at install and llama.rn must be built from source (ORG_GRADLE_PROJECT_rnllamaBuildFromSource=true)."
         },
         {
           "lib": "librnllama_jni_v8_2_dotprod_i8mm_hexagon_opencl.so",
           "kind": "patch-marker",
-          "mustExport": [
-            "rnllama_jsi_patch_ownership_v3"
-          ],
+          "mustExport": ["rnllama_jsi_patch_ownership_v3"],
           "why": "The llama.rn patch in patches/ is not in this library: patch-package must apply it at install and llama.rn must be built from source (ORG_GRADLE_PROJECT_rnllamaBuildFromSource=true)."
         }
       ],
@@ -152,33 +126,25 @@
         {
           "lib": "librnllama.so",
           "kind": "patch-marker",
-          "mustExport": [
-            "rnllama_patch_abort_v3"
-          ],
+          "mustExport": ["rnllama_patch_abort_v3"],
           "why": "The llama.rn patch in patches/ is not in this library: patch-package must apply it at install and llama.rn must be built from source (ORG_GRADLE_PROJECT_rnllamaBuildFromSource=true)."
         },
         {
           "lib": "librnllama_jni.so",
           "kind": "patch-marker",
-          "mustExport": [
-            "rnllama_jsi_patch_ownership_v3"
-          ],
+          "mustExport": ["rnllama_jsi_patch_ownership_v3"],
           "why": "The llama.rn patch in patches/ is not in this library: patch-package must apply it at install and llama.rn must be built from source (ORG_GRADLE_PROJECT_rnllamaBuildFromSource=true)."
         },
         {
           "lib": "librnllama_x86_64.so",
           "kind": "patch-marker",
-          "mustExport": [
-            "rnllama_patch_abort_v3"
-          ],
+          "mustExport": ["rnllama_patch_abort_v3"],
           "why": "The llama.rn patch in patches/ is not in this library: patch-package must apply it at install and llama.rn must be built from source (ORG_GRADLE_PROJECT_rnllamaBuildFromSource=true)."
         },
         {
           "lib": "librnllama_jni_x86_64.so",
           "kind": "patch-marker",
-          "mustExport": [
-            "rnllama_jsi_patch_ownership_v3"
-          ],
+          "mustExport": ["rnllama_jsi_patch_ownership_v3"],
           "why": "The llama.rn patch in patches/ is not in this library: patch-package must apply it at install and llama.rn must be built from source (ORG_GRADLE_PROJECT_rnllamaBuildFromSource=true)."
         }
       ]

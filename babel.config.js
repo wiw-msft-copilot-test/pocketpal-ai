@@ -11,13 +11,18 @@ module.exports = function (api) {
     // Default ON for E2E builds; the onboarding spec sets
     // E2E_SKIP_ONBOARDING=false so the flow actually mounts.
     const skipOnboarding = isE2E && process.env.E2E_SKIP_ONBOARDING !== 'false';
-    return `${envName}:${isE2E}:${skipOnboarding}:${enablePalsHub}`;
+    const plusStoreGate =
+      process.env.PLUS_STORE_GATE === 'true' ||
+      (isE2E && process.env.PLUS_STORE_GATE !== 'false');
+    return `${envName}:${isE2E}:${skipOnboarding}:${enablePalsHub}:${plusStoreGate}`;
   });
-  const [envName, e2eFlag, skipFlag, palsHubFlag] = cacheKey.split(':');
+  const [envName, e2eFlag, skipFlag, palsHubFlag, gateFlag] =
+    cacheKey.split(':');
   const isTest = envName === 'test';
   const isE2E = e2eFlag === 'true';
   const skipOnboarding = skipFlag === 'true';
   const enablePalsHub = palsHubFlag === 'true';
+  const plusStoreGate = gateFlag === 'true';
 
   return {
     presets: ['module:@react-native/babel-preset'],
@@ -32,6 +37,7 @@ module.exports = function (api) {
             ? {
                 __E2E__: isE2E,
                 __E2E_SKIP_ONBOARDING__: skipOnboarding,
+                __PLUS_STORE_GATE__: plusStoreGate,
               }
             : {}),
           __ENABLE_PALSHUB__: enablePalsHub,

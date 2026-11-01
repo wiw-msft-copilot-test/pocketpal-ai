@@ -40,6 +40,22 @@ We highly encourage testing your changes before submitting a pull request.
   yarn android
   ```
 
+### Build flags
+
+`PLUS_STORE_GATE` is an environment variable of the command that bundles the JS, not a `.env` key. It applies only inside the explicitly enabled centralized-integration boundary:
+
+- Unset (the default): integration-enabled source builds unlock shipped Plus features without purchase UI.
+- `true`: integration-enabled store builds gate Plus behind a purchase.
+- E2E builds (`E2E_BUILD=true`) are gated by default; `PLUS_STORE_GATE=false` turns that off.
+
+Normal fork builds keep `ENABLE_PALSHUB_INTEGRATION` disabled regardless of the store gate: Plus controls, entitlement, purchase startup and upstream hands-free voice remain inactive, including through E2E overrides. The unfinished local API server remains `shipped: false`. Fork Android hands-free conversation is separate and requires no Plus entitlement.
+
+Set it on the process that bundles: Metro for debug builds, Gradle or Xcode for release builds. After changing it on a debug build, restart Metro with a clean cache:
+
+```bash
+PLUS_STORE_GATE=true yarn start:reset
+```
+
 ### Linting and Type Checking
 
 Make sure your code passes the lint and type check processes:
@@ -52,7 +68,6 @@ Make sure your code passes the lint and type check processes:
   ```bash
   yarn typecheck
   ```
-
 
 ### Writing Tests
 
@@ -92,6 +107,7 @@ We follow the **Conventional Commits** specification for our commit messages to 
 4. Follow the pull request template and fill in all relevant details.
 
 Before opening a pull request, make sure:
+
 - Your changes are focused and kept to a **single logical change**.
 - Your code is linted and passes type checks.
 - Tests are added or updated if applicable.

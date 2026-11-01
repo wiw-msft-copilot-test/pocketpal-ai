@@ -10,6 +10,7 @@ import type {
 } from '@pocketpalai/react-native-speech';
 
 import {
+  ensureVoiceFile,
   getEngine,
   getNeuralEngine,
   getPhononSupport,
@@ -308,6 +309,23 @@ export class TTSStore {
       () => {
         this.stop('session_change');
       },
+    );
+
+    reaction(
+      () => {
+        const voice = this.currentVoice;
+        return voice &&
+          voice.engine !== 'system' &&
+          this.getDownloadState(voice.engine) === 'ready'
+          ? `${voice.engine}:${voice.id}`
+          : null;
+      },
+      key => {
+        if (key && this.currentVoice) {
+          ensureVoiceFile(this.currentVoice);
+        }
+      },
+      {fireImmediately: true},
     );
   }
 
@@ -679,6 +697,10 @@ export class TTSStore {
     });
 
     try {
+      await ensureVoiceFile(voice);
+      if (this.playbackRevision !== revision) {
+        return 'skipped';
+      }
       const engine = getEngine(voice.engine);
       if (voice.engine === 'supertonic') {
         await (engine as SupertonicEngine).play(spokenText, voice, {
@@ -712,8 +734,8 @@ export class TTSStore {
    * Skips the thinking-stripper entirely — preview text is fixed and
    * known clean.
    *
-   * messageId is engine-qualified (`preview:<engine>:<voiceId>`) so two
-   * engines that share a voice id can't collide on the cleanup guard.
+   * messageId is engine-qualified (`preview:<engine>:<voiceId>`) so
+   * `isPreviewingVoice` can't match another engine's voice with the same id.
    */
   async preview(voice: Voice): Promise<void> {
     if (!this.isTTSAvailable) {
@@ -721,10 +743,15 @@ export class TTSStore {
     }
     const messageId = previewMessageId(voice);
     await this.stop();
-    runInAction(() => {
+    const playing = runInAction(() => {
       this.playbackState = {mode: 'playing', messageId};
+      return this.playbackState;
     });
     try {
+      await ensureVoiceFile(voice);
+      if (this.playbackState !== playing) {
+        return;
+      }
       const engine = getEngine(voice.engine);
       if (voice.engine === 'supertonic') {
         await (engine as SupertonicEngine).play(TTS_PREVIEW_SAMPLE, voice, {
@@ -741,10 +768,7 @@ export class TTSStore {
       }
     } finally {
       runInAction(() => {
-        if (
-          this.playbackState.mode === 'playing' &&
-          this.playbackState.messageId === messageId
-        ) {
+        if (this.playbackState === playing) {
           this.playbackState = {mode: 'idle'};
         }
       });
@@ -787,6 +811,9 @@ export class TTSStore {
     });
 
     const voice = this.currentVoice;
+    const voiceReady = stopDone
+      .then(() => ensureVoiceFile(voice))
+      .then(() => undefined);
     this.lastSpokenMessageId = messageId;
     this.streamStripper = new ThinkingStripper();
     this.streamPlaceholderEmitted = false;
@@ -796,7 +823,7 @@ export class TTSStore {
     if (voice.engine === 'supertonic') {
       engineHandle = (engine as SupertonicEngine).playStreaming(
         voice,
-        stopDone,
+        voiceReady,
         {
           ...voiceOpts,
           language: this.supertonicLanguage,
@@ -804,9 +831,9 @@ export class TTSStore {
         },
       );
     } else if (voiceOpts) {
-      engineHandle = engine.playStreaming(voice, stopDone, voiceOpts);
+      engineHandle = engine.playStreaming(voice, voiceReady, voiceOpts);
     } else {
-      engineHandle = engine.playStreaming(voice, stopDone);
+      engineHandle = engine.playStreaming(voice, voiceReady);
     }
     const handle =
       voice.engine === 'phonon'
