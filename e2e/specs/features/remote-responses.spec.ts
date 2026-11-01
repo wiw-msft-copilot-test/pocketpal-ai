@@ -320,6 +320,10 @@ describe('Remote Responses protocol', () => {
       .$(byTestId('compaction-dialog'))
       .waitForExist({timeout: 5000});
     await browser.$(byTestId('compaction-cancel')).click();
+    await browser.$(byTestId('compaction-dialog')).waitForExist({
+      reverse: true,
+      timeout: 10000,
+    });
     expect(
       (await fixtureStatus(FIXTURE_URL)).requests.at(-1)?.scenario,
     ).not.toBe('compaction');

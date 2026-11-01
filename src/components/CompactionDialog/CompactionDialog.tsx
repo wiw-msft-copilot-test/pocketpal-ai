@@ -1,12 +1,16 @@
 import React, {useContext, useEffect, useState} from 'react';
 import {
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   ScrollView,
   TextInput,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import {ActivityIndicator, Text, useTheme} from 'react-native-paper';
+import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {L10nContext} from '../../utils';
 import {compactChat} from '../../services/compactChat';
 import {CompactionError} from '../../services/compaction';
@@ -26,6 +30,8 @@ export const CompactionDialog: React.FC<Props> = ({
 }) => {
   const theme = useTheme();
   const styles = createStyles(theme);
+  const {height} = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const l10n = useContext(L10nContext);
   const copy = l10n.components.compaction;
   const [guidance, setGuidance] = useState('');
@@ -68,10 +74,25 @@ export const CompactionDialog: React.FC<Props> = ({
       visible={visible}
       animationType="fade"
       onRequestClose={cancel}>
-      <View style={styles.modalOverlay}>
-        <View style={styles.modalContent} testID="compaction-dialog">
+      <KeyboardAvoidingView
+        style={styles.modalOverlay}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        <View
+          style={[
+            styles.modalContent,
+            {
+              flexShrink: 1,
+              maxHeight: Math.max(
+                160,
+                height - insets.top - insets.bottom - 32,
+              ),
+            },
+          ]}
+          testID="compaction-dialog">
           <Text style={styles.modalTitle}>{copy.title}</Text>
-          <ScrollView keyboardShouldPersistTaps="handled">
+          <ScrollView
+            keyboardShouldPersistTaps="handled"
+            style={{flexShrink: 1}}>
             <Text style={styles.textInput}>{copy.warning}</Text>
             <TextInput
               testID="compaction-guidance"
@@ -117,7 +138,7 @@ export const CompactionDialog: React.FC<Props> = ({
             </TouchableOpacity>
           </View>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 };
