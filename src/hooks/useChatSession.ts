@@ -47,6 +47,7 @@ import {
 } from '../utils/chat';
 import {acquireKeepAwake} from '../utils/keepAwake';
 import {vtrace} from '../utils/voiceTrace';
+import {LLAMARN_ERROR_PATTERNS} from '../utils/llamaRnErrors';
 import {
   toApiCompletionParams,
   ApiCompletionParams,
@@ -1081,12 +1082,19 @@ export const useChatSession = (
       const errorMessage = error instanceof Error ? error.message : '';
       const responseErrorCode = completionErrorMetadata(error).code;
       const isToolArgsParseError =
-        /Failed to parse tool call arguments as JSON/i.test(errorMessage);
-      const isContextFullError = /context is full/i.test(errorMessage);
+        LLAMARN_ERROR_PATTERNS.toolArgsParse.test(errorMessage);
+      // Prompt-processing overflow: when the prompt itself exceeds n_ctx
+      // (ctx_shift is off — the llama.rn default), the native layer throws
+      // "Context is full" before any token is generated, so it never reaches
+      // run_finished. Treat it as an n_ctx-exhaustion signal so the banner
+      // surfaces instead of a raw error dump.
+      const isContextFullError =
+        LLAMARN_ERROR_PATTERNS.contextFull.test(errorMessage);
       const treatAsContextFull = isToolArgsParseError || isContextFullError;
-      const isSpeculativeInitError = /failed to create MTP draft context/i.test(
-        errorMessage,
-      );
+      // Low-RAM devices can fail to allocate the speculative draft context at
+      // first completion (the load-time memory check has no term for it).
+      const isSpeculativeInitError =
+        LLAMARN_ERROR_PATTERNS.speculativeInit.test(errorMessage);
 
       // Error rollback path. The empty/in-flight AssistantTurn row
       // already exists; preserve any partial steps and tag with

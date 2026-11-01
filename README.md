@@ -6,7 +6,7 @@
 
 **A private AI assistant that runs entirely on your phone.**
 
-Chat with language models, give them a voice, and let them use tools — all on-device. No account, no cloud, no internet required.
+Chat with local language models, give them a voice, and let them use tools. Core on-device chat requires no account or internet; optional remote servers and web search use your chosen providers.
 
 <a href="https://pocketpal.dev/"><strong>pocketpal.dev</strong></a> ·
 <a href="#get-the-app">Get the app</a> ·
@@ -31,14 +31,14 @@ Chat with language models, give them a voice, and let them use tools — all on-
 
 ## Why PocketPal AI?
 
-Most AI apps are a thin window onto someone else's server — every message you type gets shipped off, logged, and analyzed somewhere you can't see. PocketPal flips that around: **the AI lives on your phone, and your conversations never leave it.**
+Most AI apps are a thin window onto someone else's server — every message you type gets shipped off, logged, and analyzed somewhere you can't see. PocketPal flips that around: **the AI lives on your phone, and your conversations stay on it unless you choose an online feature.**
 
-- **🔒 Private by default** — every prompt, response, and document stays on your device. Nothing is uploaded or stored on external servers.
+- **🔒 Private by default** — every prompt, response, and document stays on your device unless you turn on an online feature such as web search or a remote server.
 - **✈️ Works offline** — download a model once and it just works, with no connection and no account. On a plane, on a trail, anywhere.
 - **📱 Runs on hardware you already own** — real language models, voices, and tools, tuned to make the most of your phone's CPU, GPU, and NPU.
-- **🆓 Free and open source** — no subscription, no "pro" tier to unlock the AI. MIT-licensed and built in the open.
+- **🆓 Free and open source** — this fork's chat, models, voices, tools and Android hands-free conversation need no account or Plus purchase. MIT-licensed.
 
-> **Privacy note:** The only data that ever leaves your device is what you explicitly choose to share — benchmark results (if you opt into the leaderboard) and feedback you submit through the app.
+> **Fork policy:** Centralized accounts, PalsHub, purchases, feedback submission and benchmark submission are disabled in normal builds. Upstream Plus hands-free voice and the unfinished local API server remain inactive. Your chats and documents leave your device only through features you turn on: web search and page reading, a remote server, or a system voice your phone runs online. Model and missing voice-file downloads and device-compatibility rules can also require a connection.
 
 ## Contents
 
@@ -55,17 +55,20 @@ Most AI apps are a thin window onto someone else's server — every message you 
 ## Features
 
 - **🧠 On-device chat** — run GGUF language models (Gemma, Qwen, Phi, Llama, and more) fully offline.
-- **🗣️ Text-to-speech** — give your assistant a voice with on-device neural TTS (Kokoro and other engines), no cloud calls.
-- **🎙️ On-device dictation on Android** — dictate an editable prompt using Android's local speech recognizer, with no cloud-recognition fallback.
+- **🗣️ Text-to-speech** — give your assistant a voice with on-device neural voices (Kokoro, Kitten, Supertonic, and Phonon on supported devices) that synthesize speech on your phone, or your phone's system voices.
+- **🎙️ Voice input** — dictate messages with on-device Whisper speech recognition (whisper.cpp).
+- **🎙️ Android hands-free conversation** — use Android's explicitly on-device recognizer without cloud fallback; final transcripts send automatically, replies are narrated, and audio cues mark successful turn boundaries. Audio-only skip stops narration without cancelling the reply.
 - **🎭 Pals** — create personalized assistants with their own model, system prompt, and personality (Assistant and Roleplay types).
-- **🛍️ [PalsHub](https://palshub.ai/)** — discover and install community Pals, including premium ones via in-app purchase.
-- **🛠️ Talents & tools** — let capable Pals call built-in tools (calculator, date/time, rich HTML rendering) inside a tool-use loop.
+- **🎭 Scout** — a built-in local Pal with tools and a customizable appearance, alongside your own Pals.
+- **🛠️ Talents & tools** — let capable Pals call built-in tools (calculator, date/time, rich HTML rendering, opt-in web search and page reading) inside a tool-use loop.
 - **📥 Hugging Face integration** — search and download GGUF models, including gated ones, directly from the HF Hub with your access token.
-- **📊 Benchmarking** — measure tokens/sec and memory, and optionally compare on the [AI Phone Leaderboard](https://pocketpal.dev/leaderboard).
+- **📊 Benchmarking** — measure tokens/sec and memory locally; centralized leaderboard submission is disabled.
 - **⚡ Hardware acceleration** — CPU, GPU (Metal on iOS, OpenCL/Adreno on Android), and NPU (Qualcomm Hexagon) inference paths, with graceful fallback.
-- **🌍 Localized** — available in 11 languages, on phones and tablets, including full iPad support.
+- **🌍 Localized** — available in 16 languages, on phones and tablets, including full iPad support.
 
 ## Get the app
+
+The store links below distribute upstream PocketPal, not this feature-bearing fork. Build this fork from source using the developer instructions below.
 
 | Platform         |                                                                                                                                                                                   |
 | ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -88,12 +91,12 @@ PocketPal is a four-layer stack, from the silicon up to the chat UI. Each layer 
   <img src="assets/images and logos/stack-diagram-dark.png" alt="PocketPal AI on-device stack — UI & Tool Use → Bridging → Engine → Hardware" width="100%">
 </div>
 
-| Layer             | What runs here                                                                                                                                                                                                                                                                                                                                                                      |
-| ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **UI & Tool Use** | The React Native app (UI via React Native Paper, state via MobX, chat history in WatermelonDB). The **`AgentRunner`** drives each chat turn — streaming tokens, dispatching **Talents** (tools) when the model calls them, and feeding results back for follow-up reasoning. **Pals** are configurable personas; **PalsHub** is the in-app marketplace for sharing and buying them. |
-| **Bridging**      | Native modules that connect JavaScript to the engines. [`llama.rn`](https://github.com/mybigday/llama.rn) bridges LLM inference over JSI; [`react-native-speech`](https://github.com/a-ghorbani/react-native-speech) and `onnxruntime-react-native` bridge text-to-speech.                                                                                                          |
-| **Engine**        | The inference engines. **llama.cpp** runs language models in the quantized **GGUF** format. **ONNX Runtime** runs TTS voice models in the **ONNX** format.                                                                                                                                                                                                                          |
-| **Hardware**      | Where the math actually happens. PocketPal targets **CPU** (universal fallback), **GPU** (Metal on iOS, OpenCL on Qualcomm Adreno for Android), and **NPU** (Qualcomm Hexagon) — falling back gracefully and offloading partial layers when a full backend isn't available.                                                                                                         |
+| Layer             | What runs here                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **UI & Tool Use** | The React Native app (UI via React Native Paper, state via MobX, chat history in WatermelonDB). The **`AgentRunner`** drives each chat turn, dispatches Talents, and persists tool results and Responses replay. Pals include local Scout and custom personas. Fork hands-free conversation coordinates on-device Android recognition, narration, silence barriers and cues; upstream Plus voice remains inactive.                               |
+| **Bridging**      | Native modules that connect JavaScript to the engines. [`llama.rn`](https://github.com/mybigday/llama.rn) bridges LLM inference over JSI; [`whisper.rn`](https://github.com/mybigday/whisper.rn) bridges speech recognition; [`@pocketpalai/react-native-speech`](https://github.com/a-ghorbani/react-native-speech) and `onnxruntime-react-native` bridge text-to-speech, with the `@pocketpalai/react-native-speech-phonon` add-on for Phonon. |
+| **Engine**        | The inference engines. **llama.cpp** runs language models in the quantized **GGUF** format. **whisper.cpp** runs Whisper speech recognition models in the **GGML** format. **ONNX Runtime** runs the Kokoro, Kitten and Supertonic voice models in the **ONNX** format. **Phonon** runs natively in its own Rust runtime: a GGUF model on the CPU on Android, a Core ML model on iOS.                                                            |
+| **Hardware**      | Where the math actually happens. PocketPal targets **CPU** (universal fallback), **GPU** (Metal on iOS, OpenCL on Qualcomm Adreno for Android), and **NPU** (Qualcomm Hexagon, and the Apple Neural Engine for Phonon on iOS) — falling back gracefully and offloading partial layers when a full backend isn't available.                                                                                                                       |
 
 ## Using the app
 
@@ -117,13 +120,13 @@ PocketPal is a four-layer stack, from the silicon up to the chat UI. Each layer 
 
 1. Make sure a model is loaded.
 2. Open the **Chat** page and start talking.
-3. On Android 12 or newer, tap the microphone to dictate one prompt locally. Review or edit the transcript, then tap **Send**. Availability depends on the phone's installed on-device speech service and language model.
+3. Dictate an editable prompt with on-device Whisper and send it manually, or start fork hands-free conversation on Android 12 or newer to send final transcripts automatically. Hands-free availability depends on the phone's installed on-device speech service and language model.
 4. The screen stays awake during inference and deactivates when idle.
 5. **Copy** a full response with the copy icon, or long-press a paragraph to copy just that.
 6. **Edit** any of your messages with a long-press — the AI regenerates from your change. Hit **retry** for a fresh answer, optionally with a different model.
 7. Open the drawer and choose **Search chats** to search local chat titles and visible messages. Results are ranked by the number of exact phrase matches, then by the latest message. For large histories you can reveal results while scanning continues; opening one stops the remaining search and any active reply before switching chats.
 
-Dictation is foreground-only and never sends automatically. Downloading a missing speech-language model may require a network connection, but recognition then uses Android's explicitly on-device service. Sending the resulting prompt can still use the network if you selected a remote language model; system TTS voices can also have provider-specific network behavior.
+Dictation and conversation are foreground-only. Hands-free conversation waits for narration and cues to drain before restarting the microphone, and provides a separate audio-only skip. Missing recognition models or neural voice files may require a download before offline use. Sending a prompt can still use the network if you selected a remote language model; system TTS voices can also have provider-specific network behavior.
 
 <img src="assets/images and logos/Chat.png" alt="Chat" width="83%">
 </details>
@@ -138,7 +141,7 @@ Create personalized assistants:
 - **Assistant Pal** — pick a default model, set a system prompt (write it yourself or have the app generate one), and customize the chat input color.
 - **Roleplay Pal** — everything above, plus location, the AI's role, and other contextual parameters.
 
-Switch personas with the Pal picker on the chat page. Browse **[PalsHub](https://palshub.ai/)** in-app to discover community Pals, including premium ones via in-app purchase.
+Switch personas with the Pal picker on the chat page. Scout and custom Pals stay local; the centralized PalsHub marketplace is disabled in this fork.
 
 <img src="assets/images and logos/Pals.png" alt="Assistant Pal" width="100%">
 <p><em>Creating a cocktail-recipe assistant</em></p>
@@ -152,7 +155,7 @@ Switch personas with the Pal picker on the chat page. Browse **[PalsHub](https:/
 1. Open the **Benchmark** page.
 2. Run performance tests to compare speed and efficiency across models.
 3. Review tokens/sec and memory usage.
-4. Optionally share your results to the [AI Phone Leaderboard](https://pocketpal.dev/leaderboard).
+4. Review results locally; centralized leaderboard submission is disabled in this fork.
 
 <img src="assets/images and logos/Benchmark.png" alt="Benchmark" width="100%">
 </details>
@@ -173,7 +176,7 @@ Switch personas with the Pal picker on the chat page. Browse **[PalsHub](https:/
 
 <br/>
 
-Go to **App Info → "Sharing your thoughts"**, type your feedback — feature requests, suggestions, anything — and submit.
+Centralized in-app feedback submission is disabled in this fork.
 
 <img src="assets/images and logos/Send_Feedback.png" alt="Send feedback" width="50%">
 </details>
@@ -200,7 +203,7 @@ see [`dev-env/README.md`](dev-env/README.md).
 ### Clone, install & run
 
 ```bash
-git clone https://github.com/a-ghorbani/pocketpal-ai
+git clone https://github.com/wiw-msft-copilot-test/pocketpal-ai
 cd pocketpal-ai
 
 nvm use                       # match the pinned Node version
@@ -240,14 +243,20 @@ Run `yarn lint && yarn typecheck && yarn test` before opening a PR. Pull request
 
 ```
 src/
-├── screens/        # Chat, Models, Pals, Benchmark, Settings, About, …
+├── screens/        # Chat, Models, Pals, Benchmark, Settings, Plus, About, …
 ├── components/     # Reusable UI
-├── store/          # MobX stores (Model, ChatSession, Pal, TTS, HF, Benchmark, …)
+├── store/          # MobX stores (Model, ChatSession, Pal, TTS, ASR, VoiceMode, HF, Benchmark, …)
 ├── services/
 │   ├── agent/      # AgentRunner — the chat / tool loop
 │   ├── talents/    # Tool engines + registries
-│   ├── tts/        # TTS engines (kokoro, kitten, supertonic, system)
+│   ├── search/     # Web search providers for the search talents
+│   ├── tts/        # TTS engines (kokoro, kitten, supertonic, phonon, system)
+│   ├── asr/        # Whisper speech recognition (dictation and voice mode)
+│   ├── voice/      # Hands-free voice mode
+│   ├── plus/       # Plus feature catalog and gate
+│   ├── iap/        # In-app purchases (store bridge)
 │   ├── palshub/    # PalsHub marketplace integration
+│   ├── deviceRules/ # Device-compatibility rules: parse, classify, launch-time fetch
 │   └── downloads/  # Model download manager
 ├── database/       # WatermelonDB schema, models, migrations
 ├── repositories/   # Data-access layer over the DB
@@ -264,16 +273,17 @@ src/
 
 Versions are pinned in [`package.json`](package.json); the highlights:
 
-| Area        | Choice                                                                     |
-| ----------- | -------------------------------------------------------------------------- |
-| Framework   | React Native `0.82.1`, React `19.1.1` (New Architecture)                   |
-| Language    | TypeScript `5.0.4`                                                         |
-| UI          | React Native Paper `5.14.5`, React Navigation                              |
-| State       | MobX `6` (`mobx`, `mobx-react`, `mobx-persist-store`)                      |
-| Persistence | WatermelonDB (chat history), AsyncStorage (settings), Keychain (secrets)   |
-| LLM         | `llama.rn` `0.13.0-rc.7` → llama.cpp b11385 · GGUF                         |
-| TTS         | `react-native-speech` `2.3.1` + `onnxruntime-react-native` `1.23.2` · ONNX |
-| Tooling     | Yarn 1 (Classic), ESLint, Prettier, Jest, Husky + Commitlint               |
+| Area        | Choice                                                                                                                                      |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| Framework   | React Native `0.87.1`, React `19.2.3` (New Architecture)                                                                                    |
+| Language    | TypeScript `5.9.3`                                                                                                                          |
+| UI          | React Native Paper `5.15.3`, React Navigation                                                                                               |
+| State       | MobX `6` (`mobx`, `mobx-react`, `mobx-persist-store`)                                                                                       |
+| Persistence | WatermelonDB (chat history), AsyncStorage (settings), Keychain (secrets)                                                                    |
+| LLM         | `llama.rn` `0.13.0-rc.9` → llama.cpp b11960 · GGUF                                                                                          |
+| ASR         | `whisper.rn` `0.7.4` → whisper.cpp · GGML; mic via `@fugood/react-native-audio-pcm-stream` `1.1.4`                                          |
+| TTS         | `@pocketpalai/react-native-speech` `2.8.2` + `onnxruntime-react-native` `^1.23.2` · ONNX; `@pocketpalai/react-native-speech-phonon` `0.1.3` |
+| Tooling     | Yarn 1 (Classic), ESLint, Prettier, Jest, Husky + Commitlint                                                                                |
 
 </details>
 
@@ -284,17 +294,19 @@ Versions are pinned in [`package.json`](package.json); the highlights:
 
 A **Talent** is a tool the model can call mid-conversation. Engines are registered in a `TalentRegistry`, exposed to the model as tool schemas; the `AgentRunner` detects a call, runs the engine, and returns the result for the next turn.
 
-| Talent        | Engine             | Does                                |
-| ------------- | ------------------ | ----------------------------------- |
-| `calculate`   | `CalculateEngine`  | Arithmetic / expression evaluation  |
-| `datetime`    | `DatetimeEngine`   | Current date / time                 |
-| `render_html` | `RenderHtmlEngine` | Renders model-produced HTML in chat |
+| Talent        | Engine             | Does                                                                                                                      |
+| ------------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------- |
+| `calculate`   | `CalculateEngine`  | Arithmetic / expression evaluation                                                                                        |
+| `datetime`    | `DatetimeEngine`   | Current date / time                                                                                                       |
+| `render_html` | `RenderHtmlEngine` | Renders model-produced HTML in chat                                                                                       |
+| `web_search`  | `WebSearchEngine`  | Searches the web (opt-in; needs a configured provider)                                                                    |
+| `read_url`    | `ReadUrlEngine`    | Reads a web page from search results, a site you named, or a link on a page it read (opt-in; needs a configured provider) |
 
 Good first contributions:
 
 - A new **Talent** — implement a `TalentEngine` and register it in `src/services/talents/`.
-- A new **TTS engine** — add it under `src/services/tts/engines/`.
-- A new **locale** — add a JSON file in `src/locales/` (or translate on [Weblate](https://hosted.weblate.org/projects/pocketpal-ai/)).
+- A new **TTS engine** — model it on an existing engine in `src/services/tts/engines/`, register it in `engineRegistry.ts`, wire it into `TTSStore`, then search `src/` for that engine's name, ignoring case, to find every other entry it needs, such as its type, constants, setup-sheet entries and strings.
+- A new **locale** — translate on [Weblate](https://hosted.weblate.org/projects/pocketpal-ai/); registering a new language in the app follows the steps in `src/locales/index.ts`.
 
 </details>
 
@@ -331,9 +343,12 @@ Licensed under the [MIT License](LICENSE).
 
 PocketPal AI stands on the shoulders of the open-source community, including:
 
-- **[llama.cpp](https://github.com/ggerganov/llama.cpp)** — efficient on-device LLM inference.
+- **[llama.cpp](https://github.com/ggml-org/llama.cpp)** — efficient on-device LLM inference.
 - **[llama.rn](https://github.com/mybigday/llama.rn)** — llama.cpp bindings for React Native.
-- **[react-native-speech](https://github.com/a-ghorbani/react-native-speech)** — React Native TTS bridge powering on-device voices.
+- **[whisper.cpp](https://github.com/ggml-org/whisper.cpp)** — on-device speech recognition.
+- **[whisper.rn](https://github.com/mybigday/whisper.rn)** — whisper.cpp bindings for React Native.
+- **[@pocketpalai/react-native-speech](https://github.com/a-ghorbani/react-native-speech)** — React Native TTS bridge powering on-device voices.
+- **[Phonon](https://github.com/gradium-ai/xn-ptts)** by Gradium — on-device TTS model, built on Kyutai's Pocket TTS and Mimi.
 - **[ONNX Runtime](https://onnxruntime.ai/)** — cross-platform inference engine powering on-device TTS.
 - **[React Native](https://reactnative.dev/)**, **[MobX](https://mobx.js.org/)**, **[React Native Paper](https://callstack.github.io/react-native-paper/)**, **[React Navigation](https://reactnavigation.org/)**, **[WatermelonDB](https://github.com/Nozbe/WatermelonDB)**, and many other open-source libraries that make this project possible.
 

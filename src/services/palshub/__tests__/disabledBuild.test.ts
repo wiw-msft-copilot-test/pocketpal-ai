@@ -41,33 +41,44 @@ describeDisabledBuild('disabled centralized integrations build', () => {
     expect(() => require('../../../store/PurchaseStore')).not.toThrow();
   });
 
-  it('does not offer Plus or unlock voice through persisted or E2E overrides', () => {
-    const {VoiceModeStore} = require('../../../store/VoiceModeStore');
-    const {purchaseStore} = require('../../../store');
-    const {
-      openPlus,
-      isPlusAvailable,
-      isPlusUnlocked,
-      plusGate,
-    } = require('../../plus/gate');
-    const {
-      shippedPlusFeatures,
-      plusFeatureRows,
-    } = require('../../plus/shipped');
-    const voice = new VoiceModeStore();
-    voice.setUserVoiceModeOverride(true);
-    voice.setUnlockOverride(true);
-    expect(voice.supported).toBe(false);
-    expect(voice.isUnlocked).toBe(false);
-    expect(shippedPlusFeatures()).toEqual([]);
-    expect(plusFeatureRows()).toEqual([]);
-    expect(isPlusAvailable()).toBe(false);
-    expect(isPlusUnlocked()).toBe(false);
-    openPlus({onUnlocked: jest.fn()});
-    expect(plusGate.request).toBeNull();
-    expect(purchaseStore.retryPlusProducts).not.toHaveBeenCalled();
-    expect(purchaseStore.start).not.toHaveBeenCalled();
-  });
+  it.each([true, false])(
+    'does not offer Plus or unlock voice through overrides (store gate %s)',
+    storeGate => {
+      const previousGate = __PLUS_STORE_GATE__;
+      Object.assign(global, {__PLUS_STORE_GATE__: storeGate});
+      try {
+        const {VoiceModeStore} = require('../../../store/VoiceModeStore');
+        const {purchaseStore} = require('../../../store');
+        const {
+          openPlus,
+          isPlusAvailable,
+          isPlusUnlocked,
+          plusGate,
+        } = require('../../plus/gate');
+        const {
+          shippedPlusFeatures,
+          plusFeatureRows,
+        } = require('../../plus/shipped');
+        const voice = new VoiceModeStore();
+        const {setShipOverride} = require('../../plus/shipOverride');
+        setShipOverride(['handsFreeVoice', 'localApiServer']);
+        voice.setUserVoiceModeOverride(true);
+        voice.setUnlockOverride(true);
+        expect(voice.supported).toBe(false);
+        expect(voice.isUnlocked).toBe(false);
+        expect(shippedPlusFeatures()).toEqual([]);
+        expect(plusFeatureRows()).toEqual([]);
+        expect(isPlusAvailable()).toBe(false);
+        expect(isPlusUnlocked()).toBe(false);
+        openPlus({onUnlocked: jest.fn()});
+        expect(plusGate.request).toBeNull();
+        expect(purchaseStore.retryPlusProducts).not.toHaveBeenCalled();
+        expect(purchaseStore.start).not.toHaveBeenCalled();
+      } finally {
+        Object.assign(global, {__PLUS_STORE_GATE__: previousGate});
+      }
+    },
+  );
 
   it('rejects Firebase App Check without loading its native modules', async () => {
     const {initializeAppCheck, getAppCheckToken} = require('../../../utils/fb');
