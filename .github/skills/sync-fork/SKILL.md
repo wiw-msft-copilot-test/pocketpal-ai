@@ -24,6 +24,11 @@ Establish these values before changing files or branches:
 - required local checks; and
 - remote acceptance workflow.
 
+Default upstream to `a-ghorbani/pocketpal-ai:main` when no upstream revision is
+supplied. Verify that the selected upstream remote points to that repository,
+fetch `main`, and pin its resolved full commit SHA before merging. An explicitly
+requested upstream branch, tag, or commit overrides this default.
+
 Default the acceptance workflow to `.github/workflows/e2e-tests.yml`. Derive a
 destination name such as `sync/upstream-<short-sha>-into-<source>`.
 
