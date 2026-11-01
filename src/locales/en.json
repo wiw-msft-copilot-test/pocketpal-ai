@@ -1157,6 +1157,10 @@
       "byteSizes": ["Bytes", "KB", "MB", "GB"]
     },
     "chatView": {
+      "deleteMessageTitle": "Delete Message",
+      "deleteMessageConfirmation": "Delete only this message? Later messages will be kept. This cannot be undone.",
+      "deleteMessageError": "Failed to delete the message. Please try again.",
+      "deleteMessageBusy": "Finish the current reply, edit, or voice conversation before deleting a message.",
       "menuItems": {
         "copy": "Copy",
         "regenerate": "Regenerate",

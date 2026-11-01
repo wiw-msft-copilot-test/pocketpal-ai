@@ -1,7 +1,7 @@
 //import {fireEvent, render} from '@testing-library/react-native';
 import * as React from 'react';
 import {runInAction} from 'mobx';
-import {StyleSheet} from 'react-native';
+import {Alert, StyleSheet} from 'react-native';
 
 import {
   fileMessage,
@@ -584,7 +584,7 @@ describe('chat', () => {
         answer,
         [menuLabels.regenerate, menuLabels.regenerateWith],
       ],
-      ['a user row', textMessage, [menuLabels.edit]],
+      ['a user row', textMessage, [menuLabels.edit, l10n.en.common.delete]],
     ])(
       'disables the row-deleting menu items on %s, but not Copy',
       (_row, message, deleting) => {
@@ -602,6 +602,138 @@ describe('chat', () => {
         expect(isDisabled(menuLabels.copy, getByText)).toBe(false);
       },
     );
+  });
+
+  describe('deleting a user message', () => {
+    const copy = l10n.en.components.chatView;
+    const onSendPress = jest.fn();
+
+    beforeEach(() => {
+      jest.clearAllMocks();
+      jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+      chatSessionStore.activeSessionId = 'session-1';
+      chatSessionStore.isGenerating = false;
+      chatSessionStore.isStopping = false;
+      chatSessionStore.isEditMode = false;
+      (
+        chatSessionStore.deleteMessageFromSession as jest.Mock
+      ).mockResolvedValue(true);
+      runInAction(() => {
+        modelStore.activeModelId = undefined;
+      });
+    });
+
+    afterEach(() => {
+      chatSessionStore.isGenerating = false;
+      chatSessionStore.isEditMode = false;
+      jest.restoreAllMocks();
+    });
+
+    const openMenu = (message = textMessage) => {
+      const view = render(
+        <ChatView messages={[message]} onSendPress={onSendPress} user={user} />,
+        {withNavigation: true, withBottomSheetProvider: true},
+      );
+      fireEvent(view.getAllByTestId('ContentContainer')[0], 'onLongPress', {
+        nativeEvent: {pageX: 0, pageY: 0},
+      });
+      return view;
+    };
+
+    const confirmDelete = async () => {
+      const buttons = (Alert.alert as jest.Mock).mock.calls[0][2];
+      await act(async () => {
+        await buttons
+          .find((button: {style?: string}) => button.style === 'destructive')
+          .onPress();
+      });
+    };
+
+    it('deletes only the selected message after confirmation without sending a prompt', async () => {
+      const {getByText} = openMenu();
+      fireEvent.press(getByText(l10n.en.common.delete));
+
+      expect(Alert.alert).toHaveBeenCalledWith(
+        copy.deleteMessageTitle,
+        copy.deleteMessageConfirmation,
+        expect.any(Array),
+      );
+      expect(chatSessionStore.deleteMessageFromSession).not.toHaveBeenCalled();
+      await confirmDelete();
+
+      expect(chatSessionStore.deleteMessageFromSession).toHaveBeenCalledWith(
+        'session-1',
+        textMessage.id,
+      );
+      expect(chatSessionStore.clearCompletionSnapshot).toHaveBeenCalled();
+      expect(chatSessionStore.removeMessagesFromId).not.toHaveBeenCalled();
+      expect(chatSessionStore.enterEditMode).not.toHaveBeenCalled();
+      expect(onSendPress).not.toHaveBeenCalled();
+    });
+
+    it('keeps the message when confirmation is cancelled', () => {
+      const {getByText} = openMenu();
+      fireEvent.press(getByText(l10n.en.common.delete));
+      const buttons = (Alert.alert as jest.Mock).mock.calls[0][2];
+      expect(buttons[0]).toEqual({
+        text: l10n.en.common.cancel,
+        style: 'cancel',
+      });
+      expect(chatSessionStore.deleteMessageFromSession).not.toHaveBeenCalled();
+      expect(onSendPress).not.toHaveBeenCalled();
+    });
+
+    it('does not offer Delete for assistant responses', () => {
+      const {queryByText} = openMenu({
+        ...textMessage,
+        author: {id: 'assistant'},
+      });
+      expect(queryByText(l10n.en.common.delete)).toBeNull();
+    });
+
+    it('reports deletion failure without clearing context state or sending a prompt', async () => {
+      (
+        chatSessionStore.deleteMessageFromSession as jest.Mock
+      ).mockResolvedValue(false);
+      const {getByText} = openMenu();
+      fireEvent.press(getByText(l10n.en.common.delete));
+      await confirmDelete();
+
+      expect(Alert.alert).toHaveBeenLastCalledWith(
+        l10n.en.common.error,
+        copy.deleteMessageError,
+      );
+      expect(chatSessionStore.clearCompletionSnapshot).not.toHaveBeenCalled();
+      expect(onSendPress).not.toHaveBeenCalled();
+    });
+
+    it('rechecks generation state when confirming deletion', async () => {
+      const {getByText} = openMenu();
+      fireEvent.press(getByText(l10n.en.common.delete));
+      chatSessionStore.isGenerating = true;
+      await confirmDelete();
+
+      expect(chatSessionStore.deleteMessageFromSession).not.toHaveBeenCalled();
+      expect(Alert.alert).toHaveBeenLastCalledWith(
+        l10n.en.common.error,
+        copy.deleteMessageBusy,
+      );
+      expect(onSendPress).not.toHaveBeenCalled();
+    });
+
+    it('does not clear another chat context after switching chats during confirmation', async () => {
+      const {getByText} = openMenu();
+      fireEvent.press(getByText(l10n.en.common.delete));
+      chatSessionStore.activeSessionId = 'session-2';
+      await confirmDelete();
+
+      expect(chatSessionStore.deleteMessageFromSession).toHaveBeenCalledWith(
+        'session-1',
+        textMessage.id,
+      );
+      expect(chatSessionStore.clearCompletionSnapshot).not.toHaveBeenCalled();
+      expect(onSendPress).not.toHaveBeenCalled();
+    });
   });
 
   describe('increase-context CTA memory estimate', () => {
