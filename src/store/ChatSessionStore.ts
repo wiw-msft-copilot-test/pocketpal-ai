@@ -241,6 +241,12 @@ class ChatSessionStore {
       : 0;
   }
 
+  clearCompletionSnapshot() {
+    this.lastCompletionResult = undefined;
+    this.dismissedBannerVariants = new Set();
+    this.consecutiveFullFailures = 0;
+  }
+
   setBannerDismissed(variant: BannerVariant) {
     if (this.dismissedBannerVariants.has(variant)) {
       return;
@@ -537,7 +543,7 @@ class ChatSessionStore {
   async deleteMessageFromSession(
     sessionId: string,
     messageId: string,
-  ): Promise<void> {
+  ): Promise<boolean> {
     try {
       await chatSessionRepository.deleteMessage(messageId);
       const session = this.sessions.find(s => s.id === sessionId);
@@ -548,8 +554,10 @@ class ChatSessionStore {
           );
         });
       }
+      return true;
     } catch (error) {
       console.error('Failed to delete message:', error);
+      return false;
     }
   }
 
@@ -1380,9 +1388,7 @@ class ChatSessionStore {
             // The frozen completion snapshot described the pre-edit
             // conversation; editing/regenerating shortens the context, so the
             // banner state is stale. Clear it and let the next turn re-evaluate.
-            this.lastCompletionResult = undefined;
-            this.dismissedBannerVariants = new Set();
-            this.consecutiveFullFailures = 0;
+            this.clearCompletionSnapshot();
           });
         }
       }

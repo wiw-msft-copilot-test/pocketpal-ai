@@ -363,15 +363,18 @@ describe('chatSessionStore', () => {
 
     afterEach(() => deleteMessage.mockReset());
 
-    it('deletes the row and drops it from the session', async () => {
-      chatSessionStore.sessions = [sessionWith('a', 'b')];
+    it('deletes only the selected row, preserving newer and older messages', async () => {
+      chatSessionStore.sessions = [sessionWith('newer', 'a', 'older')];
       deleteMessage.mockResolvedValueOnce(undefined);
 
-      await chatSessionStore.deleteMessageFromSession('S', 'a');
+      await expect(
+        chatSessionStore.deleteMessageFromSession('S', 'a'),
+      ).resolves.toBe(true);
 
       expect(deleteMessage).toHaveBeenCalledWith('a');
       expect(chatSessionStore.sessions[0].messages.map(m => m.id)).toEqual([
-        'b',
+        'newer',
+        'older',
       ]);
     });
 
@@ -382,7 +385,7 @@ describe('chatSessionStore', () => {
 
       await expect(
         chatSessionStore.deleteMessageFromSession('S', 'a'),
-      ).resolves.toBeUndefined();
+      ).resolves.toBe(false);
 
       expect(chatSessionStore.sessions[0].messages.map(m => m.id)).toEqual([
         'a',

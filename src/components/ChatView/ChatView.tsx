@@ -7,6 +7,7 @@ import {
   View,
   TouchableOpacity,
   Keyboard,
+  Alert,
 } from 'react-native';
 
 import dayjs from 'dayjs';
@@ -98,6 +99,7 @@ import {
   GridIcon,
   PencilLineIcon,
   RefreshIcon,
+  TrashIcon,
 } from '../../assets/icons';
 
 type MenuItem = {
@@ -746,6 +748,8 @@ export const ChatView = observer(
     } = l10n.components.chatView.menuItems;
 
     const isStopping = chatSessionStore.isStopping;
+    const isGenerating = chatSessionStore.isGenerating;
+    const isEditMode = chatSessionStore.isEditMode;
     const voiceModeOpen = voiceModeStore.isOpen;
     const menuItems = React.useMemo((): MenuItem[] => {
       if (
@@ -809,6 +813,58 @@ export const ChatView = observer(
           icon: () => <PencilLineIcon stroke={theme.colors.primary} />,
           disabled: !canGenerate,
         });
+
+        baseItems.push({
+          label: l10n.common.delete,
+          onPress: () => {
+            const sessionId = chatSessionStore.activeSessionId;
+            const messageId = selectedMessage.id;
+            handleMenuDismiss();
+            if (!sessionId) {
+              return;
+            }
+            Alert.alert(
+              l10n.components.chatView.deleteMessageTitle,
+              l10n.components.chatView.deleteMessageConfirmation,
+              [
+                {text: l10n.common.cancel, style: 'cancel'},
+                {
+                  text: l10n.common.delete,
+                  style: 'destructive',
+                  onPress: async () => {
+                    if (
+                      chatSessionStore.isGenerating ||
+                      chatSessionStore.isStopping ||
+                      chatSessionStore.isEditMode ||
+                      voiceModeStore.isOpen
+                    ) {
+                      Alert.alert(
+                        l10n.common.error,
+                        l10n.components.chatView.deleteMessageBusy,
+                      );
+                      return;
+                    }
+                    const deleted =
+                      await chatSessionStore.deleteMessageFromSession(
+                        sessionId,
+                        messageId,
+                      );
+                    if (!deleted) {
+                      Alert.alert(
+                        l10n.common.error,
+                        l10n.components.chatView.deleteMessageError,
+                      );
+                    } else if (chatSessionStore.activeSessionId === sessionId) {
+                      chatSessionStore.clearCompletionSnapshot();
+                    }
+                  },
+                },
+              ],
+            );
+          },
+          icon: () => <TrashIcon stroke={theme.colors.error} />,
+          disabled: isGenerating || isStopping || voiceModeOpen || isEditMode,
+        });
       }
 
       if (__ENABLE_PALSHUB__) {
@@ -841,6 +897,10 @@ export const ChatView = observer(
       regenerateWithLabel,
       editLabel,
       reportContentLabel,
+      l10n,
+      theme.colors.error,
+      isGenerating,
+      isEditMode,
     ]);
 
     // ============ RENDER FUNCTIONS ============
