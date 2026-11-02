@@ -340,7 +340,7 @@ describe('ChatView voice mode', () => {
         answer,
         [menuLabels.regenerate, menuLabels.regenerateWith],
       ],
-      ['a user row', textMessage, [menuLabels.edit]],
+      ['a user row', textMessage, [menuLabels.edit, l10n.en.common.delete]],
     ])(
       'disables the items that generate on %s while voice mode is open',
       (_row, message, generating) => {

@@ -56,7 +56,7 @@ export const mockChatSessionStore = {
   setActiveSession: jest.fn().mockResolvedValue(undefined),
   addMessageToCurrentSession: jest.fn().mockResolvedValue(undefined),
   addMessageToSession: jest.fn().mockResolvedValue(undefined),
-  deleteMessageFromSession: jest.fn().mockResolvedValue(undefined),
+  deleteMessageFromSession: jest.fn().mockResolvedValue(true),
   replaceCompactedHistory: jest.fn().mockResolvedValue(undefined),
   resetActiveSession: jest.fn(),
   updateSessionTitle: jest.fn().mockResolvedValue(undefined),
@@ -138,6 +138,7 @@ export const mockChatSessionStore = {
   consecutiveFullFailures: 0,
   palLoadHintSeen: new Set<string>(),
   recordCompletionSnapshot: jest.fn(),
+  clearCompletionSnapshot: jest.fn(),
   setBannerDismissed: jest.fn(),
   markPalLoadHintSeen: jest.fn(),
 };
