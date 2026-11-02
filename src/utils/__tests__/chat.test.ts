@@ -371,6 +371,28 @@ describe('convertToChatMessages — AssistantTurn', () => {
     expect(result[1].role).toBe('tool');
     expect(result[1].responsesState).toBeUndefined();
     expect(result[2].responsesState).toBe(secondState);
+    const summary: MessageType.Text = {
+      id: 'summary',
+      type: 'text',
+      author: user,
+      text: 'Conversation summary',
+      metadata: {compaction: true, compactionRetainedIds: ['retained']},
+    };
+    const retained = makeAssistantTurn(
+      [{content: 'done', responsesState: secondState}],
+      'retained',
+    );
+    const compacted = convertToChatMessages([retained, summary]);
+    expect(compacted[1].content).toBe('done');
+    expect(compacted[1].responsesState).toBeUndefined();
+    expect(retained.steps[0].responsesState).toBe(secondState);
+    const nextTurn = makeAssistantTurn(
+      [{content: 'new', responsesState: secondState}],
+      'next',
+    );
+    expect(
+      convertToChatMessages([nextTurn, retained, summary])[2].responsesState,
+    ).toBe(secondState);
   });
 
   it('#3 step with empty content but tool_calls → assistant message with empty content + tool_calls + sentinel "aborted" tool response (orphan-pair guard)', () => {

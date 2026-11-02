@@ -11,6 +11,9 @@ import {
 import {Selectors, byPartialText, byTestId} from '../../helpers/selectors';
 import {Gestures} from '../../helpers/gestures';
 import {saveFailureScreenshot} from '../../helpers/screenshots';
+import {SCREENSHOT_DIR} from '../../wdio.shared.conf';
+import * as fs from 'fs';
+import * as path from 'path';
 import {
   addModelFromOpenRemoteSheet,
   fixtureStatus,
@@ -291,5 +294,84 @@ describe('Remote Responses protocol', () => {
     expect(status.scoutCalculateValidated).toBe(true);
     expect(status.scoutHtmlValidated).toBe(true);
     expect(status.scoutSearchValidated).toBe(true);
+  });
+
+  it('compacts a chat from its menu and persists only summary plus retained turns', async () => {
+    await chatPage.resetChat();
+    const oldPrompt = `The blue bicycle is important. ${'Detailed historical context. '.repeat(40)}`;
+    await chatPage.sendMessage(oldPrompt);
+    await waitForAssistantText('Streaming fixture complete.');
+    await browser.$(Selectors.chat.stopButton).waitForDisplayed({
+      reverse: true,
+      timeout: 10000,
+    });
+    await chatPage.sendMessage('This is the recent turn to keep unchanged.');
+    await waitForAssistantText('Streaming fixture complete.');
+    await browser.$(Selectors.chat.stopButton).waitForDisplayed({
+      reverse: true,
+      timeout: 10000,
+    });
+
+    await browser
+      .$(`${byTestId('menu-button-container')}//android.widget.Button`)
+      .click();
+    await browser.$(byPartialText('Compaction')).click();
+    await browser
+      .$(byTestId('compaction-dialog'))
+      .waitForExist({timeout: 5000});
+    await browser.$(byTestId('compaction-cancel')).click();
+    await browser.$(byTestId('compaction-dialog')).waitForExist({
+      reverse: true,
+      timeout: 10000,
+    });
+    expect(
+      (await fixtureStatus(FIXTURE_URL)).requests.at(-1)?.scenario,
+    ).not.toBe('compaction');
+
+    await browser
+      .$(`${byTestId('menu-button-container')}//android.widget.Button`)
+      .click();
+    await browser.$(byPartialText('Compaction')).click();
+    await browser
+      .$(byTestId('compaction-guidance'))
+      .setValue('Keep the last complete turn verbatim');
+    await modelsPage.hideKeyboard();
+    fs.mkdirSync(SCREENSHOT_DIR, {recursive: true});
+    await driver.saveScreenshot(
+      path.join(SCREENSHOT_DIR, 'chat-compaction-dialog.png'),
+    );
+    await browser.$(byTestId('compaction-confirm')).click();
+    await browser.$(byTestId('compaction-dialog')).waitForExist({
+      reverse: true,
+      timeout: 30000,
+    });
+    expect((await fixtureStatus(FIXTURE_URL)).requests.at(-1)?.scenario).toBe(
+      'compaction',
+    );
+    await browser
+      .$(byPartialText('Remember the blue bicycle.'))
+      .waitForExist({timeout: 10000});
+    await driver.saveScreenshot(
+      path.join(SCREENSHOT_DIR, 'chat-compaction-result.png'),
+    );
+
+    await driver.terminateApp(APP_ID);
+    await driver.activateApp(APP_ID);
+    await chatPage.waitForReady(TIMEOUTS.appReady);
+    await chatPage.openDrawer();
+    await drawerPage.waitForOpen();
+    await drawerPage.tapSession('The blue bicycle is important.');
+    await browser
+      .$(byPartialText('Remember the blue bicycle.'))
+      .waitForExist({timeout: 10000});
+    await chatPage.sendMessage(
+      'fixture:final-only Continue using the compacted context.',
+    );
+    await waitForAssistantText('Final-only fixture output.');
+    const request = (await fixtureStatus(FIXTURE_URL)).requests.at(-1);
+    const wire = JSON.stringify(request?.body);
+    expect(wire).toContain('Remember the blue bicycle.');
+    expect(wire).toContain('This is the recent turn to keep unchanged.');
+    expect(wire).not.toContain('Detailed historical context.');
   });
 });

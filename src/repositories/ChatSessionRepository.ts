@@ -12,6 +12,7 @@ import {
 import {SessionMetaData} from '../store/ChatSessionStore';
 
 import {MessageType} from '../utils/types';
+import {CompactionError, compactionFingerprint} from '../services/compaction';
 import {CompletionParams} from '../utils/completionTypes';
 import {
   defaultCompletionParams,
@@ -491,6 +492,55 @@ class ChatSessionRepository {
     for (const id of ids) {
       await exportChatSession(id);
     }
+  }
+
+  async replaceCompactedHistory(
+    sessionId: string,
+    source: MessageType.Any[],
+    replacement: MessageType.Any[],
+    canCommit: () => boolean,
+  ): Promise<MessageType.Any[]> {
+    return database.write(async () => {
+      await database.collections
+        .get<ChatSession>('chat_sessions')
+        .find(sessionId);
+      const collection = database.collections.get<Message>('messages');
+      const rows = await collection
+        .query(Q.where('session_id', sessionId), Q.sortBy('position', Q.desc))
+        .fetch();
+      if (
+        !canCommit() ||
+        compactionFingerprint(rows.map(row => row.toMessageObject())) !==
+          compactionFingerprint(source)
+      ) {
+        throw new CompactionError('changed');
+      }
+      const summary = replacement[replacement.length - 1];
+      if (summary.type !== 'text' || !summary.metadata?.compaction) {
+        throw new CompactionError('invalid');
+      }
+      const kept = new Set(replacement.slice(0, -1).map(message => message.id));
+      const newSummary = collection.prepareCreate(record => {
+        record.sessionId = sessionId;
+        record.author = summary.author.id;
+        record.text = summary.text;
+        record.type = summary.type;
+        record.metadata = JSON.stringify(summary.metadata);
+        record.createdAt = summary.createdAt ?? Date.now();
+        record.position = 1;
+      });
+      const operations = rows.map(row => {
+        if (!kept.has(row.id)) {
+          return row.prepareDestroyPermanently();
+        }
+        const index = replacement.findIndex(message => message.id === row.id);
+        return row.prepareUpdate(record => {
+          record.position = replacement.length - index;
+        });
+      });
+      await database.batch(newSummary, ...operations);
+      return [...replacement.slice(0, -1), {...summary, id: newSummary.id}];
+    });
   }
 
   // Add a message to a session

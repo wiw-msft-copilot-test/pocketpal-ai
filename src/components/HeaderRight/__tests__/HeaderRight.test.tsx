@@ -117,6 +117,7 @@ describe('HeaderRight', () => {
           await findByText(l10n.en.components.headerRight.duplicateChatHistory),
         ).toBeTruthy();
         expect(await findByText(l10n.en.common.rename)).toBeTruthy();
+        expect(await findByText('Compaction')).toBeTruthy();
         expect(await findByText(l10n.en.common.delete)).toBeTruthy();
       });
 

@@ -901,6 +901,21 @@
       "exportChatSession": "Export chat session",
       "importSessions": "Import sessions"
     },
+    "compaction": {
+      "title": "Compaction",
+      "guidance": "Additional guidance (optional)",
+      "summary": "Conversation summary",
+      "warning": "This permanently replaces summarized messages with a shorter summary. Images and any complete turns selected for verbatim retention stay unchanged. The selected model processes this chat; remote models send it to your configured server. Remote context sizes are estimated. Summaries can lose details.",
+      "progress": "Compacting chat...",
+      "errors": {
+        "unavailable": "Select a ready model and wait for the current operation to finish. The chat must contain messages.",
+        "overflow": "The full history and summary request cannot fit in the selected model's context window. Increase its context size or use a model with more room. History was not changed.",
+        "invalid": "The model did not return a complete, valid summary and retention selection. History was not changed.",
+        "noReduction": "Compaction could not reduce the context enough. Retained turns and images may leave too little room. History was not changed.",
+        "changed": "Compaction was cancelled or the chat changed before saving. History was not changed.",
+        "failed": "Compaction failed. The model or server may be unavailable, or its context window may be full. History was not changed."
+      }
+    },
     "hfTokenSheet": {
       "title": "Hugging Face Token",
       "description": "Required to access gated models",

@@ -164,6 +164,9 @@ const inputText = (body: any): string => {
 
 const scenarioFor = (body: any): string => {
   const prompt = inputText(body).toLowerCase();
+  if (prompt.includes('"transcript":') && prompt.includes('"guidance":')) {
+    return 'compaction';
+  }
   for (const scenario of [
     'reasoning',
     'final-only',
@@ -341,6 +344,21 @@ function streamResponsesScenario(
   requestRecord.scenario = scenario;
   beginSse(response);
 
+  if (scenario === 'compaction') {
+    const input = JSON.parse(inputText(body));
+    const keepTurnIds = /keep.*last.*turn/i.test(input.guidance)
+      ? [input.transcript.at(-1).turnId]
+      : [];
+    streamText(
+      response,
+      JSON.stringify({summary: 'Remember the blue bicycle.', keepTurnIds}),
+      [
+        '{"summary":"Remember the blue bicycle.",',
+        `"keepTurnIds":${JSON.stringify(keepTurnIds)}}`,
+      ],
+    );
+    return;
+  }
   if (scenario === 'incremental') {
     streamText(
       response,

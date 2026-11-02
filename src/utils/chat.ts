@@ -197,6 +197,16 @@ export function convertToChatMessages(
   messages: MessageType.Any[],
   isMultimodalEnabled: boolean = true,
 ): ChatMessage[] {
+  const compactedIds = new Set<string>(
+    messages.flatMap(message =>
+      message.metadata?.compaction &&
+      Array.isArray(message.metadata?.compactionRetainedIds)
+        ? message.metadata.compactionRetainedIds.filter(
+            (id: unknown): id is string => typeof id === 'string',
+          )
+        : [],
+    ),
+  );
   const groups: ChatMessage[][] = messages
     .filter(message => {
       if (message.type === 'assistant_turn') {
@@ -219,7 +229,16 @@ export function convertToChatMessages(
         // Each step → assistant message (+ tool messages). All steps for
         // one turn are emitted as one inner group so the OUTER reverse
         // keeps them adjacent in chronological order.
-        return (turn.steps ?? []).flatMap(stepToApiMessages);
+        return (turn.steps ?? []).flatMap(step => {
+          // Opaque provider state belongs to the pre-compaction context.
+          // Retain original turns on disk, but replay their visible/tool data.
+          if (compactedIds.has(message.id)) {
+            const replayStep = {...step};
+            delete replayStep.responsesState;
+            return stepToApiMessages(replayStep);
+          }
+          return stepToApiMessages(step);
+        });
       }
 
       const textMessage = message as MessageType.Text;
