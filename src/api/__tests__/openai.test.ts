@@ -743,7 +743,7 @@ describe('streamChatCompletion', () => {
   it.each([
     ['temperature', 0, 'temperature'],
     ['top_p', 0, 'top_p'],
-    ['max_tokens', -1, 'max_completion_tokens'],
+    ['max_tokens', 1, 'max_completion_tokens'],
     ['stop', [], 'stop'],
     ['jinja', false, 'jinja'],
   ] as const)(
@@ -770,6 +770,37 @@ describe('streamChatCompletion', () => {
       );
       xhr.simulateLoad();
       await resultPromise;
+    },
+  );
+
+  it.each([-1, 0])(
+    'omits an unlimited legacy max_tokens %d even in explicit Send mode',
+    async maxTokens => {
+      const resultPromise = streamChatCompletion(
+        {
+          messages: [{role: 'user', content: 'Hi'}],
+          model: 'test-model',
+          max_tokens: maxTokens,
+          temperature: 0,
+          generationParameterModes: {
+            n_predict: 'send',
+            temperature: 'send',
+          },
+        },
+        'http://localhost:1234',
+      );
+      const xhr = MockXHR.instances[0];
+      const body = JSON.parse(xhr.requestBody);
+      xhr.simulateHeaders(200);
+      xhr.simulateProgress(
+        'data: {"choices":[{"delta":{},"finish_reason":"stop"}]}\n\ndata: [DONE]\n\n',
+      );
+      xhr.simulateLoad();
+      await resultPromise;
+
+      expect(body).not.toHaveProperty('max_tokens');
+      expect(body).not.toHaveProperty('max_completion_tokens');
+      expect(body.temperature).toBe(0);
     },
   );
 

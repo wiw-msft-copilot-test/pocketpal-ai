@@ -13,6 +13,7 @@ import {
 import type {Samplers} from '../../src/utils/samplerParams';
 import type {ErrorState} from '../../src/utils/errors';
 import {LlamaContext} from 'llama.rn';
+import type {AppStateStatus} from 'react-native';
 import {CompletionEngine} from '../../src/utils/completionTypes';
 import {GenerationSlot} from '../../src/store/generationLease';
 import {createDefaultContextInitParams} from '../../src/utils/contextInitParamsVersions';
@@ -119,6 +120,7 @@ class MockModelStore {
   isContextLoading: boolean = false;
   hasPendingModelOperations: boolean = false;
   loadingModel: Model | undefined;
+  appState: AppStateStatus = 'active';
 
   constructor() {
     makeAutoObservable(this, {

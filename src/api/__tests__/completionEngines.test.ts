@@ -12,6 +12,8 @@ import {
   RemoteModelRequestWithdrawnError,
 } from '../../utils/errors';
 import {routerWireJson} from '../../../jest/fixtures/routerWire';
+import {defaultCompletionParams} from '../../utils/completionSettingsVersions';
+import {toApiCompletionParams} from '../../utils/completionTypes';
 
 jest.mock('../openai', () => ({
   streamChatCompletion: jest.fn(),
@@ -65,6 +67,20 @@ describe('LocalCompletionEngine', () => {
     expect(result.stopped_eos).toBe(true);
     expect(result.tokens_predicted).toBe(2);
     expect(result.timings).toEqual({predicted_per_second: 50});
+  });
+
+  it('hands llama.rn the default unlimited n_predict as-is', async () => {
+    (mockContext.completion as jest.Mock).mockResolvedValueOnce({text: ''});
+
+    await engine.completion(
+      toApiCompletionParams({...defaultCompletionParams, messages: []}),
+    );
+
+    expect(defaultCompletionParams.n_predict).toBe(-1);
+    expect(mockContext.completion).toHaveBeenCalledWith(
+      expect.objectContaining({n_predict: -1}),
+      undefined,
+    );
   });
 
   it('drops native timings fields that are not finite numbers', async () => {
