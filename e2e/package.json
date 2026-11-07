@@ -18,6 +18,7 @@
     "test:selectors": "node --test -r ts-node/register helpers/__tests__/selectors.test.ts",
     "e2e:remote-responses:android": "node -r ts-node/register scripts/run-remote-responses.ts",
     "typecheck:remote-responses": "tsc -p tsconfig.remote-responses.json",
+    "test:run-e2e": "npx tsx scripts/__tests__/run-e2e.test.ts",
     "typecheck": "tsc --noEmit"
   },
   "packageManager": "yarn@1.22.22",

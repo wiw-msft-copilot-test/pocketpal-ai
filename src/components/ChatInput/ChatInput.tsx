@@ -217,6 +217,8 @@ export const ChatInput = observer(
     const user = React.useContext(UserContext);
     const inputRef = React.useRef<TextInputInstance>(null);
     const focusInput = React.useCallback(() => inputRef.current?.focus(), []);
+    // iOS keeps the old height when only `value` is cleared: react/react-native#56291
+    const clearNativeText = () => inputRef.current?.clear();
     const editBarHeight = React.useRef(new Animated.Value(0)).current;
     const iconRotation = React.useRef(new Animated.Value(0)).current;
     const activePalId = chatSessionStore.activePalId;
@@ -484,6 +486,7 @@ export const ChatInput = observer(
           return;
         }
 
+        clearNativeText();
         // Include imageUris in the message object
         onSendPress({
           text: trimmedValue,
@@ -630,6 +633,7 @@ export const ChatInput = observer(
     };
 
     const handleCancel = () => {
+      clearNativeText();
       setText('');
       onCancelEdit?.();
     };
