@@ -11,7 +11,7 @@ const NONE: ReadonlySet<string> = new Set();
 const GB8 = 8e9;
 
 describe('Plus feature status', () => {
-  it('shows hands-free voice ready and the API server coming soon', () => {
+  it('retains voice source readiness while the API server remains unshipped', () => {
     const rows = featureRows(PLUS_FEATURES, GB8, NONE);
     expect(rows).toEqual([
       {id: 'handsFreeVoice', status: 'ready'},
@@ -24,11 +24,14 @@ describe('Plus feature status', () => {
   });
 
   it('marks the overridden feature shipped', () => {
-    const override = new Set(['localApiServer']);
-    const rows = featureRows(PLUS_FEATURES, GB8, override);
+    const table = fakePlusFeatures([
+      {id: 'open', shipped: true},
+      {id: 'later', shipped: false},
+    ]);
+    const rows = featureRows(table, GB8, new Set(['later']));
     expect(rows).toEqual([
-      {id: 'handsFreeVoice', status: 'ready'},
-      {id: 'localApiServer', status: 'ready'},
+      {id: 'open', status: 'ready'},
+      {id: 'later', status: 'ready'},
     ]);
   });
 

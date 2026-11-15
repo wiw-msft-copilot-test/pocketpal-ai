@@ -11,6 +11,7 @@ import {
   shouldReturnFocusOnClose,
 } from '../gate';
 import {setShipOverride, shipOverride} from '../shipOverride';
+import {isLocalApiServerAvailable} from '../shipped';
 
 jest.mock('../catalog', () =>
   require('../../../../jest/fixtures/plus').mockUnshippedCatalog(),
@@ -228,5 +229,11 @@ describe('Plus gate', () => {
 
   it('exports the marker in a gated build', () => {
     expect(PLUS_STORE_GATE_MARKER).toBe('PLUS_STORE_GATE_ON');
+  });
+
+  it('does not expose the unshipped server through E2E ship or purchase overrides', () => {
+    setShipOverride(['localApiServer']);
+    setUnlocked(true);
+    expect(isLocalApiServerAvailable()).toBe(false);
   });
 });

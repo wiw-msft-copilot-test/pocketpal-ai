@@ -76,6 +76,7 @@ describe('Android hardware declarations', () => {
       'Download',
       'SpeechRecognition',
       'VoiceChatLauncher',
+      'SpeechPlayback',
     ]) {
       expect(application).toMatch(new RegExp(`add\\(${name}Package\\(\\)\\)`));
     }
@@ -93,6 +94,32 @@ describe('Android hardware declarations', () => {
         'android:name': 'android.permission.RECORD_AUDIO',
       }),
     ).toBeDefined();
+  });
+
+  it('keeps ordinary background narration private and separate from microphone capture', () => {
+    expect(
+      findTag('service', {
+        'android:name': 'com.pocketpal.speech.SpeechPlaybackService',
+        'android:foregroundServiceType': 'mediaPlayback',
+        'android:exported': 'false',
+      }),
+    ).toBeDefined();
+    expect(
+      findTag('receiver', {
+        'android:name': 'com.pocketpal.speech.SpeechPlaybackStopReceiver',
+        'android:exported': 'false',
+      }),
+    ).toBeDefined();
+    for (const permission of [
+      'FOREGROUND_SERVICE',
+      'FOREGROUND_SERVICE_MEDIA_PLAYBACK',
+    ]) {
+      expect(
+        findTag('uses-permission', {
+          'android:name': `android.permission.${permission}`,
+        }),
+      ).toBeDefined();
+    }
   });
 
   describe('Android voice chat launcher', () => {

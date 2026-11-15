@@ -6,6 +6,12 @@ import type {OptInReason, PlusFeatureRow} from './features';
 import {shipOverride} from './shipOverride';
 import {voiceModeStore} from '../../store';
 
+export const isLocalApiServerAvailable = (): boolean =>
+  __ENABLE_PALSHUB__ &&
+  PLUS_FEATURES.some(
+    feature => feature.id === 'localApiServer' && feature.shipped,
+  );
+
 export const shippedPlusFeatures = (): PlusFeature[] =>
   __ENABLE_PALSHUB__ ? shippedFeatures(PLUS_FEATURES, shipOverride.get()) : [];
 

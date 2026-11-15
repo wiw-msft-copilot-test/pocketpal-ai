@@ -18,6 +18,21 @@
  * Or with default app paths:
  *   yarn test:aws --platform android
  *   yarn test:aws --platform ios
+ *
+ * One spec on one device, against a prebuilt app:
+ *   yarn e2e:aws --platform ios --app path/to/app.ipa \
+ *     --testspec testspec-ios-metal-load.yml --var METAL_LOAD_DEVICE=auto \
+ *     --device-arn arn:aws:devicefarm:us-west-2::device:XXXX \
+ *     --timeout 35 --name metal-load-1.22.0 --artifacts-dir device-farm-artifacts/x
+ *
+ *   --testspec <file>     test spec to upload instead of testspec-<platform>.yml
+ *   --var KEY=VALUE       replace __KEY__ in the test spec (repeatable)
+ *   --device-arn <arn>    run on exactly this device (no device pool needed)
+ *   --device-pool <arn>   device pool ARN (overrides AWS_DEVICE_POOL_ARN_*)
+ *   --timeout <minutes>   per-device job timeout (default 60, 120 with --all-models)
+ *   --name <label>        run name suffix
+ *   --artifacts-dir <dir> where artifacts are saved (default device-farm-artifacts)
+ *   --dry-run             print the resolved run and exit, with no AWS call
  */
 
 import {config} from 'dotenv';
@@ -37,6 +52,7 @@ import {
 } from '@aws-sdk/client-device-farm';
 import * as fs from 'fs';
 import * as path from 'path';
+import * as os from 'os';
 import * as https from 'https';
 import {execSync} from 'child_process';
 
@@ -52,17 +68,54 @@ const DEVICE_POOL_ARN_IOS = process.env.AWS_DEVICE_POOL_ARN_IOS;
 // Default app paths
 // Note: iOS requires an IPA built for real devices (not simulator)
 // The simulator .app from yarn ios:build:e2e will NOT work on Device Farm
-const DEFAULT_ANDROID_APP = '../android/app/build/outputs/apk/e2e/releaseE2e/app-e2e-releaseE2e.apk';
+const DEFAULT_ANDROID_APP =
+  '../android/app/build/outputs/apk/e2e/releaseE2e/app-e2e-releaseE2e.apk';
 const DEFAULT_IOS_APP = '../ios/build/PocketPal.ipa';
 
+interface RunnerArgs {
+  platform: 'ios' | 'android';
+  appPath: string;
+  allModels: boolean;
+  testSpec?: string;
+  vars: Record<string, string>;
+  deviceArn?: string;
+  devicePool?: string;
+  timeoutMinutes?: number;
+  runName?: string;
+  artifactsDir?: string;
+  dryRun: boolean;
+}
+
+function optionValue(args: string[], flag: string): string | undefined {
+  const i = args.indexOf(flag);
+  return i !== -1 ? args[i + 1] : undefined;
+}
+
+function resolveFromE2e(p: string): string {
+  return path.isAbsolute(p) ? p : path.resolve(__dirname, '..', p);
+}
+
 // Parse command line arguments
-function parseArgs(): {platform: 'ios' | 'android'; appPath: string; allModels: boolean} {
+function parseArgs(): RunnerArgs {
   const args = process.argv.slice(2);
   const platformIndex = args.indexOf('--platform');
   const appIndex = args.indexOf('--app');
   const allModels = args.includes('--all-models');
 
-  const platform = (platformIndex !== -1 ? args[platformIndex + 1] : 'android') as 'ios' | 'android';
+  const vars: Record<string, string> = {};
+  args.forEach((arg, i) => {
+    if (arg === '--var' && args[i + 1]?.includes('=')) {
+      const [key, ...rest] = args[i + 1].split('=');
+      vars[key] = rest.join('=');
+    }
+  });
+  const timeout = optionValue(args, '--timeout');
+  const testSpec = optionValue(args, '--testspec');
+  const artifactsDir = optionValue(args, '--artifacts-dir');
+
+  const platform = (
+    platformIndex !== -1 ? args[platformIndex + 1] : 'android'
+  ) as 'ios' | 'android';
 
   let appPath: string;
   if (appIndex !== -1 && args[appIndex + 1]) {
@@ -77,7 +130,19 @@ function parseArgs(): {platform: 'ios' | 'android'; appPath: string; allModels: 
     appPath = path.resolve(__dirname, '..', appPath);
   }
 
-  return {platform, appPath, allModels};
+  return {
+    platform,
+    appPath,
+    allModels,
+    testSpec: testSpec && resolveFromE2e(testSpec),
+    vars,
+    deviceArn: optionValue(args, '--device-arn'),
+    devicePool: optionValue(args, '--device-pool'),
+    timeoutMinutes: timeout ? parseInt(timeout, 10) : undefined,
+    runName: optionValue(args, '--name'),
+    artifactsDir: artifactsDir && resolveFromE2e(artifactsDir),
+    dryRun: args.includes('--dry-run'),
+  };
 }
 
 // Validate required environment variables
@@ -97,13 +162,27 @@ function validateEnvironment(): void {
   if (missing.length > 0) {
     console.error('Error: Missing required environment variables:');
     missing.forEach(v => console.error(`  - ${v}`));
-    console.error('\nPlease set these in e2e/.env or as environment variables.');
+    console.error(
+      '\nPlease set these in e2e/.env or as environment variables.',
+    );
     console.error('See e2e/.env.example for reference.');
     process.exit(1);
   }
 }
 
-const {platform, appPath, allModels} = parseArgs();
+const runnerArgs = parseArgs();
+const {platform, appPath, allModels} = runnerArgs;
+
+if (runnerArgs.dryRun) {
+  console.log(
+    JSON.stringify({...runnerArgs, appExists: fs.existsSync(appPath)}, null, 2),
+  );
+  const spec = prepareTestSpec(platform, allModels);
+  console.log(
+    `--- test spec to upload (${spec}) ---\n${fs.readFileSync(spec, 'utf8')}`,
+  );
+  process.exit(0);
+}
 
 // Validate environment before proceeding
 validateEnvironment();
@@ -114,7 +193,9 @@ if (!fs.existsSync(appPath)) {
   console.error('\nMake sure to build the app first:');
   console.error('  Android: yarn build:android:release (creates APK)');
   console.error('  iOS:     yarn ios:build:ipa (creates IPA via Fastlane)');
-  console.error('\nOr specify a custom path: yarn test:aws --platform ios --app /path/to/app.ipa');
+  console.error(
+    '\nOr specify a custom path: yarn test:aws --platform ios --app /path/to/app.ipa',
+  );
   process.exit(1);
 }
 
@@ -156,10 +237,14 @@ async function uploadToS3WithRetry(
     } catch (error) {
       const errorMessage = (error as Error).message;
       if (attempt < maxRetries) {
-        console.log(`  Upload attempt ${attempt} failed: ${errorMessage}. Retrying...`);
+        console.log(
+          `  Upload attempt ${attempt} failed: ${errorMessage}. Retrying...`,
+        );
         await new Promise(resolve => setTimeout(resolve, 2000 * attempt)); // Exponential backoff
       } else {
-        throw new Error(`Upload failed after ${maxRetries} attempts: ${errorMessage}`);
+        throw new Error(
+          `Upload failed after ${maxRetries} attempts: ${errorMessage}`,
+        );
       }
     }
   }
@@ -231,9 +316,39 @@ function createTestPackage(): string {
  * Create a modified testspec with --all-models flag if needed.
  * Returns path to the testspec file to upload.
  */
-function prepareTestSpec(targetPlatform: 'ios' | 'android', useAllModels: boolean): string {
+function prepareTestSpec(
+  targetPlatform: 'ios' | 'android',
+  useAllModels: boolean,
+): string {
   const packageDir = path.join(__dirname, '..');
-  const originalPath = path.join(packageDir, `testspec-${targetPlatform}.yml`);
+  const originalPath =
+    runnerArgs.testSpec ||
+    path.join(packageDir, `testspec-${targetPlatform}.yml`);
+
+  const varKeys = Object.keys(runnerArgs.vars);
+  const placeholder = /__[A-Z][A-Z0-9_]*__/;
+  if (
+    varKeys.length > 0 ||
+    placeholder.test(fs.readFileSync(originalPath, 'utf8'))
+  ) {
+    let templated = fs.readFileSync(originalPath, 'utf8');
+    for (const key of varKeys) {
+      templated = templated.split(`__${key}__`).join(runnerArgs.vars[key]);
+    }
+    const leftover = templated.match(/__[A-Z][A-Z0-9_]*__/g);
+    if (leftover) {
+      throw new Error(
+        `Unset test spec variables: ${[...new Set(leftover)].join(', ')}`,
+      );
+    }
+    const tempPath = path.join(
+      fs.mkdtempSync(path.join(os.tmpdir(), 'df-testspec-')),
+      path.basename(originalPath),
+    );
+    fs.writeFileSync(tempPath, templated);
+    console.log(`Test spec with variables: ${tempPath}`);
+    return tempPath;
+  }
 
   if (!useAllModels) {
     return originalPath;
@@ -249,7 +364,10 @@ function prepareTestSpec(targetPlatform: 'ios' | 'android', useAllModels: boolea
   );
 
   // Write to temporary file
-  const tempPath = path.join(packageDir, `testspec-${targetPlatform}-allmodels.yml`);
+  const tempPath = path.join(
+    packageDir,
+    `testspec-${targetPlatform}-allmodels.yml`,
+  );
   fs.writeFileSync(tempPath, content);
   console.log(`Created modified testspec with --all-models: ${tempPath}`);
 
@@ -264,9 +382,18 @@ function prepareTestSpec(targetPlatform: 'ios' | 'android', useAllModels: boolea
  * 3. Curated "Top Devices" pool
  * 4. First available pool
  */
-async function getDevicePoolArn(targetPlatform: 'ios' | 'android'): Promise<string> {
+async function getDevicePoolArn(
+  targetPlatform: 'ios' | 'android',
+): Promise<string> {
+  if (runnerArgs.devicePool) {
+    console.log(
+      `Using device pool from --device-pool: ${runnerArgs.devicePool}`,
+    );
+    return runnerArgs.devicePool;
+  }
   // Check for explicit device pool ARN in environment
-  const envPoolArn = targetPlatform === 'ios' ? DEVICE_POOL_ARN_IOS : DEVICE_POOL_ARN_ANDROID;
+  const envPoolArn =
+    targetPlatform === 'ios' ? DEVICE_POOL_ARN_IOS : DEVICE_POOL_ARN_ANDROID;
   if (envPoolArn) {
     console.log(`Using device pool from environment: ${envPoolArn}`);
     return envPoolArn;
@@ -281,7 +408,8 @@ async function getDevicePoolArn(targetPlatform: 'ios' | 'android'): Promise<stri
   );
 
   const privatePools = privateResponse.devicePools || [];
-  const platformPoolName = targetPlatform === 'ios' ? 'iOS-Test-Devices' : 'Android-Test-Devices';
+  const platformPoolName =
+    targetPlatform === 'ios' ? 'iOS-Test-Devices' : 'Android-Test-Devices';
   const matchingPool = privatePools.find(
     pool => pool.name?.toLowerCase() === platformPoolName.toLowerCase(),
   );
@@ -314,7 +442,9 @@ async function getDevicePoolArn(targetPlatform: 'ios' | 'android'): Promise<stri
     return curatedPools[0].arn;
   }
 
-  throw new Error('No device pools available. Please create a device pool in AWS Device Farm console.');
+  throw new Error(
+    'No device pools available. Please create a device pool in AWS Device Farm console.',
+  );
 }
 
 /**
@@ -323,40 +453,47 @@ async function getDevicePoolArn(targetPlatform: 'ios' | 'android'): Promise<stri
 async function downloadFile(url: string, destPath: string): Promise<void> {
   return new Promise((resolve, reject) => {
     const file = fs.createWriteStream(destPath);
-    https.get(url, response => {
-      // Handle redirects
-      if (response.statusCode === 301 || response.statusCode === 302) {
-        const redirectUrl = response.headers.location;
-        if (redirectUrl) {
-          https.get(redirectUrl, redirectResponse => {
-            redirectResponse.pipe(file);
-            file.on('finish', () => {
-              file.close();
-              resolve();
-            });
-          }).on('error', err => {
-            fs.unlink(destPath, () => {});
-            reject(err);
-          });
-          return;
+    https
+      .get(url, response => {
+        // Handle redirects
+        if (response.statusCode === 301 || response.statusCode === 302) {
+          const redirectUrl = response.headers.location;
+          if (redirectUrl) {
+            https
+              .get(redirectUrl, redirectResponse => {
+                redirectResponse.pipe(file);
+                file.on('finish', () => {
+                  file.close();
+                  resolve();
+                });
+              })
+              .on('error', err => {
+                fs.unlink(destPath, () => {});
+                reject(err);
+              });
+            return;
+          }
         }
-      }
-      response.pipe(file);
-      file.on('finish', () => {
-        file.close();
-        resolve();
+        response.pipe(file);
+        file.on('finish', () => {
+          file.close();
+          resolve();
+        });
+      })
+      .on('error', err => {
+        fs.unlink(destPath, () => {});
+        reject(err);
       });
-    }).on('error', err => {
-      fs.unlink(destPath, () => {});
-      reject(err);
-    });
   });
 }
 
 /**
  * Download test artifacts (JUnit XML, screenshots, logs) from Device Farm
  */
-async function downloadArtifacts(runArn: string, outputDir: string): Promise<void> {
+async function downloadArtifacts(
+  runArn: string,
+  outputDir: string,
+): Promise<void> {
   console.log('\nDownloading test artifacts...');
 
   // Ensure output directory exists
@@ -385,7 +522,11 @@ async function downloadArtifacts(runArn: string, outputDir: string): Promise<voi
     }
 
     // Artifact categories we want to download
-    const artifactCategories: ArtifactCategory[] = ['FILE', 'LOG', 'SCREENSHOT'];
+    const artifactCategories: ArtifactCategory[] = [
+      'FILE',
+      'LOG',
+      'SCREENSHOT',
+    ];
 
     for (const artifactCategory of artifactCategories) {
       try {
@@ -408,20 +549,30 @@ async function downloadArtifacts(runArn: string, outputDir: string): Promise<voi
           }
 
           // Determine file extension from artifact name or type
-          const artifactName = artifact.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+          // Several artifacts share a name (e.g. Syslog), so prefix the type.
+          const artifactName = `${artifact.type}-${artifact.name}`.replace(
+            /[^a-zA-Z0-9.-]/g,
+            '_',
+          );
           const extension = artifact.extension || '';
-          const filename = extension ? `${artifactName}.${extension}` : artifactName;
+          const filename = extension
+            ? `${artifactName}.${extension}`
+            : artifactName;
           const destPath = path.join(typeDir, filename);
 
           try {
             await downloadFile(artifact.url, destPath);
             console.log(`    Downloaded: ${filename}`);
           } catch (downloadErr) {
-            console.log(`    Failed to download ${filename}: ${(downloadErr as Error).message}`);
+            console.log(
+              `    Failed to download ${filename}: ${(downloadErr as Error).message}`,
+            );
           }
         }
       } catch (listErr) {
-        console.log(`    Error listing ${artifactCategory} artifacts: ${(listErr as Error).message}`);
+        console.log(
+          `    Error listing ${artifactCategory} artifacts: ${(listErr as Error).message}`,
+        );
       }
     }
   }
@@ -479,8 +630,12 @@ ${testSuites.join('\n')}
 
     const mergedPath = path.join(outputDir, 'junit-results.xml');
     fs.writeFileSync(mergedPath, mergedXml);
-    console.log(`  Merged ${junitFiles.length} JUnit file(s) into: ${mergedPath}`);
-    console.log(`    Total: ${totalTests} tests, ${totalFailures} failures, ${totalErrors} errors`);
+    console.log(
+      `  Merged ${junitFiles.length} JUnit file(s) into: ${mergedPath}`,
+    );
+    console.log(
+      `    Total: ${totalTests} tests, ${totalFailures} failures, ${totalErrors} errors`,
+    );
   }
 
   console.log(`Artifacts saved to: ${outputDir}`);
@@ -488,7 +643,9 @@ ${testSuites.join('\n')}
 
 async function waitForRunComplete(runArn: string): Promise<Run> {
   console.log('Waiting for test run to complete...');
-  console.log('(This may take several minutes. You can also monitor progress in the AWS Console.)\n');
+  console.log(
+    '(This may take several minutes. You can also monitor progress in the AWS Console.)\n',
+  );
 
   let status = 'PENDING';
   while (!['COMPLETED', 'STOPPING', 'ERRORED'].includes(status)) {
@@ -499,7 +656,9 @@ async function waitForRunComplete(runArn: string): Promise<Run> {
     const result = response.run?.result;
 
     const timestamp = new Date().toLocaleTimeString();
-    console.log(`[${timestamp}] Status: ${status}, Result: ${result || 'pending'}`);
+    console.log(
+      `[${timestamp}] Status: ${status}, Result: ${result || 'pending'}`,
+    );
 
     if (status === 'RUNNING') {
       const counters = response.run?.counters;
@@ -532,11 +691,7 @@ async function main(): Promise<void> {
     const testSpecType: UploadType = 'APPIUM_NODE_TEST_SPEC';
 
     // Upload app
-    const appArn = await uploadFile(
-      appPath,
-      appType,
-      path.basename(appPath),
-    );
+    const appArn = await uploadFile(appPath, appType, path.basename(appPath));
 
     // Create and upload test package
     const testPackagePath = createTestPackage();
@@ -558,8 +713,24 @@ async function main(): Promise<void> {
       `testspec-${platform}.yml`,
     );
 
-    // Get device pool
-    const devicePoolArn = await getDevicePoolArn(platform);
+    // One named device, or a device pool
+    const devices = runnerArgs.deviceArn
+      ? {
+          deviceSelectionConfiguration: {
+            filters: [
+              {
+                attribute: 'ARN' as const,
+                operator: 'IN' as const,
+                values: [runnerArgs.deviceArn],
+              },
+            ],
+            maxDevices: 1,
+          },
+        }
+      : {devicePoolArn: await getDevicePoolArn(platform)};
+    if (runnerArgs.deviceArn) {
+      console.log(`Using device: ${runnerArgs.deviceArn}`);
+    }
 
     // Schedule test run with custom environment mode
     console.log('\nScheduling test run...');
@@ -567,15 +738,16 @@ async function main(): Promise<void> {
       new ScheduleRunCommand({
         projectArn: PROJECT_ARN,
         appArn,
-        devicePoolArn,
-        name: `PocketPal E2E - ${platform}${allModels ? ' (all models)' : ''} - ${new Date().toISOString()}`,
+        ...devices,
+        name: `PocketPal E2E - ${platform}${allModels ? ' (all models)' : ''}${runnerArgs.runName ? ` - ${runnerArgs.runName}` : ''} - ${new Date().toISOString()}`,
         test: {
           type: 'APPIUM_NODE',
           testPackageArn,
           testSpecArn, // Required for custom environment mode
         },
         executionConfiguration: {
-          jobTimeoutMinutes: allModels ? 120 : 60, // More time for all models
+          jobTimeoutMinutes:
+            runnerArgs.timeoutMinutes ?? (allModels ? 120 : 60),
         },
       }),
     );
@@ -583,13 +755,17 @@ async function main(): Promise<void> {
     const runArn = scheduleResponse.run?.arn as string;
     console.log(`Test run scheduled: ${runArn}`);
     console.log(`\nView in AWS Console:`);
-    console.log(`https://${REGION}.console.aws.amazon.com/devicefarm/home?region=${REGION}#/mobile/projects/${PROJECT_ARN?.split(':').pop()}/runs/${runArn.split('/').pop()}\n`);
+    console.log(
+      `https://${REGION}.console.aws.amazon.com/devicefarm/home?region=${REGION}#/mobile/projects/${PROJECT_ARN?.split(':').pop()}/runs/${runArn.split('/').pop()}\n`,
+    );
 
     // Wait for completion
     const finalRun = await waitForRunComplete(runArn);
 
     // Download artifacts (JUnit XML, screenshots, logs)
-    const artifactsDir = path.join(__dirname, '..', 'device-farm-artifacts');
+    const artifactsDir =
+      runnerArgs.artifactsDir ||
+      path.join(__dirname, '..', 'device-farm-artifacts');
     await downloadArtifacts(runArn, artifactsDir);
 
     // Print results
@@ -606,6 +782,12 @@ async function main(): Promise<void> {
       console.log(`  Failed:  ${finalRun.counters.failed}`);
       console.log(`  Errored: ${finalRun.counters.errored}`);
       console.log(`  Skipped: ${finalRun.counters.skipped}`);
+    }
+
+    if (finalRun.deviceMinutes) {
+      console.log(
+        `\nDevice minutes: ${JSON.stringify(finalRun.deviceMinutes)}`,
+      );
     }
 
     console.log('='.repeat(50) + '\n');

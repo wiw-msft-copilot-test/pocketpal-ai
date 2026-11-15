@@ -126,6 +126,7 @@ const Speech = {
       quality: 0,
     },
   ]),
+  openVoiceDataInstaller: jest.fn().mockResolvedValue(undefined),
   createSpeechStream,
   onStart,
   onFinish,

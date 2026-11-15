@@ -54,6 +54,7 @@ import {
   parseSizeLabel,
 } from '../utils';
 import {getRecommendedProjectionModel} from '../utils/multimodalHelpers';
+import {isModelFilePath} from '../utils/pathGuard';
 import {isDraftOnlyModel} from '../utils/mtp';
 import {getOriginalModelName} from '../utils/formatters';
 import {stopQuietly} from '../utils/stopQuietly';
@@ -193,6 +194,14 @@ const answersSession = (
 ): boolean =>
   capsMatchBinding(caps, binding, binding.modelId) &&
   caps?.samplerDefaults !== undefined;
+
+const isRegularFile = async (path: string): Promise<boolean> => {
+  try {
+    return (await RNFS.stat(path)).isFile();
+  } catch {
+    return false;
+  }
+};
 
 const pairedDraftModel = (config?: DraftConfig): Model | undefined =>
   config?.mode === 'paired' ? config.draftModel : undefined;
@@ -1744,6 +1753,9 @@ class ModelStore {
 
     try {
       const destinationPath = await this.getModelFullPath(model);
+      if (!isModelFilePath(destinationPath)) {
+        throw new Error(`Invalid model download path: ${destinationPath}`);
+      }
       const authToken = hfStore.shouldUseToken ? hfStore.hfToken : null;
       await downloadManager.startDownload(model, destinationPath, authToken);
 
@@ -1906,18 +1918,24 @@ class ModelStore {
         await this.releaseContext(true); // Clear active model and all related state
       }
 
-      // Delete the file from internal storage
-      try {
-        await RNFS.unlink(filePath);
-      } catch (err) {
-        console.error('Failed to delete local model file:', err);
+      if (isModelFilePath(filePath) && (await isRegularFile(filePath))) {
+        try {
+          await RNFS.unlink(filePath);
+        } catch (err) {
+          console.error('Failed to delete local model file:', err);
+        }
+      } else {
+        console.warn(
+          '[ModelStore] Skipped deleting unexpected path:',
+          filePath,
+        );
       }
     } else {
       // Non-local models are not removed from the list, when the file is deleted.
       console.log('deleting: ', filePath);
 
       try {
-        if (filePath) {
+        if (isModelFilePath(filePath) && (await isRegularFile(filePath))) {
           await RNFS.unlink(filePath);
 
           // Check if we need to release context (if this model is currently active)
@@ -1936,7 +1954,10 @@ class ModelStore {
 
           //console.log('models: ', this.models);
         } else {
-          console.error("Failed to delete, file doesn't exist: ", filePath);
+          console.warn(
+            '[ModelStore] Skipped deleting unexpected path:',
+            filePath,
+          );
         }
         this.refreshDownloadStatuses();
       } catch (err) {
