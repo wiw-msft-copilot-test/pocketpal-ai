@@ -159,6 +159,15 @@ Exact-commit Android source-build, installation, foreground launch and all
 unfiltered scenarios remain pending. Final results belong in the final handoff;
 a local pass or artifact-reuse run cannot establish Android acceptance.
 
+The first exact-commit run, 43757665146, built and verified the Android payload
+and installed/launched the APK, but all eight protocol scenarios failed while
+reading reply text. Its first screenshot and accessibility tree prove that
+the fixture reply rendered correctly: enriched markdown exposes paragraph text
+on virtual `android.view.View` descendants, not `android.widget.TextView`.
+Reuse the incoming shared `readReplyText` helper rather than changing product
+rendering, widening timeouts, or weakening expected reply assertions. A fresh
+source build for the resulting commit must pass every unchanged scenario.
+
 ## Superseded when
 
 A later reviewed sync supplies equivalent or stronger import, markdown, native
