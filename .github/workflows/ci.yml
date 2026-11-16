@@ -394,7 +394,8 @@ jobs:
 
   # Job for iOS build
   build-ios:
-    runs-on: macos-26  # Keep CI on the same Xcode major as the release workflow
+    # Avoid the constrained ARM runner pool while retaining the release Xcode major.
+    runs-on: macos-26-intel
     needs: [build-and-test, detect-changes]
     if: needs.detect-changes.outputs.translation_only != 'true'
     env:
@@ -415,7 +416,7 @@ jobs:
         uses: actions/cache@v3
         with:
           path: node_modules
-          key: ${{ runner.os }}-node-${{ hashFiles('yarn.lock', 'patches/**') }}
+          key: ${{ runner.os }}-${{ runner.arch }}-node-${{ hashFiles('yarn.lock', 'patches/**') }}
 
       - name: Install Yarn
         run: npm install -g yarn
