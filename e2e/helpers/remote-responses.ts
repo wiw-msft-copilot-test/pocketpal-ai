@@ -1,6 +1,7 @@
 import {expect} from '@wdio/globals';
 import {Gestures} from './gestures';
-import {Selectors, byPartialText, nativeTextElement} from './selectors';
+import {Selectors, byPartialText} from './selectors';
+import {readReplyText} from './element-text';
 
 declare const browser: WebdriverIO.Browser;
 declare const driver: WebdriverIO.Browser;
@@ -100,11 +101,7 @@ export async function latestAssistantText(timeout = 30000): Promise<string> {
       // Chat uses an inverted FlatList; native accessibility order exposes
       // the newest assistant turn first.
       const latest = messages[0];
-      text =
-        (await latest
-          .$(nativeTextElement())
-          .getText()
-          .catch(() => '')) || (await latest.getText().catch(() => ''));
+      text = await readReplyText(latest);
       return text.length > 0;
     },
     {timeout, interval: 250},

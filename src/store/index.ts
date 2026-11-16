@@ -14,3 +14,4 @@ export * from './SearchProviderStore';
 export * from './StartupSelectionStore';
 export * from './PurchaseStore';
 export * from './VoiceModeStore';
+export * from './LocalApiServerStore';

@@ -19,7 +19,7 @@ describe('Plus catalog', () => {
     },
   );
 
-  it('ships hands-free voice only', () => {
+  it('retains upstream voice source but leaves the unfinished local server unshipped', () => {
     expect(PLUS_FEATURES.map(feature => [feature.id, feature.shipped])).toEqual(
       [
         ['handsFreeVoice', true],

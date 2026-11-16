@@ -30,6 +30,7 @@ describeDisabledBuild('Settings and Plus voice in a disabled build', () => {
 
     expect(view.queryByTestId('voice-mode-availability-switch')).toBeNull();
     expect(view.queryByText('Account')).toBeNull();
+    expect(view.queryByTestId('local-api-server-card')).toBeNull();
   });
 
   it('cannot start Plus voice or a paywall through controller entry points', async () => {

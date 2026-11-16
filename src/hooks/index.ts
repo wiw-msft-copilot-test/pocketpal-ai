@@ -12,3 +12,4 @@ export * from './useChatSearch';
 export * from './useVoiceCapture';
 export * from './useVoiceMode';
 export * from './useMenuStatusBarHeight';
+export * from './useTouchLongPress';

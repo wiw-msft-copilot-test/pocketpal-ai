@@ -1,13 +1,22 @@
 import assert from 'node:assert/strict';
 import {after, describe, it} from 'node:test';
 import {byInputTestId, Selectors} from '../selectors';
+import {readReplyText} from '../element-text';
+
+declare const browser: WebdriverIO.Browser;
 
 const originalDriver = Object.getOwnPropertyDescriptor(globalThis, 'driver');
+const originalBrowser = Object.getOwnPropertyDescriptor(globalThis, 'browser');
 after(() => {
   if (originalDriver) {
     Object.defineProperty(globalThis, 'driver', originalDriver);
   } else {
     Reflect.deleteProperty(globalThis, 'driver');
+  }
+  if (originalBrowser) {
+    Object.defineProperty(globalThis, 'browser', originalBrowser);
+  } else {
+    Reflect.deleteProperty(globalThis, 'browser');
   }
 });
 
@@ -51,6 +60,29 @@ describe('remote input selectors', () => {
     assert.equal(
       Selectors.serverDetails.timeoutInput,
       '~server-details-timeout-input',
+    );
+  });
+
+  it('reads enriched markdown virtual Android paragraphs rather than TextViews', async () => {
+    Object.defineProperty(globalThis, 'driver', {
+      configurable: true,
+      value: {isAndroid: true},
+    });
+    const texts = ['', '', 'Streaming fixture complete.', 'Second paragraph.'];
+    Object.defineProperty(globalThis, 'browser', {
+      configurable: true,
+      value: {
+        $: () => ({
+          $$: async (selector: string) => {
+            assert.equal(selector, './/*');
+            return texts.map(text => ({getText: async () => text}));
+          },
+        }),
+      },
+    });
+    assert.equal(
+      await readReplyText(browser.$(Selectors.chat.aiMessage)),
+      'Streaming fixture complete.\nSecond paragraph.',
     );
   });
 });
