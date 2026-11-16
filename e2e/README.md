@@ -96,6 +96,13 @@ The merger dedupes across multiple raw reports (latest run per `model_id × quan
 
 ## Local Testing
 
+### Android Auto projection in Docker
+
+See [Android Auto projection testing in Docker](../docs/android-auto-docker.md)
+for a verified phone-emulator + Desktop Head Unit setup with no physical phone
+or car. This establishes the projection environment, not PocketPal hands-free
+audio or actual-car acceptance.
+
 ### Prerequisites
 
 - Xcode configured (for iOS)
