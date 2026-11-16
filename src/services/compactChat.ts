@@ -47,6 +47,9 @@ export async function compactChat(
     const vision = context
       ? modelStore.isMultimodalActive
       : caps.vision === 'yes';
+    const settings = await chatSessionStore.getCurrentCompletionSettings(
+      modelStore.activeModelCompletionSettings,
+    );
     const countTokens = async (messages: ChatMessage[]) => {
       if (context) {
         const formatted = await context.getFormattedChat(messages);
@@ -85,7 +88,15 @@ export async function compactChat(
       result = await lease.engine.completion({
         messages,
         n_predict: outputBudget,
-        temperature: 0.2,
+        ...(context
+          ? {temperature: 0.2}
+          : {
+              temperature: settings.temperature,
+              generationParameterModes: {
+                temperature:
+                  settings.generationParameterModes?.temperature ?? 'omit',
+              },
+            }),
         enable_thinking: false,
         reasoning: {enabled: false},
         reasoning_format: 'auto',
@@ -96,9 +107,6 @@ export async function compactChat(
       await stopPromise;
     }
     const replacement = compactionReplacement(turns, result, summaryLabel);
-    const settings = await chatSessionStore.getCurrentCompletionSettings(
-      modelStore.activeModelCompletionSettings,
-    );
     const system: ChatMessage[] = settings.prompt
       ? [{role: 'system', content: settings.prompt}]
       : [];
