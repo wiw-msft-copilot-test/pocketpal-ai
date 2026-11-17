@@ -1,8 +1,12 @@
 import {compactChat} from '../compactChat';
 import {chatSessionStore, modelStore} from '../../store';
 import {assistant, user} from '../../utils/chat';
+import {applyGenerationParameterModes} from '../../utils/generationParameterModes';
 import type {GenerationLease} from '../../store/generationLease';
-import type {CompletionResult} from '../../utils/completionTypes';
+import type {
+  ApiCompletionParams,
+  CompletionResult,
+} from '../../utils/completionTypes';
 
 jest.mock('../../store', () => ({
   chatSessionStore: {
@@ -27,7 +31,10 @@ jest.mock('../../store', () => ({
 describe('compactChat lifecycle', () => {
   let controller: AbortController;
   let lease: GenerationLease;
-  const completion = jest.fn<Promise<CompletionResult>, []>();
+  const completion = jest.fn<
+    Promise<CompletionResult>,
+    [ApiCompletionParams]
+  >();
   const stopCompletion = jest.fn().mockResolvedValue(undefined);
   const source = [
     {
@@ -90,7 +97,7 @@ describe('compactChat lifecycle', () => {
         enable_thinking: false,
       }),
     );
-    expect(completion.mock.calls[0]).not.toHaveProperty('tools');
+    expect(completion.mock.calls[0][0]).not.toHaveProperty('tools');
     expect(chatSessionStore.replaceCompactedHistory).toHaveBeenCalledWith(
       'chat',
       source,
@@ -99,6 +106,53 @@ describe('compactChat lifecycle', () => {
     );
     expect(lease.end).toHaveBeenCalled();
   });
+
+  it.each(['omit', undefined] as const)(
+    'uses the remote provider temperature when its policy is %s',
+    async temperature => {
+      jest
+        .spyOn(chatSessionStore, 'getCurrentCompletionSettings')
+        .mockResolvedValueOnce({
+          temperature: 0.7,
+          n_predict: 9999,
+          generationParameterModes: {temperature, n_predict: 'omit'},
+          tools: [{type: 'function', function: {name: 'calculate'}}],
+        });
+
+      await compactChat('chat', '', 'Summary');
+
+      const request = applyGenerationParameterModes(
+        completion.mock.calls[0][0],
+      );
+      expect(request).not.toHaveProperty('temperature');
+      expect(request).not.toHaveProperty('tools');
+      expect(request.n_predict).toBe(2048);
+      expect(chatSessionStore.replaceCompactedHistory).toHaveBeenCalledWith(
+        'chat',
+        source,
+        [expect.objectContaining({metadata: {compaction: true}})],
+        expect.any(Function),
+      );
+    },
+  );
+
+  it.each([0, 0.4])(
+    'preserves an explicitly configured remote temperature of %s',
+    async temperature => {
+      jest
+        .spyOn(chatSessionStore, 'getCurrentCompletionSettings')
+        .mockResolvedValueOnce({
+          temperature,
+          generationParameterModes: {temperature: 'send'},
+        });
+
+      await compactChat('chat', '', 'Summary');
+
+      expect(
+        applyGenerationParameterModes(completion.mock.calls[0][0]).temperature,
+      ).toBe(temperature);
+    },
+  );
 
   it.each([
     ['invalid', '{"summary":"bad","keepTurnIds":["unknown"]}'],

@@ -10,6 +10,7 @@ import {
   DuplicateIcon,
   EditBoxIcon,
   EditIcon,
+  FilterLinesIcon,
   GridIcon,
   SettingsIcon,
   ShareIcon,
@@ -227,6 +228,13 @@ export const HeaderRight: React.FC = observer(() => {
                 closeMenu();
               }}
               label={l10n.components.compaction.title}
+              leadingIcon={() => (
+                <FilterLinesIcon
+                  width={20}
+                  height={20}
+                  stroke={theme.colors.primary}
+                />
+              )}
             />
             <Menu.Item
               onPress={onPressDuplicate}
