@@ -108,6 +108,26 @@ const whisperPhase = parsePhase('whisper.rn');
 const APP_RESOURCES =
   '$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)';
 
+describe('the pinned ONNX Runtime archive', () => {
+  it('uses the local checksum-verified podspec without changing static linkage', () => {
+    const onnx = JSON.parse(read('ios/onnxruntime-c.podspec.json'));
+    expect(podfile).toMatch(
+      /pod\s+'onnxruntime-c'\s*,\s*:podspec\s*=>\s*'onnxruntime-c\.podspec\.json'/,
+    );
+    expect(onnx.source).toEqual({
+      http: 'https://github.com/a-ghorbani/pocketpal-ai/releases/download/deps-onnxruntime-c-1.24.3/pod-archive-onnxruntime-c-1.24.3.zip',
+      sha256:
+        'b7eedc45932bac758ffd057cac0feb3f682269e47750b159e4c865145cbf0a8e',
+    });
+    expect(onnx.static_framework).toBe(true);
+    expect(onnx.vendored_frameworks).toBe('onnxruntime.xcframework');
+    expect(read('ios/Podfile.lock')).toMatch(/onnxruntime-c \(1\.24\.3\)/);
+    expect(read('ios/Podfile.lock')).toMatch(
+      /onnxruntime-c:\s*\n\s*:podspec: onnxruntime-c\.podspec\.json/,
+    );
+  });
+});
+
 describe('the parse itself', () => {
   it('finds the kernel set in the vendored ggml', () => {
     expect(kernelSet.length).toBeGreaterThan(0);
