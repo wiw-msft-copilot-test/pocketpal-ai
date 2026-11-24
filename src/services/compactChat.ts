@@ -68,8 +68,7 @@ export async function compactChat(
     const turns = compactionTurns(source);
     const messages = compactionRequest(turns, guidance.trim(), vision);
     const window = caps.effectiveContextLength;
-    const outputBudget = Math.min(2048, Math.floor((window ?? 8192) / 4));
-    if (window && (await countTokens(messages)) + outputBudget >= window) {
+    if (window && (await countTokens(messages)) >= window) {
       throw new CompactionError('overflow');
     }
     if (lease.signal.aborted) {
@@ -87,7 +86,7 @@ export async function compactChat(
     try {
       result = await lease.engine.completion({
         messages,
-        n_predict: outputBudget,
+        n_predict: -1,
         ...(context
           ? {temperature: 0.2}
           : {
@@ -118,7 +117,7 @@ export async function compactChat(
       ...system,
       ...convertToChatMessages(replacement, vision),
     ]);
-    if (after >= before || (window && after + outputBudget >= window)) {
+    if (after >= before || (window && after >= window)) {
       throw new CompactionError('noReduction');
     }
     if (
